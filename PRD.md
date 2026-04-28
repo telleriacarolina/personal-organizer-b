@@ -48,11 +48,11 @@ This is a complex application because it involves multiple customizable modules 
 - **Success criteria**: Layout persists between sessions, feels smooth and intuitive, prevents overlapping or broken layouts
 
 ### Theme Personalization
-- **Functionality**: Users can select from preset color themes to customize the appearance of their organizer
-- **Purpose**: Makes the organizer feel personal and visually appealing to individual preferences
+- **Functionality**: Users can select from preset color themes, create custom color schemes using color pickers, or upload background images to personalize their organizer
+- **Purpose**: Makes the organizer feel personal and visually appealing to individual preferences with extensive customization options
 - **Trigger**: User clicks "Customize Theme" button in header
-- **Progression**: User opens theme dialog → Previews themes by hovering → Selects preferred theme → Theme applies instantly → Preference saves automatically
-- **Success criteria**: Theme changes apply instantly, persist between sessions, maintain readability and accessibility, preview works smoothly on hover
+- **Progression**: User opens theme dialog → Navigates between tabs (Presets/Custom Colors/Background Image) → Previews themes by hovering OR adjusts custom colors OR uploads image and adjusts opacity → Applies changes → Preference saves automatically
+- **Success criteria**: Theme changes apply instantly, custom colors override presets, background images persist with adjustable opacity, all preferences save between sessions, maintain readability and accessibility
 
 ## Edge Case Handling
 
@@ -69,14 +69,28 @@ The design should evoke feelings of calm control, creative freedom, and gentle m
 
 ## Color Selection
 
-A warm, sophisticated palette with earthy tones and vibrant accent colors that inspire creativity and focus.
+A warm, sophisticated palette with earthy tones and vibrant accent colors that inspire creativity and focus. Users can now customize these colors or upload their own background images for full personalization.
 
+**Default Theme Colors:**
 - **Primary Color**: Deep Terracotta `oklch(0.48 0.12 35)` - Grounding and warm, communicates stability and creative energy
 - **Secondary Colors**: 
   - Soft Cream `oklch(0.95 0.02 85)` - Gentle background that reduces eye strain
   - Sage Green `oklch(0.72 0.08 145)` - Calming accent for positive actions and completed states
   - Warm Sand `oklch(0.85 0.04 75)` - Muted surfaces for cards and secondary elements
 - **Accent Color**: Vibrant Coral `oklch(0.68 0.18 25)` - Energetic highlight for CTAs and important elements, draws attention without overwhelming
+
+**Custom Color Options:**
+Users can override the default theme by selecting custom colors for:
+- Primary color (buttons and key UI elements)
+- Accent color (highlights and interactive elements)
+- Background color (main page background)
+
+**Background Image Support:**
+Users can upload personal images (max 5MB) as dashboard backgrounds with:
+- Adjustable opacity (0-90%) to maintain content readability
+- Fixed attachment for parallax-like effect
+- Automatic overlay to ensure text remains legible
+
 - **Foreground/Background Pairings**: 
   - Background Cream (oklch(0.95 0.02 85)): Deep Brown text (oklch(0.25 0.02 35)) - Ratio 11.8:1 ✓
   - Primary Terracotta (oklch(0.48 0.12 35)): White text (oklch(1 0 0)) - Ratio 5.2:1 ✓
@@ -107,21 +121,25 @@ Animations should feel organic and purposeful, celebrating user actions while ma
 - **Components**: 
   - Card: Primary container for all widgets, using shadow-sm for subtle elevation
   - Button: Primary actions (add widget, save), with variants for secondary actions (edit, delete)
-  - Dialog: Widget configuration and settings panels
+  - Dialog: Widget configuration and settings panels, theme customization
+  - Tabs: Theme customization sections (Presets, Custom Colors, Background Image)
   - Checkbox: Task completion toggles
-  - Input: Task entry, habit names, note titles
+  - Input: Task entry, habit names, note titles, color hex values
   - Textarea: Note content areas
-  - Tabs: Switching between dashboard views or widget categories
+  - Slider: Background image opacity control
   - Popover: Quick settings and widget menus
   - Badge: Priority indicators, streak counters
   - ScrollArea: Widget content that may overflow
   - Separator: Visual division between widget sections
+  - Label: Form field labels in customization panels
   
 - **Customizations**: 
   - Custom grid layout system for widget placement (CSS Grid with defined columns)
   - Custom widget header component with consistent title, actions, and drag handle
   - Custom empty state illustrations using SVG patterns
   - Custom streak visualization for habit tracker using progress rings
+  - Custom hex-to-oklch color converter for theme customization
+  - Custom background image overlay system with opacity control
   
 - **States**: 
   - Buttons: Soft shadow on hover, scale down slightly on press, muted when disabled
@@ -134,12 +152,16 @@ Animations should feel organic and purposeful, celebrating user actions while ma
   - X icon: Removing/closing
   - GearSix: Settings and configuration
   - DotsSixVertical: Drag handles
-  - Check: Task completion
+  - Check: Task completion, theme selection confirmation
   - Fire: Habit streaks
   - Note: Notes widget
   - ListChecks: Tasks widget
   - Target: Goals widget
   - Calendar: Calendar view
+  - Palette: Theme customization
+  - Image: Background image tab
+  - Upload: Image upload interface
+  - Trash: Remove background image
   
 - **Spacing**: 
   - Widget padding: p-6 (24px)

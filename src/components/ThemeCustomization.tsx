@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -7,7 +7,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Palette, Check } from '@phosphor-icons/react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Slider } from '@/components/ui/slider';
+import { Palette, Check, Image as ImageIcon, Trash, Upload } from '@phosphor-icons/react';
 import { useKV } from '@github/spark/hooks';
 import { toast } from 'sonner';
 
@@ -31,6 +35,17 @@ interface ThemePreset {
     success: string;
     successForeground: string;
   };
+}
+
+interface CustomColors {
+  primary: string;
+  accent: string;
+  background: string;
+}
+
+interface BackgroundImage {
+  url: string;
+  opacity: number;
 }
 
 const themePresets: ThemePreset[] = [
@@ -162,6 +177,29 @@ const themePresets: ThemePreset[] = [
   },
 ];
 
+function hexToOklch(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+
+  const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+  const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+  const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+
+  const l_ = Math.cbrt(l);
+  const m_ = Math.cbrt(m);
+  const s_ = Math.cbrt(s);
+
+  const lightness = 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_;
+  const a = 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_;
+  const b_ = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_;
+
+  const chroma = Math.sqrt(a * a + b_ * b_);
+  const hue = (Math.atan2(b_, a) * 180) / Math.PI;
+
+  return `oklch(${lightness.toFixed(3)} ${chroma.toFixed(3)} ${hue >= 0 ? hue.toFixed(1) : (hue + 360).toFixed(1)})`;
+}
+
 interface ThemeCustomizationProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -169,7 +207,22 @@ interface ThemeCustomizationProps {
 
 export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationProps) {
   const [selectedTheme, setSelectedTheme] = useKV<string>('organizer-theme', 'Warm Terracotta');
+  const [customColors, setCustomColors] = useKV<CustomColors | null>('organizer-custom-colors', null);
+  const [backgroundImage, setBackgroundImage] = useKV<BackgroundImage | null>('organizer-bg-image', null);
   const [previewTheme, setPreviewTheme] = useState<string | null>(null);
+  const [localPrimary, setLocalPrimary] = useState('#7a5c3d');
+  const [localAccent, setLocalAccent] = useState('#ae6745');
+  const [localBg, setLocalBg] = useState('#f2ede5');
+  const [opacity, setOpacity] = useState(backgroundImage?.opacity || 30);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (customColors) {
+      setLocalPrimary(customColors.primary);
+      setLocalAccent(customColors.accent);
+      setLocalBg(customColors.background);
+    }
+  }, [customColors]);
 
   const applyTheme = (theme: ThemePreset) => {
     const root = document.documentElement;
@@ -179,10 +232,57 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     });
   };
 
+  const applyCustomColors = (colors: CustomColors) => {
+    const root = document.documentElement;
+    const primaryOklch = hexToOklch(colors.primary);
+    const accentOklch = hexToOklch(colors.accent);
+    const bgOklch = hexToOklch(colors.background);
+
+    root.style.setProperty('--primary', primaryOklch);
+    root.style.setProperty('--accent', accentOklch);
+    root.style.setProperty('--background', bgOklch);
+  };
+
+  const applyBackgroundImage = (image: BackgroundImage | null) => {
+    const appContainer = document.querySelector('.min-h-screen');
+    if (appContainer instanceof HTMLElement) {
+      if (image) {
+        appContainer.style.backgroundImage = `url(${image.url})`;
+        appContainer.style.backgroundSize = 'cover';
+        appContainer.style.backgroundPosition = 'center';
+        appContainer.style.backgroundAttachment = 'fixed';
+        appContainer.style.position = 'relative';
+        
+        let overlay = appContainer.querySelector('.bg-overlay') as HTMLElement;
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.className = 'bg-overlay';
+          overlay.style.position = 'fixed';
+          overlay.style.top = '0';
+          overlay.style.left = '0';
+          overlay.style.width = '100%';
+          overlay.style.height = '100%';
+          overlay.style.backgroundColor = 'var(--background)';
+          overlay.style.zIndex = '-1';
+          overlay.style.pointerEvents = 'none';
+          appContainer.appendChild(overlay);
+        }
+        overlay.style.opacity = (image.opacity / 100).toString();
+      } else {
+        appContainer.style.backgroundImage = '';
+        const overlay = appContainer.querySelector('.bg-overlay');
+        if (overlay) {
+          overlay.remove();
+        }
+      }
+    }
+  };
+
   const handleThemeSelect = (themeName: string) => {
     const theme = themePresets.find((t) => t.name === themeName);
     if (theme) {
       setSelectedTheme(themeName);
+      setCustomColors(null);
       applyTheme(theme);
       toast.success(`${themeName} theme applied!`);
     }
@@ -201,9 +301,62 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
       const currentTheme = themePresets.find((t) => t.name === selectedTheme);
       if (currentTheme) {
         applyTheme(currentTheme);
+      } else if (customColors) {
+        applyCustomColors(customColors);
       }
     }
     setPreviewTheme(null);
+  };
+
+  const handleApplyCustomColors = () => {
+    const colors: CustomColors = {
+      primary: localPrimary,
+      accent: localAccent,
+      background: localBg,
+    };
+    setCustomColors(colors);
+    setSelectedTheme('custom');
+    applyCustomColors(colors);
+    toast.success('Custom colors applied!');
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image must be smaller than 5MB');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const imageUrl = event.target?.result as string;
+        const newBgImage: BackgroundImage = {
+          url: imageUrl,
+          opacity: opacity,
+        };
+        setBackgroundImage(newBgImage);
+        applyBackgroundImage(newBgImage);
+        toast.success('Background image uploaded!');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleOpacityChange = (value: number[]) => {
+    const newOpacity = value[0];
+    setOpacity(newOpacity);
+    if (backgroundImage) {
+      const updated = { ...backgroundImage, opacity: newOpacity };
+      setBackgroundImage(updated);
+      applyBackgroundImage(updated);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setBackgroundImage(null);
+    applyBackgroundImage(null);
+    toast.success('Background image removed');
   };
 
   return (
@@ -213,72 +366,258 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
       }
       onOpenChange(isOpen);
     }}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
             <Palette size={28} weight="duotone" />
             Theme Customization
           </DialogTitle>
           <DialogDescription>
-            Choose a color theme that matches your style and workflow
+            Personalize your organizer with preset themes, custom colors, or background images
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-          {themePresets.map((theme) => {
-            const isSelected = selectedTheme === theme.name;
-            const isPreviewing = previewTheme === theme.name;
-            
-            return (
-              <button
-                key={theme.name}
-                onClick={() => handleThemeSelect(theme.name)}
-                onMouseEnter={() => handlePreview(theme.name)}
-                onMouseLeave={handleClosePreview}
-                className={`
-                  relative p-4 rounded-lg border-2 transition-all text-left
-                  ${isSelected ? 'border-primary shadow-lg scale-[1.02]' : 'border-border hover:border-primary/50 hover:shadow-md'}
-                `}
-              >
-                {isSelected && (
-                  <div className="absolute top-3 right-3 bg-primary text-primary-foreground rounded-full p-1">
-                    <Check size={16} weight="bold" />
-                  </div>
-                )}
+        <Tabs defaultValue="presets" className="mt-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="presets">Theme Presets</TabsTrigger>
+            <TabsTrigger value="custom">Custom Colors</TabsTrigger>
+            <TabsTrigger value="background">Background Image</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="presets" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {themePresets.map((theme) => {
+                const isSelected = selectedTheme === theme.name;
+                const isPreviewing = previewTheme === theme.name;
                 
-                <div className="flex gap-2 mb-3">
-                  <div 
-                    className="w-10 h-10 rounded-md border border-border"
-                    style={{ backgroundColor: theme.colors.primary }}
-                  />
-                  <div 
-                    className="w-10 h-10 rounded-md border border-border"
-                    style={{ backgroundColor: theme.colors.accent }}
-                  />
-                  <div 
-                    className="w-10 h-10 rounded-md border border-border"
-                    style={{ backgroundColor: theme.colors.card }}
-                  />
+                return (
+                  <button
+                    key={theme.name}
+                    onClick={() => handleThemeSelect(theme.name)}
+                    onMouseEnter={() => handlePreview(theme.name)}
+                    onMouseLeave={handleClosePreview}
+                    className={`
+                      relative p-4 rounded-lg border-2 transition-all text-left
+                      ${isSelected ? 'border-primary shadow-lg scale-[1.02]' : 'border-border hover:border-primary/50 hover:shadow-md'}
+                    `}
+                  >
+                    {isSelected && (
+                      <div className="absolute top-3 right-3 bg-primary text-primary-foreground rounded-full p-1">
+                        <Check size={16} weight="bold" />
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2 mb-3">
+                      <div 
+                        className="w-10 h-10 rounded-md border border-border"
+                        style={{ backgroundColor: theme.colors.primary }}
+                      />
+                      <div 
+                        className="w-10 h-10 rounded-md border border-border"
+                        style={{ backgroundColor: theme.colors.accent }}
+                      />
+                      <div 
+                        className="w-10 h-10 rounded-md border border-border"
+                        style={{ backgroundColor: theme.colors.card }}
+                      />
+                    </div>
+
+                    <h3 className="font-semibold text-lg mb-1">{theme.name}</h3>
+                    <p className="text-sm text-muted-foreground">{theme.description}</p>
+                    
+                    {isPreviewing && !isSelected && (
+                      <div className="mt-2 text-xs text-primary font-medium">
+                        Previewing...
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                <strong>Tip:</strong> Hover over a theme to preview it, or click to apply it permanently.
+              </p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="custom" className="mt-6">
+            <div className="space-y-6">
+              <div className="grid gap-6">
+                <div className="space-y-3">
+                  <Label htmlFor="primary-color" className="text-base font-medium">
+                    Primary Color
+                  </Label>
+                  <div className="flex gap-3 items-center">
+                    <Input
+                      id="primary-color"
+                      type="color"
+                      value={localPrimary}
+                      onChange={(e) => setLocalPrimary(e.target.value)}
+                      className="w-20 h-12 cursor-pointer"
+                    />
+                    <Input
+                      type="text"
+                      value={localPrimary}
+                      onChange={(e) => setLocalPrimary(e.target.value)}
+                      placeholder="#7a5c3d"
+                      className="flex-1"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Used for buttons and important UI elements
+                  </p>
                 </div>
 
-                <h3 className="font-semibold text-lg mb-1">{theme.name}</h3>
-                <p className="text-sm text-muted-foreground">{theme.description}</p>
-                
-                {isPreviewing && !isSelected && (
-                  <div className="mt-2 text-xs text-primary font-medium">
-                    Previewing...
+                <div className="space-y-3">
+                  <Label htmlFor="accent-color" className="text-base font-medium">
+                    Accent Color
+                  </Label>
+                  <div className="flex gap-3 items-center">
+                    <Input
+                      id="accent-color"
+                      type="color"
+                      value={localAccent}
+                      onChange={(e) => setLocalAccent(e.target.value)}
+                      className="w-20 h-12 cursor-pointer"
+                    />
+                    <Input
+                      type="text"
+                      value={localAccent}
+                      onChange={(e) => setLocalAccent(e.target.value)}
+                      placeholder="#ae6745"
+                      className="flex-1"
+                    />
                   </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                  <p className="text-sm text-muted-foreground">
+                    Used for highlights and interactive elements
+                  </p>
+                </div>
 
-        <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-          <p className="text-sm text-muted-foreground">
-            <strong>Tip:</strong> Hover over a theme to preview it, or click to apply it permanently. Your theme preference is saved automatically.
-          </p>
-        </div>
+                <div className="space-y-3">
+                  <Label htmlFor="bg-color" className="text-base font-medium">
+                    Background Color
+                  </Label>
+                  <div className="flex gap-3 items-center">
+                    <Input
+                      id="bg-color"
+                      type="color"
+                      value={localBg}
+                      onChange={(e) => setLocalBg(e.target.value)}
+                      className="w-20 h-12 cursor-pointer"
+                    />
+                    <Input
+                      type="text"
+                      value={localBg}
+                      onChange={(e) => setLocalBg(e.target.value)}
+                      placeholder="#f2ede5"
+                      className="flex-1"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Main background color of the application
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button onClick={handleApplyCustomColors} className="flex-1 gap-2">
+                  <Check size={18} />
+                  Apply Custom Colors
+                </Button>
+              </div>
+
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <strong>Note:</strong> Custom colors will override the selected theme preset. You can use the color picker or enter hex codes directly.
+                </p>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="background" className="mt-6">
+            <div className="space-y-6">
+              {backgroundImage ? (
+                <div className="space-y-4">
+                  <div className="relative rounded-lg overflow-hidden border-2 border-border">
+                    <img 
+                      src={backgroundImage.url} 
+                      alt="Background preview" 
+                      className="w-full h-48 object-cover"
+                    />
+                    <div 
+                      className="absolute inset-0 bg-background pointer-events-none"
+                      style={{ opacity: backgroundImage.opacity / 100 }}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label htmlFor="opacity-slider" className="text-base font-medium">
+                      Background Opacity: {opacity}%
+                    </Label>
+                    <Slider
+                      id="opacity-slider"
+                      value={[opacity]}
+                      onValueChange={handleOpacityChange}
+                      min={0}
+                      max={90}
+                      step={5}
+                      className="w-full"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Adjust how much the background shows through
+                    </p>
+                  </div>
+
+                  <Button 
+                    onClick={handleRemoveImage} 
+                    variant="destructive" 
+                    className="w-full gap-2"
+                  >
+                    <Trash size={18} />
+                    Remove Background Image
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full p-12 border-2 border-dashed border-border rounded-lg hover:border-primary hover:bg-muted/50 transition-all"
+                  >
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="p-4 rounded-full bg-primary/10">
+                        <Upload size={32} className="text-primary" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-medium mb-1">
+                          Upload Background Image
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Click to select an image (max 5MB)
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Tip:</strong> Choose a subtle image that won't distract from your content. You can adjust the opacity after uploading.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
@@ -287,17 +626,59 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
 export function ThemeCustomizationButton() {
   const [open, setOpen] = useState(false);
   const [selectedTheme] = useKV<string>('organizer-theme', 'Warm Terracotta');
+  const [customColors] = useKV<CustomColors | null>('organizer-custom-colors', null);
+  const [backgroundImage] = useKV<BackgroundImage | null>('organizer-bg-image', null);
 
   useEffect(() => {
-    const theme = themePresets.find((t) => t.name === selectedTheme);
-    if (theme) {
+    if (customColors) {
       const root = document.documentElement;
-      Object.entries(theme.colors).forEach(([key, value]) => {
-        const cssVar = key.replace(/([A-Z])/g, '-$1').toLowerCase();
-        root.style.setProperty(`--${cssVar}`, value);
-      });
+      const primaryOklch = hexToOklch(customColors.primary);
+      const accentOklch = hexToOklch(customColors.accent);
+      const bgOklch = hexToOklch(customColors.background);
+
+      root.style.setProperty('--primary', primaryOklch);
+      root.style.setProperty('--accent', accentOklch);
+      root.style.setProperty('--background', bgOklch);
+    } else {
+      const theme = themePresets.find((t) => t.name === selectedTheme);
+      if (theme) {
+        const root = document.documentElement;
+        Object.entries(theme.colors).forEach(([key, value]) => {
+          const cssVar = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+          root.style.setProperty(`--${cssVar}`, value);
+        });
+      }
     }
-  }, [selectedTheme]);
+  }, [selectedTheme, customColors]);
+
+  useEffect(() => {
+    if (backgroundImage) {
+      const appContainer = document.querySelector('.min-h-screen');
+      if (appContainer instanceof HTMLElement) {
+        appContainer.style.backgroundImage = `url(${backgroundImage.url})`;
+        appContainer.style.backgroundSize = 'cover';
+        appContainer.style.backgroundPosition = 'center';
+        appContainer.style.backgroundAttachment = 'fixed';
+        appContainer.style.position = 'relative';
+        
+        let overlay = appContainer.querySelector('.bg-overlay') as HTMLElement;
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.className = 'bg-overlay';
+          overlay.style.position = 'fixed';
+          overlay.style.top = '0';
+          overlay.style.left = '0';
+          overlay.style.width = '100%';
+          overlay.style.height = '100%';
+          overlay.style.backgroundColor = 'var(--background)';
+          overlay.style.zIndex = '-1';
+          overlay.style.pointerEvents = 'none';
+          appContainer.appendChild(overlay);
+        }
+        overlay.style.opacity = (backgroundImage.opacity / 100).toString();
+      }
+    }
+  }, [backgroundImage]);
 
   return (
     <>
