@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Target, Plus, Trash } from '@phosphor-icons/react';
-import { Goal } from '@/types';
+import { Goal, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface GoalsWidgetProps {
@@ -15,9 +15,11 @@ interface GoalsWidgetProps {
   widgetId: string;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  size?: WidgetSize;
+  onSizeChange?: (size: WidgetSize) => void;
 }
 
-export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, onDragEnd }: GoalsWidgetProps) {
+export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: GoalsWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -58,6 +60,8 @@ export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, 
       value={{ id: widgetId, type: 'goals', goals }}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      size={size}
+      onSizeChange={onSizeChange}
     >
       {!showNew && (
         <Button

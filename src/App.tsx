@@ -76,6 +76,12 @@ function App() {
     );
   };
 
+  const updateWidgetSize = (id: string, size: { width: number; height: number }) => {
+    setWidgets((current) =>
+      (current || []).map((w) => (w.id === id ? { ...w, size } as Widget : w))
+    );
+  };
+
   const handleReorder = (newOrder: Widget[]) => {
     setWidgets(newOrder.map((w, index) => ({ ...w, position: index })));
   };
@@ -211,6 +217,8 @@ function App() {
                   onRemove: () => removeWidget(widget.id),
                   onDragStart: handleDragStart,
                   onDragEnd: handleDragEnd,
+                  size: widget.size,
+                  onSizeChange: (size: { width: number; height: number }) => updateWidgetSize(widget.id, size),
                 };
 
                 switch (widget.type) {

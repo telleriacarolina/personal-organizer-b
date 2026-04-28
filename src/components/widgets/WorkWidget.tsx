@@ -34,7 +34,7 @@ import {
   ArrowRight
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference, WorkOrganizationType } from '@/types';
+import { ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference, WorkOrganizationType, WidgetSize } from '@/types';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -63,6 +63,8 @@ interface WorkWidgetProps {
   onRemove: () => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  size?: WidgetSize;
+  onSizeChange?: (size: WidgetSize) => void;
 }
 
 export function WorkWidget({
@@ -79,7 +81,9 @@ export function WorkWidget({
   onUpdate,
   onRemove,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  size,
+  onSizeChange
 }: WorkWidgetProps) {
   const [activeTimer, setActiveTimer] = useState<string | null>(null);
   const [showClientDialog, setShowClientDialog] = useState(false);
@@ -357,6 +361,8 @@ export function WorkWidget({
       value={{ id: widgetId, type: 'work', clientSlots, meals, timeEntries, jobs, shoppingList, errands }}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      size={size}
+      onSizeChange={onSizeChange}
     >
       <Card className="col-span-1 md:col-span-2 lg:col-span-3 border-0 shadow-none">
       <CardHeader className="flex flex-row items-center justify-between pb-3 px-0">

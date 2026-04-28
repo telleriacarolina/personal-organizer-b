@@ -1,9 +1,15 @@
 export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work';
 
+export interface WidgetSize {
+  width: number;
+  height: number;
+}
+
 export interface BaseWidget {
   id: string;
   type: WidgetType;
   position: number;
+  size?: WidgetSize;
 }
 
 export interface Task {

@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Note as NoteIcon, Plus, Trash } from '@phosphor-icons/react';
-import { Note } from '@/types';
+import { Note, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -15,9 +15,11 @@ interface NotesWidgetProps {
   widgetId: string;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  size?: WidgetSize;
+  onSizeChange?: (size: WidgetSize) => void;
 }
 
-export function NotesWidget({ notes, onUpdate, onRemove, widgetId, onDragStart, onDragEnd }: NotesWidgetProps) {
+export function NotesWidget({ notes, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: NotesWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
@@ -60,6 +62,8 @@ export function NotesWidget({ notes, onUpdate, onRemove, widgetId, onDragStart, 
       value={{ id: widgetId, type: 'notes', notes }}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      size={size}
+      onSizeChange={onSizeChange}
     >
       {!showNew && (
         <Button

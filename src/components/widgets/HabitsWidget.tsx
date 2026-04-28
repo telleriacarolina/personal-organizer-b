@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Fire, Plus, Trash } from '@phosphor-icons/react';
-import { Habit } from '@/types';
+import { Habit, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface HabitsWidgetProps {
@@ -15,9 +15,11 @@ interface HabitsWidgetProps {
   widgetId: string;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  size?: WidgetSize;
+  onSizeChange?: (size: WidgetSize) => void;
 }
 
-export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart, onDragEnd }: HabitsWidgetProps) {
+export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: HabitsWidgetProps) {
   const [newHabit, setNewHabit] = useState('');
 
   const addHabit = () => {
@@ -89,6 +91,8 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
       value={{ id: widgetId, type: 'habits', habits }}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      size={size}
+      onSizeChange={onSizeChange}
     >
       <div className="flex gap-2">
         <Input

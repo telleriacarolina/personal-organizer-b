@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight } from '@phosphor-icons/react';
-import { CalendarEvent } from '@/types';
+import { CalendarEvent, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday } from 'date-fns';
@@ -21,6 +21,8 @@ interface CalendarWidgetProps {
   widgetId: string;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  size?: WidgetSize;
+  onSizeChange?: (size: WidgetSize) => void;
 }
 
 const eventColors = [
@@ -32,7 +34,7 @@ const eventColors = [
   { value: 'red', label: 'Red', class: 'bg-red-500/20 border-red-500 text-red-700' },
 ];
 
-export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragStart, onDragEnd }: CalendarWidgetProps) {
+export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: CalendarWidgetProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -167,6 +169,8 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
       value={{ id: widgetId, type: 'calendar', events }}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      size={size}
+      onSizeChange={onSizeChange}
     >
       <div className="space-y-4">
         <div className="flex items-center justify-between">

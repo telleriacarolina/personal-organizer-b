@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ListChecks, Plus, Trash } from '@phosphor-icons/react';
-import { Task } from '@/types';
+import { Task, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface TasksWidgetProps {
@@ -15,9 +15,11 @@ interface TasksWidgetProps {
   widgetId: string;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  size?: WidgetSize;
+  onSizeChange?: (size: WidgetSize) => void;
 }
 
-export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, onDragEnd }: TasksWidgetProps) {
+export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: TasksWidgetProps) {
   const [newTask, setNewTask] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
 
@@ -68,6 +70,8 @@ export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, 
       value={{ id: widgetId, type: 'tasks', tasks }}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      size={size}
+      onSizeChange={onSizeChange}
     >
       <div className="flex gap-2">
         <Input

@@ -1,8 +1,9 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, DotsSixVertical } from '@phosphor-icons/react';
+import { X, DotsSixVertical, CornersOut } from '@phosphor-icons/react';
 import { Reorder, useDragControls } from 'framer-motion';
+import { WidgetSize } from '@/types';
 
 interface WidgetContainerProps {
   title: string;
@@ -12,6 +13,8 @@ interface WidgetContainerProps {
   value: any;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  size?: WidgetSize;
+  onSizeChange?: (size: WidgetSize) => void;
 }
 
 export function WidgetContainer({ 
@@ -21,9 +24,115 @@ export function WidgetContainer({
   children,
   value,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  size,
+  onSizeChange
 }: WidgetContainerProps) {
   const dragControls = useDragControls();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [isPinching, setIsPinching] = useState(false);
+  const [pinchStart, setPinchStart] = useState({ distance: 0, width: 0, height: 0 });
+
+  const currentWidth = size?.width || 300;
+  const currentHeight = size?.height || 400;
+
+  const handleResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setResizeStart({
+        x: e.clientX,
+        y: e.clientY,
+        width: rect.width,
+        height: rect.height
+      });
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      e.stopPropagation();
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        setIsPinching(true);
+        setPinchStart({
+          distance,
+          width: rect.width,
+          height: rect.height
+        });
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      if (isResizing) {
+        const deltaX = e.clientX - resizeStart.x;
+        const deltaY = e.clientY - resizeStart.y;
+        const newWidth = Math.max(250, Math.min(800, resizeStart.width + deltaX));
+        const newHeight = Math.max(300, Math.min(1000, resizeStart.height + deltaY));
+        
+        if (onSizeChange) {
+          onSizeChange({ width: newWidth, height: newHeight });
+        }
+      }
+    };
+
+    const handlePointerUp = () => {
+      setIsResizing(false);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isPinching && e.touches.length === 2) {
+        e.preventDefault();
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const distance = Math.hypot(
+          touch2.clientX - touch1.clientX,
+          touch2.clientY - touch1.clientY
+        );
+        const scale = distance / pinchStart.distance;
+        const newWidth = Math.max(250, Math.min(800, pinchStart.width * scale));
+        const newHeight = Math.max(300, Math.min(1000, pinchStart.height * scale));
+        
+        if (onSizeChange) {
+          onSizeChange({ width: newWidth, height: newHeight });
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      setIsPinching(false);
+    };
+
+    if (isResizing) {
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+    }
+
+    if (isPinching) {
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleTouchEnd);
+    }
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange]);
 
   return (
     <Reorder.Item
@@ -41,9 +150,19 @@ export function WidgetContainer({
         zIndex: 10,
         cursor: 'grabbing'
       }}
+      style={{
+        width: size ? `${currentWidth}px` : 'auto',
+        maxWidth: '100%'
+      }}
     >
       <Card 
+        ref={containerRef}
         className="relative p-4 sm:p-6 shadow-sm transition-all duration-200 overflow-hidden hover:shadow-lg hover:border-primary/30 bg-card touch-none"
+        style={{
+          height: size ? `${currentHeight}px` : 'auto',
+          minHeight: '300px'
+        }}
+        onTouchStart={handleTouchStart}
       >
         <div className="flex items-center justify-between mb-3 sm:mb-4 relative z-10">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
@@ -73,7 +192,19 @@ export function WidgetContainer({
             <X size={16} className="sm:w-[18px] sm:h-[18px]" />
           </Button>
         </div>
-        <div className="space-y-2 sm:space-y-3 relative z-10">{children}</div>
+        <div className="space-y-2 sm:space-y-3 relative z-10 overflow-auto" style={{ maxHeight: size ? `${currentHeight - 80}px` : 'auto' }}>{children}</div>
+        
+        <button
+          onPointerDown={handleResizeStart}
+          className={`absolute bottom-0 right-0 w-8 h-8 sm:w-10 sm:h-10 cursor-nwse-resize hover:bg-primary/10 transition-all flex items-center justify-center group ${isResizing ? 'bg-primary/20' : ''}`}
+          style={{ touchAction: 'none' }}
+        >
+          <CornersOut 
+            size={16} 
+            className={`text-muted-foreground group-hover:text-primary transition-colors sm:w-5 sm:h-5 ${isResizing ? 'text-primary' : ''}`}
+            weight="bold"
+          />
+        </button>
       </Card>
     </Reorder.Item>
   );
