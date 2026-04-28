@@ -344,6 +344,7 @@ export function WorkWidget({
         </Tabs>
       </CardContent>
     </Card>
+    </WidgetContainer>
   );
 }
 

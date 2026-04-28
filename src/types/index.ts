@@ -81,7 +81,7 @@ export interface ClientSlot {
   clientName: string;
   date: number;
   startTime: string;
-  endTime: string;
+  endTime?: string;
   service?: string;
   notes?: string;
   status: 'scheduled' | 'completed' | 'cancelled';
