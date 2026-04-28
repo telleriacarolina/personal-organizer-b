@@ -57,19 +57,19 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>Add Widget</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg sm:text-xl">Add Widget</DialogTitle>
+          <DialogDescription className="text-sm">
             Choose a widget to add to your organizer
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-3 mt-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-3 sm:mt-4">
           {widgets.map((widget) => (
             <Button
               key={widget.type}
               variant="outline"
-              className={`h-auto flex-col gap-3 p-6 hover:border-primary hover:bg-primary/5 ${
+              className={`h-auto flex-col gap-2 sm:gap-3 p-4 sm:p-6 hover:border-primary hover:bg-primary/5 ${
                 widget.type === 'work' ? 'col-span-2' : ''
               }`}
               onClick={() => {
@@ -77,10 +77,10 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
                 onOpenChange(false);
               }}
             >
-              <div className="text-primary">{widget.icon}</div>
+              <div className="text-primary scale-90 sm:scale-100">{widget.icon}</div>
               <div className="text-center">
-                <div className="font-medium text-foreground mb-1">{widget.title}</div>
-                <div className="text-xs text-muted-foreground">{widget.description}</div>
+                <div className="font-medium text-foreground mb-1 text-sm sm:text-base">{widget.title}</div>
+                <div className="text-xs text-muted-foreground line-clamp-2 sm:line-clamp-none">{widget.description}</div>
               </div>
             </Button>
           ))}

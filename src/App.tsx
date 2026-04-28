@@ -109,21 +109,22 @@ function App() {
   return (
     <div className="min-h-screen bg-background">
       <div className="bg-gradient-to-br from-primary/5 via-accent/5 to-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between mb-8">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
             <div>
-              <h1 className="text-4xl font-bold text-foreground tracking-tight">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground tracking-tight">
                 My Organizer
               </h1>
-              <p className="text-muted-foreground mt-1">
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">
                 Your personalized productivity dashboard
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
               <ThemeCustomizationButton />
-              <Button onClick={() => setShowAddDialog(true)} size="lg" className="gap-2">
+              <Button onClick={() => setShowAddDialog(true)} size="lg" className="gap-2 flex-1 sm:flex-initial">
                 <Plus size={20} />
-                Add Widget
+                <span className="hidden sm:inline">Add Widget</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             </div>
           </div>
@@ -193,7 +194,7 @@ function App() {
               axis="y"
               values={currentWidgets}
               onReorder={handleReorder}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative"
+              className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 relative"
             >
               {isDragging && (
                 <motion.div
@@ -290,7 +291,9 @@ function App() {
         onComplete={handleWorkOrganizationComplete}
       />
       
-      <Toaster position="bottom-right" />
+      <Toaster position="bottom-right" toastOptions={{
+        className: 'sm:mb-0 mb-16'
+      }} />
     </div>
   );
 }

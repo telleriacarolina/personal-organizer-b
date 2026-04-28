@@ -366,26 +366,35 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
       }
       onOpenChange(isOpen);
     }}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-2xl">
-            <Palette size={28} weight="duotone" />
+          <DialogTitle className="flex items-center gap-2 text-xl sm:text-2xl">
+            <Palette size={24} weight="duotone" className="sm:w-7 sm:h-7" />
             Theme Customization
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             Personalize your organizer with preset themes, custom colors, or background images
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="presets" className="mt-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="presets">Theme Presets</TabsTrigger>
-            <TabsTrigger value="custom">Custom Colors</TabsTrigger>
-            <TabsTrigger value="background">Background Image</TabsTrigger>
+        <Tabs defaultValue="presets" className="mt-4 sm:mt-6">
+          <TabsList className="grid w-full grid-cols-3 h-auto">
+            <TabsTrigger value="presets" className="text-xs sm:text-sm px-2 py-2">
+              <span className="hidden sm:inline">Theme Presets</span>
+              <span className="sm:hidden">Themes</span>
+            </TabsTrigger>
+            <TabsTrigger value="custom" className="text-xs sm:text-sm px-2 py-2">
+              <span className="hidden sm:inline">Custom Colors</span>
+              <span className="sm:hidden">Custom</span>
+            </TabsTrigger>
+            <TabsTrigger value="background" className="text-xs sm:text-sm px-2 py-2">
+              <span className="hidden sm:inline">Background Image</span>
+              <span className="sm:hidden">Image</span>
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="presets" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TabsContent value="presets" className="mt-4 sm:mt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {themePresets.map((theme) => {
                 const isSelected = selectedTheme === theme.name;
                 const isPreviewing = previewTheme === theme.name;
@@ -397,33 +406,33 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
                     onMouseEnter={() => handlePreview(theme.name)}
                     onMouseLeave={handleClosePreview}
                     className={`
-                      relative p-4 rounded-lg border-2 transition-all text-left
+                      relative p-3 sm:p-4 rounded-lg border-2 transition-all text-left
                       ${isSelected ? 'border-primary shadow-lg scale-[1.02]' : 'border-border hover:border-primary/50 hover:shadow-md'}
                     `}
                   >
                     {isSelected && (
-                      <div className="absolute top-3 right-3 bg-primary text-primary-foreground rounded-full p-1">
-                        <Check size={16} weight="bold" />
+                      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 bg-primary text-primary-foreground rounded-full p-1">
+                        <Check size={14} weight="bold" className="sm:w-4 sm:h-4" />
                       </div>
                     )}
                     
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex gap-1.5 sm:gap-2 mb-2 sm:mb-3">
                       <div 
-                        className="w-10 h-10 rounded-md border border-border"
+                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-md border border-border"
                         style={{ backgroundColor: theme.colors.primary }}
                       />
                       <div 
-                        className="w-10 h-10 rounded-md border border-border"
+                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-md border border-border"
                         style={{ backgroundColor: theme.colors.accent }}
                       />
                       <div 
-                        className="w-10 h-10 rounded-md border border-border"
+                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-md border border-border"
                         style={{ backgroundColor: theme.colors.card }}
                       />
                     </div>
 
-                    <h3 className="font-semibold text-lg mb-1">{theme.name}</h3>
-                    <p className="text-sm text-muted-foreground">{theme.description}</p>
+                    <h3 className="font-semibold text-base sm:text-lg mb-1">{theme.name}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground">{theme.description}</p>
                     
                     {isPreviewing && !isSelected && (
                       <div className="mt-2 text-xs text-primary font-medium">
@@ -686,10 +695,11 @@ export function ThemeCustomizationButton() {
         variant="outline"
         size="lg"
         onClick={() => setOpen(true)}
-        className="gap-2"
+        className="gap-2 flex-1 sm:flex-initial"
       >
-        <Palette size={20} weight="duotone" />
-        Customize Theme
+        <Palette size={18} weight="duotone" className="sm:w-5 sm:h-5" />
+        <span className="hidden sm:inline">Customize Theme</span>
+        <span className="sm:hidden">Theme</span>
       </Button>
       
       <ThemeCustomization open={open} onOpenChange={setOpen} />
