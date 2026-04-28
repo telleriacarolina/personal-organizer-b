@@ -35,8 +35,10 @@ export function WidgetContainer({
   const [isPinching, setIsPinching] = useState(false);
   const [pinchStart, setPinchStart] = useState({ distance: 0, width: 0, height: 0 });
 
-  const currentWidth = size?.width || 300;
-  const currentHeight = size?.height || 400;
+  const defaultWidth = 350;
+  const defaultHeight = 400;
+  const currentWidth = size?.width || defaultWidth;
+  const currentHeight = size?.height || defaultHeight;
 
   const handleResizeStart = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -151,17 +153,15 @@ export function WidgetContainer({
         cursor: 'grabbing'
       }}
       style={{
-        width: size ? `${currentWidth}px` : 'auto',
-        maxWidth: '100%'
+        width: `${currentWidth}px`,
+        height: `${currentHeight}px`,
+        maxWidth: '100%',
+        flexShrink: 0
       }}
     >
       <Card 
         ref={containerRef}
-        className="relative p-4 sm:p-6 shadow-sm transition-all duration-200 overflow-hidden hover:shadow-lg hover:border-primary/30 bg-card touch-none"
-        style={{
-          height: size ? `${currentHeight}px` : 'auto',
-          minHeight: '300px'
-        }}
+        className="relative p-4 sm:p-6 shadow-sm transition-all duration-200 overflow-hidden hover:shadow-lg hover:border-primary/30 bg-card touch-none h-full"
         onTouchStart={handleTouchStart}
       >
         <div className="flex items-center justify-between mb-3 sm:mb-4 relative z-10">

@@ -41,11 +41,11 @@ This is a complex application because it involves multiple customizable modules 
 - **Success criteria**: Habits show clear visual feedback for completion, display current streak count, and reset tracking at midnight
 
 ### Dashboard Customization
-- **Functionality**: Users can add, remove, resize, and rearrange widgets on their dashboard
+- **Functionality**: Users can add, remove, resize, and rearrange widgets on their dashboard with flexible layout that allows widgets to fit next to each other based on their individual sizes
 - **Purpose**: Enables personalization so each user's organizer reflects their priorities and workflow
-- **Trigger**: User enters edit mode or drags widget
-- **Progression**: User clicks "Customize" → Widgets become draggable → User repositions/resizes → Clicks "Done" → Layout saves
-- **Success criteria**: Layout persists between sessions, feels smooth and intuitive, prevents overlapping or broken layouts
+- **Trigger**: User drags widget or resizes via corner handle or pinch gesture
+- **Progression**: User drags widget handle → Widget repositions anywhere on dashboard → Widgets flow and fit next to each other → Layout auto-saves OR User resizes via corner/pinch → Widget adjusts to custom size → Layout auto-saves
+- **Success criteria**: Layout persists between sessions, feels smooth and intuitive, widgets fit flexibly next to each other without rigid grid constraints, resizing is responsive and intuitive
 
 ### Theme Personalization
 - **Functionality**: Users can select from preset color themes, create custom color schemes using color pickers, or upload background images to personalize their organizer
@@ -134,12 +134,13 @@ Animations should feel organic and purposeful, celebrating user actions while ma
   - Label: Form field labels in customization panels
   
 - **Customizations**: 
-  - Custom grid layout system for widget placement (CSS Grid with defined columns)
+  - Custom flexible layout system for widget placement (Flexbox with wrap enabled)
   - Custom widget header component with consistent title, actions, and drag handle
   - Custom empty state illustrations using SVG patterns
   - Custom streak visualization for habit tracker using progress rings
   - Custom hex-to-oklch color converter for theme customization
   - Custom background image overlay system with opacity control
+  - Custom widget sizing with both desktop (drag corners) and mobile (pinch) support
   
 - **States**: 
   - Buttons: Soft shadow on hover, scale down slightly on press, muted when disabled
