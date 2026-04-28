@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank } from '@phosphor-icons/react';
-import { PersonalShoppingItem, Receipt, ShoppingTrip, WidgetSize } from '@/types';
+import { PersonalShoppingItem, Receipt, ShoppingTrip, WidgetSize, ShoppingCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears } from 'date-fns';
@@ -31,25 +31,27 @@ interface ShoppingWidgetProps {
   globalLock?: boolean;
 }
 
-type CategoryType = PersonalShoppingItem['category'];
-
-const categoryLabels: Record<CategoryType, string> = {
-  'groceries': 'Groceries',
-  'household': 'Household',
-  'personal-care': 'Personal Care',
+const categoryLabels: Record<ShoppingCategory, string> = {
+  'food': 'Food Shopping',
+  'clothes': 'Clothes Shopping',
+  'personal-items': 'Personal Items',
+  'work': 'Work Shopping',
+  'gifts': 'Gift Shopping',
+  'home-supplies': 'Home Supplies',
+  'health': 'Health & Wellness',
   'electronics': 'Electronics',
-  'clothing': 'Clothing',
-  'health': 'Health',
   'other': 'Other'
 };
 
-const categoryColors: Record<CategoryType, string> = {
-  'groceries': 'bg-success/20 text-success-foreground border-success/30',
-  'household': 'bg-primary/20 text-primary-foreground border-primary/30',
-  'personal-care': 'bg-accent/20 text-accent-foreground border-accent/30',
-  'electronics': 'bg-chart-1/20 text-foreground border-chart-1/30',
-  'clothing': 'bg-chart-2/20 text-foreground border-chart-2/30',
+const categoryColors: Record<ShoppingCategory, string> = {
+  'food': 'bg-success/20 text-success-foreground border-success/30',
+  'clothes': 'bg-chart-2/20 text-foreground border-chart-2/30',
+  'personal-items': 'bg-accent/20 text-accent-foreground border-accent/30',
+  'work': 'bg-primary/20 text-primary-foreground border-primary/30',
+  'gifts': 'bg-chart-5/20 text-foreground border-chart-5/30',
+  'home-supplies': 'bg-chart-1/20 text-foreground border-chart-1/30',
   'health': 'bg-chart-3/20 text-foreground border-chart-3/30',
+  'electronics': 'bg-chart-4/20 text-foreground border-chart-4/30',
   'other': 'bg-muted text-muted-foreground border-border'
 };
 
@@ -77,11 +79,11 @@ export function ShoppingWidget({
   const [newItemName, setNewItemName] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState('');
   const [newItemPrice, setNewItemPrice] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<CategoryType>('groceries');
+  const [selectedCategory, setSelectedCategory] = useState<ShoppingCategory>('food');
   const [selectedStore, setSelectedStore] = useState('');
   const [selectedPriority, setSelectedPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [viewMode, setViewMode] = useState<'all' | 'category' | 'store'>('all');
-  const [filterCategory, setFilterCategory] = useState<CategoryType | 'all'>('all');
+  const [filterCategory, setFilterCategory] = useState<ShoppingCategory | 'all'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'priority' | 'category' | 'price'>('name');
   const [budgetInput, setBudgetInput] = useState(budget?.toString() || '');
   
@@ -133,7 +135,7 @@ export function ShoppingWidget({
 
 Return a JSON object with:
 - name: the product name (string)
-- category: one of: groceries, household, personal-care, electronics, clothing, health, other
+- category: one of: food, clothes, personal-items, work, gifts, home-supplies, health, electronics, other
 - estimatedPrice: a reasonable estimated price in USD (number)
 
 Be realistic and use common knowledge about products.`;
@@ -194,7 +196,7 @@ Return a JSON object with these exact properties:
   "subtotal": subtotal_as_number_or_null
 }
 
-Categories must be one of: groceries, household, personal-care, electronics, clothing, health, other
+Categories must be one of: food, clothes, personal-items, work, gifts, home-supplies, health, electronics, other
 
 If the image doesn't contain a receipt, return null for all fields except items (empty array).`;
 
@@ -246,7 +248,7 @@ Return a JSON object with a single property "items" that contains an array of ob
 - name: item name (string)
 - quantity: quantity if mentioned (string or undefined)
 - price: price per item in USD (number)
-- category: best guess from: groceries, household, personal-care, electronics, clothing, health, other
+- category: best guess from: food, clothes, personal-items, work, gifts, home-supplies, health, electronics, other
 
 Be smart about parsing prices and quantities from the text.`;
 
@@ -396,7 +398,7 @@ Be smart about parsing prices and quantities from the text.`;
     if (!acc[item.category]) acc[item.category] = [];
     acc[item.category].push(item);
     return acc;
-  }, {} as Record<CategoryType, PersonalShoppingItem[]>);
+  }, {} as Record<ShoppingCategory, PersonalShoppingItem[]>);
 
   const groupedByStore = filteredItems.reduce((acc, item) => {
     const store = item.store || 'Unassigned';
@@ -747,8 +749,8 @@ Be smart about parsing prices and quantities from the text.`;
                     {Object.entries(comparisonData.categorySpending).map(([cat, data]) => (
                       <Card key={cat} className="p-3">
                         <div className="flex items-center justify-between mb-2">
-                          <Badge className={categoryColors[cat as CategoryType]}>
-                            {categoryLabels[cat as CategoryType]}
+                          <Badge className={categoryColors[cat as ShoppingCategory]}>
+                            {categoryLabels[cat as ShoppingCategory]}
                           </Badge>
                           <div className="text-sm font-semibold">
                             ${data.current.toFixed(2)}
@@ -835,7 +837,7 @@ Be smart about parsing prices and quantities from the text.`;
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as CategoryType)}>
+          <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as ShoppingCategory)}>
             <SelectTrigger className="w-36 h-9">
               <SelectValue />
             </SelectTrigger>
@@ -1068,8 +1070,8 @@ Be smart about parsing prices and quantities from the text.`;
             {Object.entries(groupedByCategory).map(([category, categoryItems]) => (
               <Card key={category} className="p-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <Badge className={categoryColors[category as CategoryType]}>
-                    {categoryLabels[category as CategoryType]}
+                  <Badge className={categoryColors[category as ShoppingCategory]}>
+                    {categoryLabels[category as ShoppingCategory]}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
                     {categoryItems.filter(i => !i.purchased).length} items

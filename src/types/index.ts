@@ -186,11 +186,22 @@ export interface WorkWidget extends BaseWidget {
   organizationPreference?: WorkOrganizationPreference;
 }
 
+export type ShoppingCategory = 
+  | 'food'
+  | 'clothes'
+  | 'personal-items'
+  | 'work'
+  | 'gifts'
+  | 'home-supplies'
+  | 'health'
+  | 'electronics'
+  | 'other';
+
 export interface PersonalShoppingItem {
   id: string;
   name: string;
   quantity?: string;
-  category: 'groceries' | 'household' | 'personal-care' | 'electronics' | 'clothing' | 'health' | 'other';
+  category: ShoppingCategory;
   store?: string;
   estimatedPrice?: number;
   actualPrice?: number;
@@ -207,7 +218,7 @@ export interface ReceiptItem {
   name: string;
   quantity?: string;
   price: number;
-  category?: PersonalShoppingItem['category'];
+  category?: ShoppingCategory;
 }
 
 export interface Receipt {
