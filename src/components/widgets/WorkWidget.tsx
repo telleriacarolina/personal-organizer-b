@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { WidgetContainer } from '@/components/WidgetContainer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,9 +48,8 @@ interface WorkWidgetProps {
     errands?: WorkErrand[];
   }) => void;
   onRemove: () => void;
-  onDragStart: (id: string) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (id: string) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
 export function WorkWidget({
@@ -63,8 +63,7 @@ export function WorkWidget({
   onUpdate,
   onRemove,
   onDragStart,
-  onDragOver,
-  onDrop
+  onDragEnd
 }: WorkWidgetProps) {
   const [activeTimer, setActiveTimer] = useState<string | null>(null);
   const [showClientDialog, setShowClientDialog] = useState(false);
@@ -247,18 +246,16 @@ export function WorkWidget({
   };
 
   return (
-    <Card
-      draggable
-      onDragStart={() => onDragStart(widgetId)}
-      onDragOver={onDragOver}
-      onDrop={() => onDrop(widgetId)}
-      className="cursor-move hover:shadow-lg transition-shadow col-span-1 md:col-span-2 lg:col-span-3"
+    <WidgetContainer
+      title="Work Dashboard"
+      icon={<Briefcase size={24} weight="duotone" />}
+      onRemove={onRemove}
+      value={{ id: widgetId, type: 'work', clientSlots, meals, timeEntries, jobs, shoppingList, errands }}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
     >
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Briefcase className="text-primary" weight="duotone" size={24} />
-          Work Dashboard
-        </CardTitle>
+      <Card className="col-span-1 md:col-span-2 lg:col-span-3 border-0 shadow-none">
+      <CardHeader className="flex flex-row items-center justify-between pb-3 px-0">
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="gap-1">
             <Clock size={14} />

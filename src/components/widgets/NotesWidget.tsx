@@ -13,12 +13,11 @@ interface NotesWidgetProps {
   onUpdate: (notes: Note[]) => void;
   onRemove: () => void;
   widgetId: string;
-  onDragStart: (id: string) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (id: string) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
-export function NotesWidget({ notes, onUpdate, onRemove, widgetId, onDragStart, onDragOver, onDrop }: NotesWidgetProps) {
+export function NotesWidget({ notes, onUpdate, onRemove, widgetId, onDragStart, onDragEnd }: NotesWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
@@ -58,10 +57,9 @@ export function NotesWidget({ notes, onUpdate, onRemove, widgetId, onDragStart, 
       title="Notes" 
       icon={<NoteIcon size={24} />} 
       onRemove={onRemove}
-      widgetId={widgetId}
+      value={{ id: widgetId, type: 'notes', notes }}
       onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      onDragEnd={onDragEnd}
     >
       {!showNew && (
         <Button

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useKV } from '@github/spark/hooks';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowsOutCardinal } from '@phosphor-icons/react';
@@ -12,13 +12,14 @@ import { GoalsWidget } from '@/components/widgets/GoalsWidget';
 import { CalendarWidget } from '@/components/widgets/CalendarWidget';
 import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { Widget, WidgetType } from '@/types';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
 function App() {
   const [widgets, setWidgets] = useKV<Widget[]>('organizer-widgets', []);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
   const [showDragHint, setShowDragHint] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartTimeRef = useRef<number>(0);
 
   const addWidget = (type: WidgetType) => {
     const newWidget: Widget = {
@@ -48,37 +49,21 @@ function App() {
     );
   };
 
-  const handleDragStart = (id: string) => {
-    setDraggedId(id);
-    toast.info('Drop on another widget to swap positions');
+  const handleReorder = (newOrder: Widget[]) => {
+    setWidgets(newOrder.map((w, index) => ({ ...w, position: index })));
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
+  const handleDragStart = () => {
+    dragStartTimeRef.current = Date.now();
+    setIsDragging(true);
   };
 
-  const handleDrop = (targetId: string) => {
-    if (!draggedId || draggedId === targetId) {
-      setDraggedId(null);
-      return;
+  const handleDragEnd = () => {
+    const dragDuration = Date.now() - dragStartTimeRef.current;
+    setIsDragging(false);
+    if (dragDuration > 200) {
+      toast.success('Widget repositioned');
     }
-
-    setWidgets((current) => {
-      const currentWidgets = current || [];
-      const draggedIndex = currentWidgets.findIndex((w) => w.id === draggedId);
-      const targetIndex = currentWidgets.findIndex((w) => w.id === targetId);
-
-      if (draggedIndex === -1 || targetIndex === -1) return currentWidgets;
-
-      const newWidgets = [...currentWidgets];
-      const [draggedWidget] = newWidgets.splice(draggedIndex, 1);
-      newWidgets.splice(targetIndex, 0, draggedWidget);
-
-      return newWidgets.map((w, index) => ({ ...w, position: index }));
-    });
-
-    setDraggedId(null);
-    toast.success('Widget repositioned');
   };
 
   const currentWidgets = widgets || [];
@@ -177,89 +162,74 @@ function App() {
               </Button>
             </motion.div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative">
-              {draggedId && (
+            <Reorder.Group
+              axis="y"
+              values={currentWidgets}
+              onReorder={handleReorder}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative"
+            >
+              {isDragging && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-0 pointer-events-none z-0"
-                >
-                  <div className="absolute inset-0 bg-primary/5 rounded-xl backdrop-blur-[1px]" />
-                </motion.div>
+                  className="absolute inset-0 pointer-events-none z-0 bg-primary/5 rounded-xl backdrop-blur-[1px]"
+                />
               )}
               {currentWidgets.map((widget) => {
+                const widgetProps = {
+                  key: widget.id,
+                  widgetId: widget.id,
+                  onRemove: () => removeWidget(widget.id),
+                  onDragStart: handleDragStart,
+                  onDragEnd: handleDragEnd,
+                };
+
                 switch (widget.type) {
                   case 'tasks':
                     return (
                       <TasksWidget
-                        key={widget.id}
-                        widgetId={widget.id}
+                        {...widgetProps}
                         tasks={widget.tasks}
                         onUpdate={(tasks) => updateWidget(widget.id, { tasks })}
-                        onRemove={() => removeWidget(widget.id)}
-                        onDragStart={handleDragStart}
-                        onDragOver={handleDragOver}
-                        onDrop={handleDrop}
                       />
                     );
                   case 'notes':
                     return (
                       <NotesWidget
-                        key={widget.id}
-                        widgetId={widget.id}
+                        {...widgetProps}
                         notes={widget.notes}
                         onUpdate={(notes) => updateWidget(widget.id, { notes })}
-                        onRemove={() => removeWidget(widget.id)}
-                        onDragStart={handleDragStart}
-                        onDragOver={handleDragOver}
-                        onDrop={handleDrop}
                       />
                     );
                   case 'habits':
                     return (
                       <HabitsWidget
-                        key={widget.id}
-                        widgetId={widget.id}
+                        {...widgetProps}
                         habits={widget.habits}
                         onUpdate={(habits) => updateWidget(widget.id, { habits })}
-                        onRemove={() => removeWidget(widget.id)}
-                        onDragStart={handleDragStart}
-                        onDragOver={handleDragOver}
-                        onDrop={handleDrop}
                       />
                     );
                   case 'goals':
                     return (
                       <GoalsWidget
-                        key={widget.id}
-                        widgetId={widget.id}
+                        {...widgetProps}
                         goals={widget.goals}
                         onUpdate={(goals) => updateWidget(widget.id, { goals })}
-                        onRemove={() => removeWidget(widget.id)}
-                        onDragStart={handleDragStart}
-                        onDragOver={handleDragOver}
-                        onDrop={handleDrop}
                       />
                     );
                   case 'calendar':
                     return (
                       <CalendarWidget
-                        key={widget.id}
-                        widgetId={widget.id}
+                        {...widgetProps}
                         events={widget.events}
                         onUpdate={(events) => updateWidget(widget.id, { events })}
-                        onRemove={() => removeWidget(widget.id)}
-                        onDragStart={handleDragStart}
-                        onDragOver={handleDragOver}
-                        onDrop={handleDrop}
                       />
                     );
                   case 'work':
                     return (
                       <WorkWidget
-                        key={widget.id}
-                        widgetId={widget.id}
+                        {...widgetProps}
                         clientSlots={widget.clientSlots}
                         meals={widget.meals}
                         timeEntries={widget.timeEntries}
@@ -267,17 +237,13 @@ function App() {
                         shoppingList={widget.shoppingList}
                         errands={widget.errands}
                         onUpdate={(data) => updateWidget(widget.id, data)}
-                        onRemove={() => removeWidget(widget.id)}
-                        onDragStart={handleDragStart}
-                        onDragOver={handleDragOver}
-                        onDrop={handleDrop}
                       />
                     );
                   default:
                     return null;
                 }
               })}
-            </div>
+            </Reorder.Group>
           )}
         </div>
       </div>

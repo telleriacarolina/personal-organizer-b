@@ -19,9 +19,8 @@ interface CalendarWidgetProps {
   onUpdate: (events: CalendarEvent[]) => void;
   onRemove: () => void;
   widgetId: string;
-  onDragStart: (id: string) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (id: string) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
 const eventColors = [
@@ -33,7 +32,7 @@ const eventColors = [
   { value: 'red', label: 'Red', class: 'bg-red-500/20 border-red-500 text-red-700' },
 ];
 
-export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragStart, onDragOver, onDrop }: CalendarWidgetProps) {
+export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragStart, onDragEnd }: CalendarWidgetProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -165,10 +164,9 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
       title="Calendar"
       icon={<Calendar size={24} />}
       onRemove={onRemove}
-      widgetId={widgetId}
+      value={{ id: widgetId, type: 'calendar', events }}
       onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      onDragEnd={onDragEnd}
     >
       <div className="space-y-4">
         <div className="flex items-center justify-between">

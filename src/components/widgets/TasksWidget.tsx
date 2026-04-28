@@ -13,12 +13,11 @@ interface TasksWidgetProps {
   onUpdate: (tasks: Task[]) => void;
   onRemove: () => void;
   widgetId: string;
-  onDragStart: (id: string) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (id: string) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
-export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, onDragOver, onDrop }: TasksWidgetProps) {
+export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, onDragEnd }: TasksWidgetProps) {
   const [newTask, setNewTask] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
 
@@ -66,10 +65,9 @@ export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, 
       title="Tasks" 
       icon={<ListChecks size={24} />} 
       onRemove={onRemove}
-      widgetId={widgetId}
+      value={{ id: widgetId, type: 'tasks', tasks }}
       onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      onDragEnd={onDragEnd}
     >
       <div className="flex gap-2">
         <Input
