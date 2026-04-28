@@ -154,6 +154,18 @@ export interface WorkRoutine {
   createdAt: number;
 }
 
+export type WorkOrganizationType = 
+  | 'date'
+  | 'week'
+  | 'month'
+  | 'time-of-day'
+  | 'job-based';
+
+export interface WorkOrganizationPreference {
+  type: WorkOrganizationType;
+  startTime?: string;
+}
+
 export interface WorkWidget extends BaseWidget {
   type: 'work';
   clientSlots: ClientSlot[];
@@ -164,6 +176,7 @@ export interface WorkWidget extends BaseWidget {
   errands: WorkErrand[];
   routines?: WorkRoutine[];
   activeRoutineId?: string;
+  organizationPreference?: WorkOrganizationPreference;
 }
 
 export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget;

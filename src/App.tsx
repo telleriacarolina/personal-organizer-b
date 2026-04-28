@@ -5,6 +5,7 @@ import { Plus, ArrowsOutCardinal } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
+import { WorkOrganizationQuestionnaire, WorkOrganizationPreference } from '@/components/WorkOrganizationQuestionnaire';
 import { TasksWidget } from '@/components/widgets/TasksWidget';
 import { NotesWidget } from '@/components/widgets/NotesWidget';
 import { HabitsWidget } from '@/components/widgets/HabitsWidget';
@@ -19,9 +20,16 @@ function App() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showWorkQuestionnaire, setShowWorkQuestionnaire] = useState(false);
   const dragStartTimeRef = useRef<number>(0);
 
   const addWidget = (type: WidgetType) => {
+    if (type === 'work') {
+      setShowAddDialog(false);
+      setShowWorkQuestionnaire(true);
+      return;
+    }
+
     const newWidget: Widget = {
       id: Date.now().toString(),
       type,
@@ -31,11 +39,30 @@ function App() {
       ...(type === 'habits' && { habits: [] }),
       ...(type === 'goals' && { goals: [] }),
       ...(type === 'calendar' && { events: [] }),
-      ...(type === 'work' && { clientSlots: [], meals: [], timeEntries: [], jobs: [], shoppingList: [], errands: [], routines: [], activeRoutineId: undefined }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
     toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} widget added!`);
+  };
+
+  const handleWorkOrganizationComplete = (preference: WorkOrganizationPreference) => {
+    const newWidget: Widget = {
+      id: Date.now().toString(),
+      type: 'work',
+      position: (widgets || []).length,
+      clientSlots: [],
+      meals: [],
+      timeEntries: [],
+      jobs: [],
+      shoppingList: [],
+      errands: [],
+      routines: [],
+      activeRoutineId: undefined,
+      organizationPreference: preference,
+    } as Widget;
+
+    setWidgets((current) => [...(current || []), newWidget]);
+    toast.success(`Work widget added with ${preference.type} organization!`);
   };
 
   const removeWidget = (id: string) => {
@@ -238,6 +265,7 @@ function App() {
                         errands={widget.errands}
                         routines={widget.routines}
                         activeRoutineId={widget.activeRoutineId}
+                        organizationPreference={widget.organizationPreference}
                         onUpdate={(data) => updateWidget(widget.id, data)}
                       />
                     );
@@ -254,6 +282,12 @@ function App() {
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
         onAddWidget={addWidget}
+      />
+
+      <WorkOrganizationQuestionnaire
+        open={showWorkQuestionnaire}
+        onOpenChange={setShowWorkQuestionnaire}
+        onComplete={handleWorkOrganizationComplete}
       />
       
       <Toaster position="bottom-right" />

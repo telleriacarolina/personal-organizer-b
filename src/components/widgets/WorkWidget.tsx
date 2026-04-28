@@ -31,7 +31,7 @@ import {
   Copy
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine } from '@/types';
+import { ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference } from '@/types';
 import { format } from 'date-fns';
 
 interface WorkWidgetProps {
@@ -44,6 +44,7 @@ interface WorkWidgetProps {
   errands: WorkErrand[];
   routines?: WorkRoutine[];
   activeRoutineId?: string;
+  organizationPreference?: WorkOrganizationPreference;
   onUpdate: (data: {
     clientSlots?: ClientSlot[];
     meals?: WorkMeal[];
@@ -53,6 +54,7 @@ interface WorkWidgetProps {
     errands?: WorkErrand[];
     routines?: WorkRoutine[];
     activeRoutineId?: string;
+    organizationPreference?: WorkOrganizationPreference;
   }) => void;
   onRemove: () => void;
   onDragStart?: () => void;
@@ -69,6 +71,7 @@ export function WorkWidget({
   errands,
   routines = [],
   activeRoutineId,
+  organizationPreference,
   onUpdate,
   onRemove,
   onDragStart,
@@ -324,6 +327,17 @@ export function WorkWidget({
     }
   };
 
+  const getOrganizationLabel = (type?: string) => {
+    switch (type) {
+      case 'date': return 'By Date';
+      case 'week': return 'By Week';
+      case 'month': return 'By Month';
+      case 'time-of-day': return 'By Time';
+      case 'job-based': return 'By Job';
+      default: return 'Custom';
+    }
+  };
+
   return (
     <WidgetContainer
       title="Work Dashboard"
@@ -335,14 +349,17 @@ export function WorkWidget({
     >
       <Card className="col-span-1 md:col-span-2 lg:col-span-3 border-0 shadow-none">
       <CardHeader className="flex flex-row items-center justify-between pb-3 px-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline" className="gap-1">
             <Clock size={14} />
             {getTotalHoursToday()}m today
           </Badge>
-          <Button variant="ghost" size="icon" onClick={onRemove}>
-            <X size={18} />
-          </Button>
+          {organizationPreference && (
+            <Badge variant="secondary" className="gap-1">
+              📋 {getOrganizationLabel(organizationPreference.type)}
+              {organizationPreference.startTime && ` (${organizationPreference.startTime})`}
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent>
