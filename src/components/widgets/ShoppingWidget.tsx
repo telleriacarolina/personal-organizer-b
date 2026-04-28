@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank } from '@phosphor-icons/react';
+import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise } from '@phosphor-icons/react';
 import { PersonalShoppingItem, Receipt, ShoppingTrip, WidgetSize, ShoppingCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -103,6 +103,8 @@ export function ShoppingWidget({
 
   const [showAnalyticsDialog, setShowAnalyticsDialog] = useState(false);
   const [comparisonPeriod, setComparisonPeriod] = useState<'day' | 'week' | 'month' | 'year'>('month');
+  const [showTripRevisitsDialog, setShowTripRevisitsDialog] = useState(false);
+  const [selectedTripForRevisit, setSelectedTripForRevisit] = useState<ShoppingTrip | null>(null);
 
   const addItem = () => {
     if (newItemName.trim()) {
@@ -478,6 +480,87 @@ Be smart about parsing prices and quantities from the text.`;
 
   const comparisonData = getComparisonData();
 
+  const getSimilarTrips = (trip: ShoppingTrip) => {
+    const tripDate = new Date(trip.date);
+    const tripMonth = tripDate.getMonth();
+    const tripDayOfMonth = tripDate.getDate();
+    const tripDayOfWeek = tripDate.getDay();
+    
+    const similarTrips = trips.filter(t => {
+      if (t.id === trip.id) return false;
+      
+      const tDate = new Date(t.date);
+      const isSameStore = t.storeName.toLowerCase() === trip.storeName.toLowerCase();
+      const isSameMonth = tDate.getMonth() === tripMonth;
+      const isSimilarDayOfMonth = Math.abs(tDate.getDate() - tripDayOfMonth) <= 3;
+      const isSameDayOfWeek = tDate.getDay() === tripDayOfWeek;
+      
+      return isSameStore && (isSameMonth || isSimilarDayOfMonth || isSameDayOfWeek);
+    }).sort((a, b) => b.date - a.date);
+    
+    return similarTrips;
+  };
+
+  const getItemsFromTrip = (trip: ShoppingTrip): PersonalShoppingItem[] => {
+    const tripReceipts = receipts.filter(r => trip.receiptIds.includes(r.id));
+    const itemsSet = new Set<string>();
+    const itemsList: PersonalShoppingItem[] = [];
+    
+    tripReceipts.forEach(receipt => {
+      receipt.items.forEach(receiptItem => {
+        if (!itemsSet.has(receiptItem.name)) {
+          itemsSet.add(receiptItem.name);
+          itemsList.push({
+            id: `revisit-${Date.now()}-${Math.random()}`,
+            name: receiptItem.name,
+            quantity: receiptItem.quantity,
+            category: receiptItem.category || 'other',
+            store: receipt.storeName,
+            estimatedPrice: receiptItem.price,
+            purchased: false,
+            priority: 'medium',
+            createdAt: Date.now(),
+          });
+        }
+      });
+    });
+    
+    return itemsList;
+  };
+
+  const handleRevisitTrip = (trip: ShoppingTrip) => {
+    setSelectedTripForRevisit(trip);
+    setShowTripRevisitsDialog(true);
+  };
+
+  const handleAddRevisitItems = (tripItems: PersonalShoppingItem[]) => {
+    const newItems = tripItems.map(item => ({
+      ...item,
+      id: `revisit-${Date.now()}-${Math.random()}`,
+      purchased: false,
+      createdAt: Date.now(),
+    }));
+    
+    onUpdate({ items: [...items, ...newItems] });
+    toast.success(`Added ${newItems.length} items from similar trip`);
+    setShowTripRevisitsDialog(false);
+    setSelectedTripForRevisit(null);
+  };
+
+  const getTripCategories = (trip: ShoppingTrip): Record<ShoppingCategory, number> => {
+    const tripReceipts = receipts.filter(r => trip.receiptIds.includes(r.id));
+    const categoryCounts: Record<string, number> = {};
+    
+    tripReceipts.forEach(receipt => {
+      receipt.items.forEach(item => {
+        const cat = item.category || 'other';
+        categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+      });
+    });
+    
+    return categoryCounts as Record<ShoppingCategory, number>;
+  };
+
   return (
     <WidgetContainer
       title="Shopping List"
@@ -770,35 +853,209 @@ Be smart about parsing prices and quantities from the text.`;
                   </div>
                 </div>
 
-                {receipts.length > 0 && (
+                {trips.length > 0 && (
                   <div>
                     <h4 className="font-medium mb-3 flex items-center gap-2">
-                      <CalendarBlank size={18} />
-                      Recent Receipts
+                      <ClockCounterClockwise size={18} />
+                      Shopping Trip History
                     </h4>
                     <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {[...receipts].sort((a, b) => b.date - a.date).slice(0, 10).map((receipt) => (
-                        <Card key={receipt.id} className="p-3">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <div className="font-medium flex items-center gap-2">
-                                <Storefront size={16} />
-                                {receipt.storeName}
+                      {[...trips].sort((a, b) => b.date - a.date).slice(0, 8).map((trip) => {
+                        const categories = getTripCategories(trip);
+                        const topCategory = Object.entries(categories).sort(([,a], [,b]) => (b as number) - (a as number))[0];
+                        
+                        return (
+                          <Card key={trip.id} className="p-3 hover:border-primary/50 transition-colors cursor-pointer group" onClick={() => handleRevisitTrip(trip)}>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium flex items-center gap-2">
+                                  <Storefront size={16} />
+                                  {trip.storeName}
+                                  {topCategory && (
+                                    <Badge className={`text-xs ${categoryColors[topCategory[0] as ShoppingCategory]}`}>
+                                      {categoryLabels[topCategory[0] as ShoppingCategory]}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {format(trip.date, 'MMM d, yyyy')} • {trip.itemCount} items
+                                </div>
                               </div>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {format(receipt.date, 'MMM d, yyyy')} • {receipt.items.length} items
+                              <div className="text-right flex items-center gap-2">
+                                <div>
+                                  <div className="font-bold text-primary">${trip.total.toFixed(2)}</div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRevisitTrip(trip);
+                                  }}
+                                >
+                                  <ArrowClockwise size={16} />
+                                </Button>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="font-bold text-primary">${receipt.total.toFixed(2)}</div>
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
+                          </Card>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
               </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showTripRevisitsDialog} onOpenChange={setShowTripRevisitsDialog}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <ClockCounterClockwise size={20} />
+                  Similar Shopping Trips
+                </DialogTitle>
+                <DialogDescription>
+                  {selectedTripForRevisit && (
+                    <>Reviewing {selectedTripForRevisit.storeName} trip from {format(selectedTripForRevisit.date, 'MMM d, yyyy')}</>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              {selectedTripForRevisit && (
+                <div className="space-y-6 py-4">
+                  <Card className="p-4 bg-primary/5 border-primary/20">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="font-bold text-lg flex items-center gap-2">
+                          <Storefront size={20} />
+                          {selectedTripForRevisit.storeName}
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {format(selectedTripForRevisit.date, 'EEEE, MMMM d, yyyy')}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-primary">${selectedTripForRevisit.total.toFixed(2)}</div>
+                        <div className="text-xs text-muted-foreground">{selectedTripForRevisit.itemCount} items</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(getTripCategories(selectedTripForRevisit)).map(([cat, count]) => (
+                        <Badge key={cat} className={categoryColors[cat as ShoppingCategory]}>
+                          {categoryLabels[cat as ShoppingCategory]}: {count}
+                        </Badge>
+                      ))}
+                    </div>
+                  </Card>
+
+                  {(() => {
+                    const similarTrips = getSimilarTrips(selectedTripForRevisit);
+                    return similarTrips.length > 0 ? (
+                      <div>
+                        <h4 className="font-medium mb-3 flex items-center gap-2">
+                          <CalendarBlank size={18} />
+                          Similar Trips from the Same Period
+                        </h4>
+                        <div className="text-sm text-muted-foreground mb-3">
+                          Found {similarTrips.length} similar {similarTrips.length === 1 ? 'trip' : 'trips'} to {selectedTripForRevisit.storeName} during comparable time periods
+                        </div>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {similarTrips.map((trip) => {
+                            const categories = getTripCategories(trip);
+                            const topCategory = Object.entries(categories).sort(([,a], [,b]) => (b as number) - (a as number))[0];
+                            
+                            return (
+                              <Card key={trip.id} className="p-3 hover:border-accent/50 transition-colors cursor-pointer" onClick={() => {
+                                setSelectedTripForRevisit(trip);
+                              }}>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="font-medium flex items-center gap-2">
+                                      {format(trip.date, 'MMM d, yyyy')}
+                                      {topCategory && (
+                                        <Badge className={`text-xs ${categoryColors[topCategory[0] as ShoppingCategory]}`}>
+                                          {categoryLabels[topCategory[0] as ShoppingCategory]}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      {trip.itemCount} items • {trip.storeName}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="font-bold">${trip.total.toFixed(2)}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {Math.abs(new Date(trip.date).getTime() - selectedTripForRevisit.date) / (1000 * 60 * 60 * 24) > 365 
+                                        ? 'Year ago' 
+                                        : Math.abs(new Date(trip.date).getTime() - selectedTripForRevisit.date) / (1000 * 60 * 60 * 24) > 30
+                                        ? 'Months ago'
+                                        : 'Weeks ago'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <Card className="p-6 text-center bg-muted/20">
+                        <CalendarBlank size={32} className="mx-auto mb-2 text-muted-foreground" />
+                        <div className="text-sm text-muted-foreground">
+                          No similar trips found for this store during comparable periods
+                        </div>
+                      </Card>
+                    );
+                  })()}
+
+                  <div>
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <ShoppingCart size={18} />
+                      Items from This Trip
+                    </h4>
+                    <div className="space-y-2 max-h-80 overflow-y-auto">
+                      {(() => {
+                        const tripItems = getItemsFromTrip(selectedTripForRevisit);
+                        return tripItems.length > 0 ? (
+                          <>
+                            {tripItems.map((item, index) => (
+                              <Card key={index} className="p-3 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1">
+                                    <div className="font-medium">{item.name}</div>
+                                    {item.quantity && (
+                                      <div className="text-xs text-muted-foreground">Qty: {item.quantity}</div>
+                                    )}
+                                  </div>
+                                  <Badge className={`text-xs ${categoryColors[item.category]}`}>
+                                    {categoryLabels[item.category]}
+                                  </Badge>
+                                </div>
+                                <div className="text-sm font-semibold">
+                                  ${item.estimatedPrice?.toFixed(2)}
+                                </div>
+                              </Card>
+                            ))}
+                            <Button 
+                              onClick={() => handleAddRevisitItems(tripItems)} 
+                              className="w-full gap-2 mt-4"
+                              size="lg"
+                            >
+                              <Plus size={18} />
+                              Add All {tripItems.length} Items to Shopping List
+                            </Button>
+                          </>
+                        ) : (
+                          <div className="text-center py-6 text-muted-foreground text-sm">
+                            No items found for this trip
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
         </div>
