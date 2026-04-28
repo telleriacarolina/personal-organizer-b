@@ -93,6 +93,7 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      widgetType="habits"
     >
       <div className="flex gap-2">
         <Input

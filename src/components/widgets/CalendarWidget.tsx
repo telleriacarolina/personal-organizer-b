@@ -171,6 +171,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      widgetType="calendar"
     >
       <div className="space-y-4">
         <div className="flex items-center justify-between">

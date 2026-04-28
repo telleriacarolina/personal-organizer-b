@@ -72,6 +72,7 @@ export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, 
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      widgetType="tasks"
     >
       <div className="flex gap-2">
         <Input

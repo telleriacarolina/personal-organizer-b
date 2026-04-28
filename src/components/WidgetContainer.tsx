@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, DotsSixVertical, CornersOut } from '@phosphor-icons/react';
 import { Reorder, useDragControls } from 'framer-motion';
-import { WidgetSize } from '@/types';
+import { WidgetSize, WidgetType } from '@/types';
 
 interface WidgetContainerProps {
   title: string;
@@ -16,6 +16,7 @@ interface WidgetContainerProps {
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
   snapToGrid?: boolean;
+  widgetType?: WidgetType;
 }
 
 export function WidgetContainer({ 
@@ -28,7 +29,8 @@ export function WidgetContainer({
   onDragEnd,
   size,
   onSizeChange,
-  snapToGrid = false
+  snapToGrid = false,
+  widgetType
 }: WidgetContainerProps) {
   const dragControls = useDragControls();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,8 +40,29 @@ export function WidgetContainer({
   const [pinchStart, setPinchStart] = useState({ distance: 0, width: 0, height: 0 });
 
   const GRID_SIZE = 50;
-  const defaultWidth = 350;
-  const defaultHeight = 400;
+  
+  const getMinimumSize = () => {
+    switch (widgetType) {
+      case 'tasks':
+        return { minWidth: 320, minHeight: 400 };
+      case 'notes':
+        return { minWidth: 320, minHeight: 450 };
+      case 'habits':
+        return { minWidth: 320, minHeight: 400 };
+      case 'goals':
+        return { minWidth: 320, minHeight: 450 };
+      case 'calendar':
+        return { minWidth: 400, minHeight: 550 };
+      case 'work':
+        return { minWidth: 450, minHeight: 600 };
+      default:
+        return { minWidth: 280, minHeight: 350 };
+    }
+  };
+
+  const { minWidth, minHeight } = getMinimumSize();
+  const defaultWidth = Math.max(350, minWidth);
+  const defaultHeight = Math.max(400, minHeight);
   const currentWidth = size?.width || defaultWidth;
   const currentHeight = size?.height || defaultHeight;
 
@@ -90,8 +113,8 @@ export function WidgetContainer({
       if (isResizing) {
         const deltaX = e.clientX - resizeStart.x;
         const deltaY = e.clientY - resizeStart.y;
-        let newWidth = Math.max(250, Math.min(800, resizeStart.width + deltaX));
-        let newHeight = Math.max(300, Math.min(1000, resizeStart.height + deltaY));
+        let newWidth = Math.max(minWidth, Math.min(800, resizeStart.width + deltaX));
+        let newHeight = Math.max(minHeight, Math.min(1000, resizeStart.height + deltaY));
         
         newWidth = snapToGridValue(newWidth);
         newHeight = snapToGridValue(newHeight);
@@ -116,8 +139,8 @@ export function WidgetContainer({
           touch2.clientY - touch1.clientY
         );
         const scale = distance / pinchStart.distance;
-        let newWidth = Math.max(250, Math.min(800, pinchStart.width * scale));
-        let newHeight = Math.max(300, Math.min(1000, pinchStart.height * scale));
+        let newWidth = Math.max(minWidth, Math.min(800, pinchStart.width * scale));
+        let newHeight = Math.max(minHeight, Math.min(1000, pinchStart.height * scale));
         
         newWidth = snapToGridValue(newWidth);
         newHeight = snapToGridValue(newHeight);
@@ -148,7 +171,7 @@ export function WidgetContainer({
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGrid]);
+  }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGrid, minWidth, minHeight]);
 
   return (
     <Reorder.Item

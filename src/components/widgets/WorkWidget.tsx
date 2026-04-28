@@ -363,6 +363,7 @@ export function WorkWidget({
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      widgetType="work"
     >
       <Card className="col-span-1 md:col-span-2 lg:col-span-3 border-0 shadow-none">
       <CardHeader className="flex flex-row items-center justify-between pb-3 px-0">

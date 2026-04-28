@@ -62,6 +62,7 @@ export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, 
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      widgetType="goals"
     >
       {!showNew && (
         <Button

@@ -64,6 +64,7 @@ export function NotesWidget({ notes, onUpdate, onRemove, widgetId, onDragStart, 
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      widgetType="notes"
     >
       {!showNew && (
         <Button
