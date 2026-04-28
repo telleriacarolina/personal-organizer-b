@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { 
   Plus, 
   X, 
@@ -28,11 +29,14 @@ import {
   Target,
   FloppyDisk,
   CalendarBlank,
-  Copy
+  Copy,
+  Gear,
+  ArrowRight
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference } from '@/types';
+import { ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference, WorkOrganizationType } from '@/types';
 import { format } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface WorkWidgetProps {
   widgetId: string;
@@ -83,6 +87,7 @@ export function WorkWidget({
   const [showJobDialog, setShowJobDialog] = useState(false);
   const [showErrandDialog, setShowErrandDialog] = useState(false);
   const [showRoutineDialog, setShowRoutineDialog] = useState(false);
+  const [showOrganizationDialog, setShowOrganizationDialog] = useState(false);
 
   const addClientSlot = (data: Omit<ClientSlot, 'id' | 'createdAt'>) => {
     const newSlot: ClientSlot = {
@@ -299,6 +304,12 @@ export function WorkWidget({
     toast.success('Workspace cleared');
   };
 
+  const updateOrganizationPreference = (newPreference: WorkOrganizationPreference) => {
+    onUpdate({ organizationPreference: newPreference });
+    toast.success(`Organization changed to ${getOrganizationLabel(newPreference.type)}`);
+    setShowOrganizationDialog(false);
+  };
+
   const getTotalHoursToday = () => {
     const today = new Date().setHours(0, 0, 0, 0);
     return timeEntries
@@ -355,12 +366,25 @@ export function WorkWidget({
             {getTotalHoursToday()}m today
           </Badge>
           {organizationPreference && (
-            <Badge variant="secondary" className="gap-1">
+            <Badge 
+              variant="secondary" 
+              className="gap-1 cursor-pointer hover:bg-secondary/80 transition-colors"
+              onClick={() => setShowOrganizationDialog(true)}
+            >
               📋 {getOrganizationLabel(organizationPreference.type)}
               {organizationPreference.startTime && ` (${organizationPreference.startTime})`}
             </Badge>
           )}
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowOrganizationDialog(true)}
+          className="gap-2"
+        >
+          <Gear size={18} />
+          Change Organization
+        </Button>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="clients" className="w-full">
@@ -455,6 +479,13 @@ export function WorkWidget({
         </Tabs>
       </CardContent>
     </Card>
+
+    <OrganizationPreferenceDialog
+      open={showOrganizationDialog}
+      onOpenChange={setShowOrganizationDialog}
+      currentPreference={organizationPreference}
+      onUpdate={updateOrganizationPreference}
+    />
     </WidgetContainer>
   );
 }
@@ -1662,5 +1693,210 @@ function RoutinesTab({
         </div>
       </ScrollArea>
     </>
+  );
+}
+
+function OrganizationPreferenceDialog({
+  open,
+  onOpenChange,
+  currentPreference,
+  onUpdate
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  currentPreference?: WorkOrganizationPreference;
+  onUpdate: (preference: WorkOrganizationPreference) => void;
+}) {
+  const [selectedType, setSelectedType] = useState<WorkOrganizationType>(
+    currentPreference?.type || 'date'
+  );
+  const [startTime, setStartTime] = useState(
+    currentPreference?.startTime || '06:00'
+  );
+
+  const organizationOptions = [
+    {
+      value: 'date' as WorkOrganizationType,
+      title: 'By Date',
+      description: 'Organize work items by specific calendar dates',
+      icon: <Calendar size={32} weight="duotone" className="text-primary" />,
+      example: 'Show all tasks, clients, and jobs for each day',
+      bestFor: 'Day-to-day planning and appointments'
+    },
+    {
+      value: 'week' as WorkOrganizationType,
+      title: 'By Week',
+      description: 'Group work by week for broader planning',
+      icon: <CalendarBlank size={32} weight="duotone" className="text-primary" />,
+      example: 'View your entire week at a glance',
+      bestFor: 'Weekly planning and recurring schedules'
+    },
+    {
+      value: 'month' as WorkOrganizationType,
+      title: 'By Month',
+      description: 'Monthly overview of all work commitments',
+      icon: <CalendarBlank size={32} weight="duotone" className="text-primary" />,
+      example: 'See monthly patterns and long-term planning',
+      bestFor: 'Long-term project management'
+    },
+    {
+      value: 'time-of-day' as WorkOrganizationType,
+      title: 'By Time of Day',
+      description: 'Schedule-based organization starting from a specific time',
+      icon: <Clock size={32} weight="duotone" className="text-primary" />,
+      example: 'Daily schedule from 6 AM onwards',
+      bestFor: 'Hourly scheduling and time blocking'
+    },
+    {
+      value: 'job-based' as WorkOrganizationType,
+      title: 'By Job/Project',
+      description: 'Organize by different jobs or clients',
+      icon: <Briefcase size={32} weight="duotone" className="text-primary" />,
+      example: 'Group tasks: Job 1 (9am-12pm), Job 2 (1pm-5pm)',
+      bestFor: 'Multiple projects or client-based work'
+    }
+  ];
+
+  const handleUpdate = () => {
+    onUpdate({
+      type: selectedType,
+      ...(selectedType === 'time-of-day' && { startTime })
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-2xl flex items-center gap-2">
+            <Gear size={28} weight="duotone" className="text-primary" />
+            Change Work Organization
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            Switch between different organization styles. Your work data will remain unchanged.
+          </p>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          <RadioGroup value={selectedType} onValueChange={(value) => setSelectedType(value as WorkOrganizationType)}>
+            <div className="grid gap-4">
+              {organizationOptions.map((option) => (
+                <motion.div
+                  key={option.value}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Label
+                    htmlFor={`org-${option.value}`}
+                    className="cursor-pointer"
+                  >
+                    <Card
+                      className={`p-5 transition-all duration-200 hover:shadow-md ${
+                        selectedType === option.value
+                          ? 'ring-2 ring-primary bg-primary/5'
+                          : 'hover:bg-accent/50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <RadioGroupItem
+                          value={option.value}
+                          id={`org-${option.value}`}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            {option.icon}
+                            <div>
+                              <h3 className="font-semibold text-lg">{option.title}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {option.description}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-3 space-y-2 ml-11">
+                            <div className="flex items-start gap-2">
+                              <span className="text-xs font-medium text-muted-foreground">Example:</span>
+                              <p className="text-xs text-muted-foreground italic flex-1">
+                                {option.example}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-xs">
+                                {option.bestFor}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <AnimatePresence>
+                          {selectedType === option.value && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              exit={{ scale: 0 }}
+                              className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground"
+                            >
+                              <Check size={18} weight="bold" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </Card>
+                  </Label>
+                </motion.div>
+              ))}
+            </div>
+          </RadioGroup>
+
+          <AnimatePresence>
+            {selectedType === 'time-of-day' && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <Card className="p-4 bg-accent/20">
+                  <Label htmlFor="org-start-time" className="text-sm font-medium mb-2 block">
+                    What time does your workday typically start?
+                  </Label>
+                  <div className="flex items-center gap-3">
+                    <Clock size={20} className="text-primary" />
+                    <input
+                      id="org-start-time"
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      Your schedule will start from this time
+                    </span>
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdate}
+              className="flex-1 gap-2"
+            >
+              Update Organization
+              <ArrowRight size={18} weight="bold" />
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
