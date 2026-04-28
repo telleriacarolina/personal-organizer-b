@@ -42,7 +42,7 @@ function App() {
       ...(type === 'habits' && { habits: [] }),
       ...(type === 'goals' && { goals: [] }),
       ...(type === 'calendar' && { events: [] }),
-      ...(type === 'shopping' && { items: [] }),
+      ...(type === 'shopping' && { items: [], receipts: [], trips: [] }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
@@ -338,6 +338,8 @@ function App() {
                         {...widgetProps}
                         items={widget.items}
                         budget={widget.budget}
+                        receipts={widget.receipts}
+                        trips={widget.trips}
                         onUpdate={(data) => updateWidget(widget.id, data)}
                       />
                     );

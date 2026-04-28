@@ -197,13 +197,47 @@ export interface PersonalShoppingItem {
   purchased: boolean;
   priority: 'low' | 'medium' | 'high';
   notes?: string;
+  barcode?: string;
+  receiptId?: string;
   createdAt: number;
+  purchasedAt?: number;
+}
+
+export interface ReceiptItem {
+  name: string;
+  quantity?: string;
+  price: number;
+  category?: PersonalShoppingItem['category'];
+}
+
+export interface Receipt {
+  id: string;
+  storeName: string;
+  date: number;
+  items: ReceiptItem[];
+  total: number;
+  tax?: number;
+  subtotal?: number;
+  notes?: string;
+  imageData?: string;
+  createdAt: number;
+}
+
+export interface ShoppingTrip {
+  id: string;
+  date: number;
+  storeName: string;
+  total: number;
+  itemCount: number;
+  receiptIds: string[];
 }
 
 export interface ShoppingWidget extends BaseWidget {
   type: 'shopping';
   items: PersonalShoppingItem[];
   budget?: number;
+  receipts?: Receipt[];
+  trips?: ShoppingTrip[];
 }
 
 export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget;
