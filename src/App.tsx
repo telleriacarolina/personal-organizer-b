@@ -31,7 +31,7 @@ function App() {
       ...(type === 'habits' && { habits: [] }),
       ...(type === 'goals' && { goals: [] }),
       ...(type === 'calendar' && { events: [] }),
-      ...(type === 'work' && { clientSlots: [], meals: [], timeEntries: [], jobs: [], shoppingList: [], errands: [] }),
+      ...(type === 'work' && { clientSlots: [], meals: [], timeEntries: [], jobs: [], shoppingList: [], errands: [], routines: [], activeRoutineId: undefined }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
@@ -236,6 +236,8 @@ function App() {
                         jobs={widget.jobs}
                         shoppingList={widget.shoppingList}
                         errands={widget.errands}
+                        routines={widget.routines}
+                        activeRoutineId={widget.activeRoutineId}
                         onUpdate={(data) => updateWidget(widget.id, data)}
                       />
                     );

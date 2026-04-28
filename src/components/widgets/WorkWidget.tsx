@@ -25,10 +25,13 @@ import {
   Trash,
   Check,
   ForkKnife,
-  Target
+  Target,
+  FloppyDisk,
+  CalendarBlank,
+  Copy
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand } from '@/types';
+import { ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine } from '@/types';
 import { format } from 'date-fns';
 
 interface WorkWidgetProps {
@@ -39,6 +42,8 @@ interface WorkWidgetProps {
   jobs: Job[];
   shoppingList: ShoppingItem[];
   errands: WorkErrand[];
+  routines?: WorkRoutine[];
+  activeRoutineId?: string;
   onUpdate: (data: {
     clientSlots?: ClientSlot[];
     meals?: WorkMeal[];
@@ -46,6 +51,8 @@ interface WorkWidgetProps {
     jobs?: Job[];
     shoppingList?: ShoppingItem[];
     errands?: WorkErrand[];
+    routines?: WorkRoutine[];
+    activeRoutineId?: string;
   }) => void;
   onRemove: () => void;
   onDragStart?: () => void;
@@ -60,6 +67,8 @@ export function WorkWidget({
   jobs,
   shoppingList,
   errands,
+  routines = [],
+  activeRoutineId,
   onUpdate,
   onRemove,
   onDragStart,
@@ -70,6 +79,7 @@ export function WorkWidget({
   const [showMealDialog, setShowMealDialog] = useState(false);
   const [showJobDialog, setShowJobDialog] = useState(false);
   const [showErrandDialog, setShowErrandDialog] = useState(false);
+  const [showRoutineDialog, setShowRoutineDialog] = useState(false);
 
   const addClientSlot = (data: Omit<ClientSlot, 'id' | 'createdAt'>) => {
     const newSlot: ClientSlot = {
@@ -217,6 +227,75 @@ export function WorkWidget({
     toast.success('Work errand deleted');
   };
 
+  const saveAsRoutine = (name: string, description?: string) => {
+    const newRoutine: WorkRoutine = {
+      id: Date.now().toString(),
+      name,
+      description,
+      clientSlots: [...clientSlots],
+      meals: [...meals],
+      timeEntries: [...timeEntries],
+      jobs: [...jobs],
+      shoppingList: [...shoppingList],
+      errands: [...errands],
+      createdAt: Date.now()
+    };
+    onUpdate({ routines: [...routines, newRoutine] });
+    toast.success(`Routine "${name}" saved!`);
+    setShowRoutineDialog(false);
+  };
+
+  const loadRoutine = (routineId: string) => {
+    const routine = routines.find(r => r.id === routineId);
+    if (!routine) return;
+    
+    onUpdate({
+      clientSlots: [...routine.clientSlots],
+      meals: [...routine.meals],
+      timeEntries: [...routine.timeEntries],
+      jobs: [...routine.jobs],
+      shoppingList: [...routine.shoppingList],
+      errands: [...routine.errands],
+      activeRoutineId: routineId
+    });
+    toast.success(`Loaded routine "${routine.name}"`);
+  };
+
+  const duplicateRoutine = (routineId: string) => {
+    const routine = routines.find(r => r.id === routineId);
+    if (!routine) return;
+
+    const duplicatedRoutine: WorkRoutine = {
+      ...routine,
+      id: Date.now().toString(),
+      name: `${routine.name} (Copy)`,
+      createdAt: Date.now()
+    };
+    onUpdate({ routines: [...routines, duplicatedRoutine] });
+    toast.success(`Routine duplicated!`);
+  };
+
+  const deleteRoutine = (routineId: string) => {
+    onUpdate({ 
+      routines: routines.filter(r => r.id !== routineId),
+      ...(activeRoutineId === routineId && { activeRoutineId: undefined })
+    });
+    toast.success('Routine deleted');
+  };
+
+  const clearCurrentWorkspace = () => {
+    onUpdate({
+      clientSlots: [],
+      meals: [],
+      timeEntries: [],
+      jobs: [],
+      shoppingList: [],
+      errands: [],
+      activeRoutineId: undefined
+    });
+    toast.success('Workspace cleared');
+  };
+
   const getTotalHoursToday = () => {
     const today = new Date().setHours(0, 0, 0, 0);
     return timeEntries
@@ -268,13 +347,14 @@ export function WorkWidget({
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="clients" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7 text-xs">
             <TabsTrigger value="clients" className="text-xs">Clients</TabsTrigger>
             <TabsTrigger value="meals" className="text-xs">Meals</TabsTrigger>
             <TabsTrigger value="time" className="text-xs">Time</TabsTrigger>
             <TabsTrigger value="jobs" className="text-xs">Jobs</TabsTrigger>
             <TabsTrigger value="shopping" className="text-xs">Shopping</TabsTrigger>
             <TabsTrigger value="errands" className="text-xs">Errands</TabsTrigger>
+            <TabsTrigger value="routines" className="text-xs">Routines</TabsTrigger>
           </TabsList>
 
           <TabsContent value="clients" className="space-y-3 mt-4">
@@ -339,6 +419,20 @@ export function WorkWidget({
               showDialog={showErrandDialog}
               setShowDialog={setShowErrandDialog}
               getPriorityColor={getPriorityColor}
+            />
+          </TabsContent>
+
+          <TabsContent value="routines" className="space-y-3 mt-4">
+            <RoutinesTab
+              routines={routines}
+              activeRoutineId={activeRoutineId}
+              onSave={saveAsRoutine}
+              onLoad={loadRoutine}
+              onDuplicate={duplicateRoutine}
+              onDelete={deleteRoutine}
+              onClearWorkspace={clearCurrentWorkspace}
+              showDialog={showRoutineDialog}
+              setShowDialog={setShowRoutineDialog}
             />
           </TabsContent>
         </Tabs>
@@ -1340,6 +1434,211 @@ function ErrandsTab({
                     <Trash size={16} />
                   </Button>
                 </div>
+              </div>
+            ))
+          )}
+        </div>
+      </ScrollArea>
+    </>
+  );
+}
+
+function RoutinesTab({
+  routines,
+  activeRoutineId,
+  onSave,
+  onLoad,
+  onDuplicate,
+  onDelete,
+  onClearWorkspace,
+  showDialog,
+  setShowDialog
+}: {
+  routines: WorkRoutine[];
+  activeRoutineId?: string;
+  onSave: (name: string, description?: string) => void;
+  onLoad: (routineId: string) => void;
+  onDuplicate: (routineId: string) => void;
+  onDelete: (routineId: string) => void;
+  onClearWorkspace: () => void;
+  showDialog: boolean;
+  setShowDialog: (show: boolean) => void;
+}) {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: ''
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name) {
+      toast.error('Please enter a routine name');
+      return;
+    }
+    onSave(formData.name, formData.description || undefined);
+    setFormData({ name: '', description: '' });
+  };
+
+  const activeRoutine = routines.find(r => r.id === activeRoutineId);
+
+  return (
+    <>
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <Dialog open={showDialog} onOpenChange={setShowDialog}>
+            <DialogTrigger asChild>
+              <Button className="flex-1 gap-2">
+                <FloppyDisk size={18} />
+                Save Current as Routine
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Save Work Routine</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="routineName">Routine Name *</Label>
+                  <Input
+                    id="routineName"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Monday Morning, Client Work, etc."
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="routineDescription">Description</Label>
+                  <Textarea
+                    id="routineDescription"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="What is this routine for?"
+                    rows={3}
+                  />
+                </div>
+                <Button type="submit" className="w-full">Save Routine</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+          
+          <Button 
+            variant="outline" 
+            onClick={onClearWorkspace}
+            className="gap-2"
+          >
+            <X size={18} />
+            Clear
+          </Button>
+        </div>
+
+        {activeRoutine && (
+          <div className="p-3 rounded-lg bg-primary/10 border border-primary/30">
+            <div className="flex items-center gap-2">
+              <CalendarBlank size={18} className="text-primary" weight="duotone" />
+              <div className="flex-1">
+                <p className="font-semibold text-sm">Active Routine</p>
+                <p className="text-xs text-muted-foreground">{activeRoutine.name}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ScrollArea className="h-[400px]">
+        <div className="space-y-2">
+          {routines.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-sm text-muted-foreground mb-4">
+                No routines saved yet
+              </p>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                Save your current work dashboard state as a routine to quickly switch between different jobs or work schedules
+              </p>
+            </div>
+          ) : (
+            routines.map((routine) => (
+              <div
+                key={routine.id}
+                className={`p-3 rounded-lg border bg-card ${
+                  routine.id === activeRoutineId ? 'ring-2 ring-primary' : ''
+                }`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <CalendarBlank size={16} className="text-primary" weight="duotone" />
+                      <span className="font-semibold">{routine.name}</span>
+                      {routine.id === activeRoutineId && (
+                        <Badge variant="default" className="text-xs">Active</Badge>
+                      )}
+                    </div>
+                    {routine.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{routine.description}</p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap gap-1 text-xs text-muted-foreground mb-3">
+                  {routine.clientSlots.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {routine.clientSlots.length} client{routine.clientSlots.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                  {routine.jobs.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {routine.jobs.length} job{routine.jobs.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                  {routine.meals.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {routine.meals.length} meal{routine.meals.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                  {routine.errands.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {routine.errands.length} errand{routine.errands.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                  {routine.shoppingList.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {routine.shoppingList.length} item{routine.shoppingList.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant={routine.id === activeRoutineId ? 'secondary' : 'default'}
+                    onClick={() => onLoad(routine.id)}
+                    className="flex-1 text-xs gap-1"
+                    disabled={routine.id === activeRoutineId}
+                  >
+                    <Check size={14} />
+                    Load
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onDuplicate(routine.id)}
+                    className="text-xs gap-1"
+                  >
+                    <Copy size={14} />
+                    Duplicate
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onDelete(routine.id)}
+                    className="text-xs"
+                  >
+                    <Trash size={14} />
+                  </Button>
+                </div>
+                
+                <p className="text-xs text-muted-foreground mt-2">
+                  Created {format(routine.createdAt, 'MMM d, yyyy')}
+                </p>
               </div>
             ))
           )}

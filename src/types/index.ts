@@ -141,6 +141,19 @@ export interface WorkErrand {
   createdAt: number;
 }
 
+export interface WorkRoutine {
+  id: string;
+  name: string;
+  description?: string;
+  clientSlots: ClientSlot[];
+  meals: WorkMeal[];
+  timeEntries: TimeEntry[];
+  jobs: Job[];
+  shoppingList: ShoppingItem[];
+  errands: WorkErrand[];
+  createdAt: number;
+}
+
 export interface WorkWidget extends BaseWidget {
   type: 'work';
   clientSlots: ClientSlot[];
@@ -149,6 +162,8 @@ export interface WorkWidget extends BaseWidget {
   jobs: Job[];
   shoppingList: ShoppingItem[];
   errands: WorkErrand[];
+  routines?: WorkRoutine[];
+  activeRoutineId?: string;
 }
 
 export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget;
