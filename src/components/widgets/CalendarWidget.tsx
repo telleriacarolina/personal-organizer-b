@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { CalendarEvent } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -209,14 +210,14 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
             const isCurrentMonth = isSameMonth(day, currentMonth);
             const isSelected = selectedDate && isSameDay(day, selectedDate);
             const isTodayDate = isToday(day);
+            const hasEvents = dayEvents.length > 0;
 
-            return (
+            const calendarCell = (
               <button
-                key={idx}
                 onClick={() => setSelectedDate(day)}
                 onDoubleClick={() => openAddDialog(day)}
                 className={`
-                  aspect-square p-1 rounded-lg text-xs transition-all relative
+                  aspect-square p-1 rounded-lg text-xs transition-all relative group
                   ${isCurrentMonth ? 'text-foreground' : 'text-muted-foreground opacity-50'}
                   ${isSelected ? 'bg-primary/20 ring-2 ring-primary' : 'hover:bg-accent/50'}
                   ${isTodayDate ? 'font-bold ring-1 ring-primary/50' : ''}
@@ -224,26 +225,78 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
               >
                 <div className="flex flex-col h-full">
                   <span className="text-center">{format(day, 'd')}</span>
-                  {dayEvents.length > 0 && (
-                    <div className="flex-1 flex items-center justify-center gap-0.5 flex-wrap mt-0.5">
-                      {dayEvents.slice(0, 3).map((event) => (
-                        <div
-                          key={event.id}
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            event.color === 'blue' ? 'bg-blue-500' :
-                            event.color === 'green' ? 'bg-green-500' :
-                            event.color === 'purple' ? 'bg-purple-500' :
-                            event.color === 'orange' ? 'bg-orange-500' :
-                            event.color === 'pink' ? 'bg-pink-500' :
-                            event.color === 'red' ? 'bg-red-500' : 'bg-blue-500'
-                          }`}
-                        />
-                      ))}
+                  {hasEvents && (
+                    <div className="flex-1 flex items-center justify-center">
+                      <Badge 
+                        variant="secondary" 
+                        className="h-4 min-w-4 px-1 text-[10px] font-semibold bg-primary/80 text-primary-foreground group-hover:scale-110 transition-transform"
+                      >
+                        {dayEvents.length}
+                      </Badge>
                     </div>
                   )}
                 </div>
               </button>
             );
+
+            if (hasEvents && isCurrentMonth) {
+              return (
+                <HoverCard key={idx} openDelay={200} closeDelay={100}>
+                  <HoverCardTrigger asChild>
+                    {calendarCell}
+                  </HoverCardTrigger>
+                  <HoverCardContent 
+                    side="right" 
+                    align="start" 
+                    className="w-72 p-3"
+                    sideOffset={5}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between border-b border-border pb-2">
+                        <h4 className="font-semibold text-sm">
+                          {format(day, 'MMM d, yyyy')}
+                        </h4>
+                        <Badge variant="outline" className="text-xs">
+                          {dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {dayEvents.map((event) => (
+                          <div
+                            key={event.id}
+                            className={`p-2 rounded-md border text-xs ${getColorClass(event.color || 'blue')}`}
+                          >
+                            <div className="font-medium truncate">{event.title}</div>
+                            {event.description && (
+                              <div className="text-xs opacity-80 mt-0.5 line-clamp-2">
+                                {event.description}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              {event.startTime && (
+                                <div className="flex items-center gap-1 opacity-90">
+                                  <Clock size={10} />
+                                  <span>{event.startTime}</span>
+                                  {event.endTime && <span>- {event.endTime}</span>}
+                                </div>
+                              )}
+                              {event.reminder && (
+                                <div className="flex items-center gap-1 opacity-90">
+                                  <Bell size={10} />
+                                  <span>{event.reminder}m before</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              );
+            }
+
+            return <div key={idx}>{calendarCell}</div>;
           })}
         </div>
 
