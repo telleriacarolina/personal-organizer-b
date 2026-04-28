@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useKV } from '@github/spark/hooks';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowsOutCardinal, GridFour } from '@phosphor-icons/react';
+import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
@@ -22,6 +22,7 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [showWorkQuestionnaire, setShowWorkQuestionnaire] = useState(false);
   const [snapToGrid, setSnapToGrid] = useKV<boolean>('organizer-snap-to-grid', false);
+  const [globalLock, setGlobalLock] = useKV<boolean>('organizer-global-lock', false);
   const dragStartTimeRef = useRef<number>(0);
 
   const addWidget = (type: WidgetType) => {
@@ -88,6 +89,39 @@ function App() {
     toast.success(snapToGrid ? 'Grid snapping disabled' : 'Grid snapping enabled');
   };
 
+  const toggleGlobalLock = () => {
+    const newLockState = !globalLock;
+    setGlobalLock(newLockState);
+    
+    if (newLockState) {
+      setWidgets((current) =>
+        (current || []).map((w) => ({
+          ...w,
+          size: {
+            ...w.size,
+            width: w.size?.width || 350,
+            height: w.size?.height || 400,
+            locked: true
+          }
+        }))
+      );
+      toast.success('All widgets locked');
+    } else {
+      setWidgets((current) =>
+        (current || []).map((w) => ({
+          ...w,
+          size: {
+            ...w.size,
+            width: w.size?.width || 350,
+            height: w.size?.height || 400,
+            locked: false
+          }
+        }))
+      );
+      toast.success('All widgets unlocked');
+    }
+  };
+
   const handleReorder = (newOrder: Widget[]) => {
     setWidgets(newOrder.map((w, index) => ({ ...w, position: index })));
   };
@@ -140,6 +174,20 @@ function App() {
               >
                 <GridFour size={20} weight={snapToGrid ? "fill" : "regular"} />
                 <span className="hidden lg:inline">{snapToGrid ? 'Grid: On' : 'Grid: Off'}</span>
+              </Button>
+              <Button 
+                onClick={toggleGlobalLock} 
+                size="lg" 
+                variant={globalLock ? "default" : "outline"}
+                className="gap-2 flex-shrink-0"
+                title={globalLock ? "Unlock all widgets" : "Lock all widgets"}
+              >
+                {globalLock ? (
+                  <Lock size={20} weight="fill" />
+                ) : (
+                  <LockOpen size={20} />
+                )}
+                <span className="hidden lg:inline">{globalLock ? 'Locked' : 'Unlocked'}</span>
               </Button>
               <ThemeCustomizationButton />
               <Button onClick={() => setShowAddDialog(true)} size="lg" className="gap-2 flex-1 sm:flex-initial">
@@ -220,7 +268,7 @@ function App() {
               {snapToGrid && (
                 <div className="absolute inset-0 pointer-events-none z-0 grid-background" />
               )}
-              {isDragging && (
+              {isDragging && !globalLock && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -233,11 +281,12 @@ function App() {
                   key: widget.id,
                   widgetId: widget.id,
                   onRemove: () => removeWidget(widget.id),
-                  onDragStart: handleDragStart,
-                  onDragEnd: handleDragEnd,
+                  onDragStart: globalLock ? undefined : handleDragStart,
+                  onDragEnd: globalLock ? undefined : handleDragEnd,
                   size: widget.size,
                   onSizeChange: (size: { width: number; height: number }) => updateWidgetSize(widget.id, size),
                   snapToGrid: snapToGrid,
+                  globalLock: globalLock,
                 };
 
                 switch (widget.type) {

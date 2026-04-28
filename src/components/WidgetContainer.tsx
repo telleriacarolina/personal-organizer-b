@@ -18,6 +18,7 @@ interface WidgetContainerProps {
   onSizeChange?: (size: WidgetSize) => void;
   snapToGrid?: boolean;
   widgetType?: WidgetType;
+  globalLock?: boolean;
 }
 
 export function WidgetContainer({ 
@@ -31,7 +32,8 @@ export function WidgetContainer({
   size,
   onSizeChange,
   snapToGrid = false,
-  widgetType
+  widgetType,
+  globalLock = false
 }: WidgetContainerProps) {
   const dragControls = useDragControls();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,7 +68,7 @@ export function WidgetContainer({
   const defaultHeight = Math.max(400, minHeight);
   const currentWidth = size?.width || defaultWidth;
   const currentHeight = size?.height || defaultHeight;
-  const isLocked = size?.locked || false;
+  const isLocked = globalLock || size?.locked || false;
 
   const snapToGridValue = (value: number) => {
     if (!snapToGrid) return value;
@@ -218,16 +220,18 @@ export function WidgetContainer({
       >
         <div className="flex items-center justify-between mb-3 sm:mb-4 relative z-10">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-            <button
-              onPointerDown={(e) => {
-                e.preventDefault();
-                dragControls.start(e);
-              }}
-              className="text-muted-foreground cursor-grab active:cursor-grabbing hover:text-primary transition-colors p-1.5 sm:p-1 -ml-1 rounded hover:bg-primary/10 touch-none flex-shrink-0"
-              style={{ touchAction: 'none' }}
-            >
-              <DotsSixVertical size={18} weight="bold" className="sm:w-5 sm:h-5" />
-            </button>
+            {!globalLock && (
+              <button
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  dragControls.start(e);
+                }}
+                className="text-muted-foreground cursor-grab active:cursor-grabbing hover:text-primary transition-colors p-1.5 sm:p-1 -ml-1 rounded hover:bg-primary/10 touch-none flex-shrink-0"
+                style={{ touchAction: 'none' }}
+              >
+                <DotsSixVertical size={18} weight="bold" className="sm:w-5 sm:h-5" />
+              </button>
+            )}
             <div className="text-primary flex-shrink-0">
               {icon}
             </div>
@@ -236,23 +240,25 @@ export function WidgetContainer({
             </h2>
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleLock}
-              className={`h-8 w-8 sm:h-9 sm:w-9 transition-all ${
-                isLocked 
-                  ? 'text-primary hover:text-primary/80 hover:bg-primary/10' 
-                  : 'text-muted-foreground hover:text-primary hover:bg-primary/10'
-              }`}
-              title={isLocked ? 'Unlock widget size' : 'Lock widget size'}
-            >
-              {isLocked ? (
-                <Lock size={16} className="sm:w-[18px] sm:h-[18px]" weight="fill" />
-              ) : (
-                <LockOpen size={16} className="sm:w-[18px] sm:h-[18px]" />
-              )}
-            </Button>
+            {!globalLock && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleLock}
+                className={`h-8 w-8 sm:h-9 sm:w-9 transition-all ${
+                  isLocked 
+                    ? 'text-primary hover:text-primary/80 hover:bg-primary/10' 
+                    : 'text-muted-foreground hover:text-primary hover:bg-primary/10'
+                }`}
+                title={isLocked ? 'Unlock widget size' : 'Lock widget size'}
+              >
+                {isLocked ? (
+                  <Lock size={16} className="sm:w-[18px] sm:h-[18px]" weight="fill" />
+                ) : (
+                  <LockOpen size={16} className="sm:w-[18px] sm:h-[18px]" />
+                )}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
