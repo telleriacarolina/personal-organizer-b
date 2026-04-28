@@ -3,6 +3,7 @@ export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | '
 export interface WidgetSize {
   width: number;
   height: number;
+  locked?: boolean;
 }
 
 export interface BaseWidget {

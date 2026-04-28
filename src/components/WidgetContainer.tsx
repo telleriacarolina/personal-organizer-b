@@ -1,9 +1,10 @@
 import { ReactNode, useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, DotsSixVertical, CornersOut } from '@phosphor-icons/react';
+import { X, DotsSixVertical, CornersOut, Lock, LockOpen } from '@phosphor-icons/react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { WidgetSize, WidgetType } from '@/types';
+import { toast } from 'sonner';
 
 interface WidgetContainerProps {
   title: string;
@@ -65,13 +66,26 @@ export function WidgetContainer({
   const defaultHeight = Math.max(400, minHeight);
   const currentWidth = size?.width || defaultWidth;
   const currentHeight = size?.height || defaultHeight;
+  const isLocked = size?.locked || false;
 
   const snapToGridValue = (value: number) => {
     if (!snapToGrid) return value;
     return Math.round(value / GRID_SIZE) * GRID_SIZE;
   };
 
+  const toggleLock = () => {
+    if (onSizeChange) {
+      onSizeChange({
+        width: currentWidth,
+        height: currentHeight,
+        locked: !isLocked
+      });
+      toast.success(isLocked ? 'Widget size unlocked' : 'Widget size locked');
+    }
+  };
+
   const handleResizeStart = (e: React.PointerEvent) => {
+    if (isLocked) return;
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
@@ -87,6 +101,7 @@ export function WidgetContainer({
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isLocked) return;
     if (e.touches.length === 2) {
       e.preventDefault();
       e.stopPropagation();
@@ -220,28 +235,50 @@ export function WidgetContainer({
               {title}
             </h2>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onRemove}
-            className="h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all flex-shrink-0 ml-2"
-          >
-            <X size={16} className="sm:w-[18px] sm:h-[18px]" />
-          </Button>
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleLock}
+              className={`h-8 w-8 sm:h-9 sm:w-9 transition-all ${
+                isLocked 
+                  ? 'text-primary hover:text-primary/80 hover:bg-primary/10' 
+                  : 'text-muted-foreground hover:text-primary hover:bg-primary/10'
+              }`}
+              title={isLocked ? 'Unlock widget size' : 'Lock widget size'}
+            >
+              {isLocked ? (
+                <Lock size={16} className="sm:w-[18px] sm:h-[18px]" weight="fill" />
+              ) : (
+                <LockOpen size={16} className="sm:w-[18px] sm:h-[18px]" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onRemove}
+              className="h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+            >
+              <X size={16} className="sm:w-[18px] sm:h-[18px]" />
+            </Button>
+          </div>
         </div>
         <div className="space-y-2 sm:space-y-3 relative z-10 overflow-auto" style={{ maxHeight: size ? `${currentHeight - 80}px` : 'auto' }}>{children}</div>
         
-        <button
-          onPointerDown={handleResizeStart}
-          className={`absolute bottom-0 right-0 w-8 h-8 sm:w-10 sm:h-10 cursor-nwse-resize hover:bg-primary/10 transition-all flex items-center justify-center group ${isResizing ? 'bg-primary/20' : ''}`}
-          style={{ touchAction: 'none' }}
-        >
-          <CornersOut 
-            size={16} 
-            className={`text-muted-foreground group-hover:text-primary transition-colors sm:w-5 sm:h-5 ${isResizing ? 'text-primary' : ''}`}
-            weight="bold"
-          />
-        </button>
+        {!isLocked && (
+          <button
+            onPointerDown={handleResizeStart}
+            className={`absolute bottom-0 right-0 w-8 h-8 sm:w-10 sm:h-10 cursor-nwse-resize hover:bg-primary/10 transition-all flex items-center justify-center group ${isResizing ? 'bg-primary/20' : ''}`}
+            style={{ touchAction: 'none' }}
+            title="Drag to resize widget"
+          >
+            <CornersOut 
+              size={16} 
+              className={`text-muted-foreground group-hover:text-primary transition-colors sm:w-5 sm:h-5 ${isResizing ? 'text-primary' : ''}`}
+              weight="bold"
+            />
+          </button>
+        )}
       </Card>
     </Reorder.Item>
   );
