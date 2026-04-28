@@ -12,9 +12,13 @@ interface HabitsWidgetProps {
   habits: Habit[];
   onUpdate: (habits: Habit[]) => void;
   onRemove: () => void;
+  widgetId: string;
+  onDragStart: (id: string) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (id: string) => void;
 }
 
-export function HabitsWidget({ habits, onUpdate, onRemove }: HabitsWidgetProps) {
+export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart, onDragOver, onDrop }: HabitsWidgetProps) {
   const [newHabit, setNewHabit] = useState('');
 
   const addHabit = () => {
@@ -79,7 +83,15 @@ export function HabitsWidget({ habits, onUpdate, onRemove }: HabitsWidgetProps) 
   };
 
   return (
-    <WidgetContainer title="Habits" icon={<Fire size={24} />} onRemove={onRemove}>
+    <WidgetContainer 
+      title="Habits" 
+      icon={<Fire size={24} />} 
+      onRemove={onRemove}
+      widgetId={widgetId}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
       <div className="flex gap-2">
         <Input
           id="new-habit"

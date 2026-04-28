@@ -13,6 +13,7 @@ import { Widget, WidgetType } from '@/types';
 function App() {
   const [widgets, setWidgets] = useKV<Widget[]>('organizer-widgets', []);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
 
   const addWidget = (type: WidgetType) => {
     const newWidget: Widget = {
@@ -38,6 +39,38 @@ function App() {
     setWidgets((current) =>
       (current || []).map((w) => (w.id === id ? { ...w, ...data } as Widget : w))
     );
+  };
+
+  const handleDragStart = (id: string) => {
+    setDraggedId(id);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (targetId: string) => {
+    if (!draggedId || draggedId === targetId) {
+      setDraggedId(null);
+      return;
+    }
+
+    setWidgets((current) => {
+      const currentWidgets = current || [];
+      const draggedIndex = currentWidgets.findIndex((w) => w.id === draggedId);
+      const targetIndex = currentWidgets.findIndex((w) => w.id === targetId);
+
+      if (draggedIndex === -1 || targetIndex === -1) return currentWidgets;
+
+      const newWidgets = [...currentWidgets];
+      const [draggedWidget] = newWidgets.splice(draggedIndex, 1);
+      newWidgets.splice(targetIndex, 0, draggedWidget);
+
+      return newWidgets.map((w, index) => ({ ...w, position: index }));
+    });
+
+    setDraggedId(null);
+    toast.success('Widget repositioned');
   };
 
   const currentWidgets = widgets || [];
@@ -86,36 +119,52 @@ function App() {
                     return (
                       <TasksWidget
                         key={widget.id}
+                        widgetId={widget.id}
                         tasks={widget.tasks}
                         onUpdate={(tasks) => updateWidget(widget.id, { tasks })}
                         onRemove={() => removeWidget(widget.id)}
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
                       />
                     );
                   case 'notes':
                     return (
                       <NotesWidget
                         key={widget.id}
+                        widgetId={widget.id}
                         notes={widget.notes}
                         onUpdate={(notes) => updateWidget(widget.id, { notes })}
                         onRemove={() => removeWidget(widget.id)}
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
                       />
                     );
                   case 'habits':
                     return (
                       <HabitsWidget
                         key={widget.id}
+                        widgetId={widget.id}
                         habits={widget.habits}
                         onUpdate={(habits) => updateWidget(widget.id, { habits })}
                         onRemove={() => removeWidget(widget.id)}
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
                       />
                     );
                   case 'goals':
                     return (
                       <GoalsWidget
                         key={widget.id}
+                        widgetId={widget.id}
                         goals={widget.goals}
                         onUpdate={(goals) => updateWidget(widget.id, { goals })}
                         onRemove={() => removeWidget(widget.id)}
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
                       />
                     );
                   default:

@@ -12,9 +12,13 @@ interface GoalsWidgetProps {
   goals: Goal[];
   onUpdate: (goals: Goal[]) => void;
   onRemove: () => void;
+  widgetId: string;
+  onDragStart: (id: string) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (id: string) => void;
 }
 
-export function GoalsWidget({ goals, onUpdate, onRemove }: GoalsWidgetProps) {
+export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, onDragOver, onDrop }: GoalsWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -48,7 +52,15 @@ export function GoalsWidget({ goals, onUpdate, onRemove }: GoalsWidgetProps) {
   };
 
   return (
-    <WidgetContainer title="Goals" icon={<Target size={24} />} onRemove={onRemove}>
+    <WidgetContainer 
+      title="Goals" 
+      icon={<Target size={24} />} 
+      onRemove={onRemove}
+      widgetId={widgetId}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
       {!showNew && (
         <Button
           onClick={() => setShowNew(true)}
