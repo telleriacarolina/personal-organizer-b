@@ -96,6 +96,7 @@ export function ShoppingWidget({
   const [receiptTotal, setReceiptTotal] = useState('');
   const [receiptNotes, setReceiptNotes] = useState('');
   const [receiptImageInput, setReceiptImageInput] = useState<File | null>(null);
+  const [isProcessingReceipt, setIsProcessingReceipt] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showAnalyticsDialog, setShowAnalyticsDialog] = useState(false);
@@ -128,7 +129,14 @@ export function ShoppingWidget({
     
     setIsScanning(true);
     try {
-      const prompt = window.spark.llmPrompt(['You are a product information assistant. Given this barcode number: ',', provide the most likely product name and category.\n\nReturn a JSON object with:\n- name: the product name (string)\n- category: one of: groceries, household, personal-care, electronics, clothing, health, other\n- estimatedPrice: a reasonable estimated price in USD (number)\n\nBe realistic and use common knowledge about products.'], barcodeInput);
+      const prompt = window.spark.llmPrompt`You are a product information assistant. Given this barcode number: ${barcodeInput}, provide the most likely product name and category.
+
+Return a JSON object with:
+- name: the product name (string)
+- category: one of: groceries, household, personal-care, electronics, clothing, health, other
+- estimatedPrice: a reasonable estimated price in USD (number)
+
+Be realistic and use common knowledge about products.`;
 
       const result = await window.spark.llm(prompt, 'gpt-4o-mini', true);
       const productInfo = JSON.parse(result);
@@ -155,14 +163,92 @@ export function ShoppingWidget({
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setReceiptImageInput(file);
+    setIsProcessingReceipt(true);
+    
+    try {
+      const reader = new FileReader();
+      const imageData = await new Promise<string>((resolve) => {
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.readAsDataURL(file);
+      });
+      
+      const prompt = window.spark.llmPrompt`You are an expert receipt OCR system. Analyze this receipt image and extract:
+1. Store name
+2. Date (if visible)
+3. All items with their names, quantities (if shown), and prices
+4. Total amount
+5. Tax and subtotal (if shown)
+
+Return a JSON object with these exact properties:
+{
+  "storeName": "store name as string",
+  "date": "YYYY-MM-DD format if found, otherwise today's date",
+  "items": [{"name": "item name", "quantity": "qty if shown", "price": price_as_number, "category": "best_guess_category"}],
+  "total": total_as_number,
+  "tax": tax_as_number_or_null,
+  "subtotal": subtotal_as_number_or_null
+}
+
+Categories must be one of: groceries, household, personal-care, electronics, clothing, health, other
+
+If the image doesn't contain a receipt, return null for all fields except items (empty array).`;
+
+      const result = await window.spark.llm(prompt, 'gpt-4o', true);
+      const extracted = JSON.parse(result);
+      
+      if (extracted.storeName) {
+        setReceiptStoreName(extracted.storeName);
+      }
+      
+      if (extracted.date) {
+        setReceiptDate(extracted.date);
+      }
+      
+      if (extracted.items && extracted.items.length > 0) {
+        const itemsText = extracted.items.map((item: any) => 
+          `${item.name}${item.quantity ? ` (${item.quantity})` : ''} ${item.price}`
+        ).join('\n');
+        setReceiptItems(itemsText);
+      }
+      
+      if (extracted.total) {
+        setReceiptTotal(extracted.total.toString());
+      }
+      
+      toast.success('Receipt scanned! Review and confirm the details.');
+    } catch (error) {
+      console.error('Image processing error:', error);
+      toast.error('Failed to process receipt image. You can manually enter the details.');
+    } finally {
+      setIsProcessingReceipt(false);
+    }
+  };
+
   const handleReceiptScan = async () => {
-    if (!receiptItems.trim() || !receiptStoreName.trim()) {
-      toast.error('Please fill in store name and items');
+    if ((!receiptItems.trim() && !receiptImageInput) || !receiptStoreName.trim()) {
+      toast.error('Please fill in store name and items, or upload a receipt image');
       return;
     }
 
+    setIsProcessingReceipt(true);
     try {
-      const prompt = window.spark.llmPrompt(['You are a receipt parser. Parse this receipt information:\nStore: ', '\nItems text: ', '\nTotal: ', '\n\nReturn a JSON object with a single property "items" that contains an array of objects with:\n- name: item name (string)\n- quantity: quantity if mentioned (string or undefined)\n- price: price per item in USD (number)\n- category: best guess from: groceries, household, personal-care, electronics, clothing, health, other\n\nBe smart about parsing prices and quantities from the text.'], receiptStoreName, receiptItems, receiptTotal || 'unknown');
+      const prompt = window.spark.llmPrompt`You are a receipt parser. Parse this receipt information:
+Store: ${receiptStoreName}
+Items text: ${receiptItems}
+Total: ${receiptTotal || 'unknown'}
+
+Return a JSON object with a single property "items" that contains an array of objects with:
+- name: item name (string)
+- quantity: quantity if mentioned (string or undefined)
+- price: price per item in USD (number)
+- category: best guess from: groceries, household, personal-care, electronics, clothing, health, other
+
+Be smart about parsing prices and quantities from the text.`;
 
       const result = await window.spark.llm(prompt, 'gpt-4o', true);
       const parsed = JSON.parse(result);
@@ -466,6 +552,46 @@ export function ShoppingWidget({
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                {isProcessingReceipt && (
+                  <div className="flex items-center justify-center gap-2 p-4 bg-primary/10 rounded-lg border border-primary/20">
+                    <MagnifyingGlass size={20} className="animate-spin text-primary" />
+                    <span className="text-sm font-medium">Processing receipt...</span>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Quick Scan (Recommended)</label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full gap-2 h-12 border-2 border-dashed hover:border-primary hover:bg-primary/5"
+                      disabled={isProcessingReceipt}
+                    >
+                      <Camera size={20} />
+                      {receiptImageInput ? `Selected: ${receiptImageInput.name}` : 'Upload Receipt Photo'}
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageUpload}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">AI will automatically extract items, prices, and store details</p>
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-popover px-2 text-muted-foreground">Or enter manually</span>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Store Name</label>
@@ -473,6 +599,7 @@ export function ShoppingWidget({
                       placeholder="e.g., Walmart"
                       value={receiptStoreName}
                       onChange={(e) => setReceiptStoreName(e.target.value)}
+                      disabled={isProcessingReceipt}
                     />
                   </div>
                   <div className="space-y-2">
@@ -481,6 +608,7 @@ export function ShoppingWidget({
                       type="date"
                       value={receiptDate}
                       onChange={(e) => setReceiptDate(e.target.value)}
+                      disabled={isProcessingReceipt}
                     />
                   </div>
                 </div>
@@ -492,6 +620,7 @@ export function ShoppingWidget({
                     value={receiptItems}
                     onChange={(e) => setReceiptItems(e.target.value)}
                     rows={6}
+                    disabled={isProcessingReceipt}
                   />
                 </div>
 
@@ -504,26 +633,14 @@ export function ShoppingWidget({
                       placeholder="0.00"
                       value={receiptTotal}
                       onChange={(e) => setReceiptTotal(e.target.value)}
+                      disabled={isProcessingReceipt}
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Receipt Image (Optional)</label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full gap-2"
-                    >
-                      <Camera size={16} />
-                      {receiptImageInput ? 'Change Image' : 'Upload Image'}
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => setReceiptImageInput(e.target.files?.[0] || null)}
-                    />
+                    <label className="text-sm font-medium">Receipt Photo</label>
+                    <div className="text-xs text-muted-foreground">
+                      {receiptImageInput ? `✓ ${receiptImageInput.name}` : 'No image selected'}
+                    </div>
                   </div>
                 </div>
 
@@ -534,12 +651,22 @@ export function ShoppingWidget({
                     value={receiptNotes}
                     onChange={(e) => setReceiptNotes(e.target.value)}
                     rows={2}
+                    disabled={isProcessingReceipt}
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowReceiptDialog(false)}>Cancel</Button>
-                <Button onClick={handleReceiptScan}>Add Receipt</Button>
+                <Button variant="outline" onClick={() => setShowReceiptDialog(false)} disabled={isProcessingReceipt}>Cancel</Button>
+                <Button onClick={handleReceiptScan} disabled={isProcessingReceipt}>
+                  {isProcessingReceipt ? (
+                    <>
+                      <MagnifyingGlass size={16} className="animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Add Receipt'
+                  )}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

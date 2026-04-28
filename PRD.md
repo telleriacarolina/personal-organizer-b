@@ -40,12 +40,19 @@ This is a complex application because it involves multiple customizable modules 
 - **Progression**: User creates habit → Sets habit name → Marks daily completion → Visual streak builds → Celebrates milestones
 - **Success criteria**: Habits show clear visual feedback for completion, display current streak count, and reset tracking at midnight
 
+### Shopping List & Expense Tracking Widget
+- **Functionality**: Comprehensive shopping management with barcode scanning, receipt processing via AI, expense tracking, and period-over-period spending analytics
+- **Purpose**: Helps users manage shopping lists, track actual spending, compare shopping trips, and analyze spending habits across time periods
+- **Trigger**: User adds shopping widget, then can scan barcodes/receipts or manually add items
+- **Progression**: User adds items manually OR scans barcode for auto-population OR uploads/pastes receipt text → AI parses receipt items, prices, categories → Items auto-added to list and history → Analytics show spending comparisons (day/week/month/year) → User views trends by category and store
+- **Success criteria**: Receipt scanning accurately extracts items and prices, spending analytics show meaningful trends, items categorize intelligently, trip comparisons provide actionable insights, all data persists between sessions
+
 ### Dashboard Customization
-- **Functionality**: Users can add, remove, resize, and rearrange widgets on their dashboard with flexible layout that allows widgets to fit next to each other based on their individual sizes
+- **Functionality**: Users can add, remove, resize, and rearrange widgets on their dashboard with flexible layout that allows widgets to fit next to each other based on their individual sizes, plus global lock/unlock and grid snap features
 - **Purpose**: Enables personalization so each user's organizer reflects their priorities and workflow
-- **Trigger**: User drags widget or resizes via corner handle or pinch gesture
-- **Progression**: User drags widget handle → Widget repositions anywhere on dashboard → Widgets flow and fit next to each other → Layout auto-saves OR User resizes via corner/pinch → Widget adjusts to custom size → Layout auto-saves
-- **Success criteria**: Layout persists between sessions, feels smooth and intuitive, widgets fit flexibly next to each other without rigid grid constraints, resizing is responsive and intuitive
+- **Trigger**: User drags widget or resizes via corner handle or pinch gesture, or toggles grid snap/lock controls
+- **Progression**: User drags widget handle → Widget repositions anywhere on dashboard → Widgets flow and fit next to each other → Layout auto-saves OR User resizes via corner/pinch → Widget adjusts to custom size → Layout auto-saves OR User toggles grid snap → Widgets align to 50px grid → User locks all widgets to prevent accidental changes
+- **Success criteria**: Layout persists between sessions, feels smooth and intuitive, widgets fit flexibly next to each other without rigid grid constraints, resizing is responsive and intuitive, grid snapping provides precise alignment, global lock prevents unwanted changes
 
 ### Theme Personalization
 - **Functionality**: Users can select from preset color themes, create custom color schemes using color pickers, or upload background images to personalize their organizer
