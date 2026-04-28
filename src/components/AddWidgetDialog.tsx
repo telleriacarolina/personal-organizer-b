@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ListChecks, Note, Fire, Target, Calendar, Briefcase } from '@phosphor-icons/react';
+import { ListChecks, Note, Fire, Target, Calendar, Briefcase, ShoppingCart } from '@phosphor-icons/react';
 import { WidgetType } from '@/types';
 
 interface AddWidgetDialogProps {
@@ -46,6 +46,12 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
       title: 'Calendar',
       description: 'Schedule events with reminders',
       icon: <Calendar size={32} />,
+    },
+    {
+      type: 'shopping' as WidgetType,
+      title: 'Shopping List',
+      description: 'Personal shopping with budgets & categories',
+      icon: <ShoppingCart size={32} />,
     },
     {
       type: 'work' as WidgetType,

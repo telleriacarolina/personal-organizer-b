@@ -1,4 +1,4 @@
-export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work';
+export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work' | 'shopping';
 
 export interface WidgetSize {
   width: number;
@@ -186,4 +186,24 @@ export interface WorkWidget extends BaseWidget {
   organizationPreference?: WorkOrganizationPreference;
 }
 
-export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget;
+export interface PersonalShoppingItem {
+  id: string;
+  name: string;
+  quantity?: string;
+  category: 'groceries' | 'household' | 'personal-care' | 'electronics' | 'clothing' | 'health' | 'other';
+  store?: string;
+  estimatedPrice?: number;
+  actualPrice?: number;
+  purchased: boolean;
+  priority: 'low' | 'medium' | 'high';
+  notes?: string;
+  createdAt: number;
+}
+
+export interface ShoppingWidget extends BaseWidget {
+  type: 'shopping';
+  items: PersonalShoppingItem[];
+  budget?: number;
+}
+
+export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget;

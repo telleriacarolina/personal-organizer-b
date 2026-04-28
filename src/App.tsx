@@ -12,6 +12,7 @@ import { HabitsWidget } from '@/components/widgets/HabitsWidget';
 import { GoalsWidget } from '@/components/widgets/GoalsWidget';
 import { CalendarWidget } from '@/components/widgets/CalendarWidget';
 import { WorkWidget } from '@/components/widgets/WorkWidget';
+import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { Widget, WidgetType } from '@/types';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
@@ -41,6 +42,7 @@ function App() {
       ...(type === 'habits' && { habits: [] }),
       ...(type === 'goals' && { goals: [] }),
       ...(type === 'calendar' && { events: [] }),
+      ...(type === 'shopping' && { items: [] }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
@@ -328,6 +330,15 @@ function App() {
                         {...widgetProps}
                         events={widget.events}
                         onUpdate={(events) => updateWidget(widget.id, { events })}
+                      />
+                    );
+                  case 'shopping':
+                    return (
+                      <ShoppingWidget
+                        {...widgetProps}
+                        items={widget.items}
+                        budget={widget.budget}
+                        onUpdate={(data) => updateWidget(widget.id, data)}
                       />
                     );
                   case 'work':
