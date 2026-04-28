@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ListChecks, Note, Fire, Target } from '@phosphor-icons/react';
+import { ListChecks, Note, Fire, Target, Calendar } from '@phosphor-icons/react';
 import { WidgetType } from '@/types';
 
 interface AddWidgetDialogProps {
@@ -40,6 +40,12 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
       title: 'Goals',
       description: 'Set and achieve your long-term goals',
       icon: <Target size={32} />,
+    },
+    {
+      type: 'calendar' as WidgetType,
+      title: 'Calendar',
+      description: 'Schedule events with reminders',
+      icon: <Calendar size={32} />,
     },
   ];
 

@@ -9,6 +9,7 @@ import { TasksWidget } from '@/components/widgets/TasksWidget';
 import { NotesWidget } from '@/components/widgets/NotesWidget';
 import { HabitsWidget } from '@/components/widgets/HabitsWidget';
 import { GoalsWidget } from '@/components/widgets/GoalsWidget';
+import { CalendarWidget } from '@/components/widgets/CalendarWidget';
 import { Widget, WidgetType } from '@/types';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
       ...(type === 'notes' && { notes: [] }),
       ...(type === 'habits' && { habits: [] }),
       ...(type === 'goals' && { goals: [] }),
+      ...(type === 'calendar' && { events: [] }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
@@ -165,6 +167,19 @@ function App() {
                         widgetId={widget.id}
                         goals={widget.goals}
                         onUpdate={(goals) => updateWidget(widget.id, { goals })}
+                        onRemove={() => removeWidget(widget.id)}
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                      />
+                    );
+                  case 'calendar':
+                    return (
+                      <CalendarWidget
+                        key={widget.id}
+                        widgetId={widget.id}
+                        events={widget.events}
+                        onUpdate={(events) => updateWidget(widget.id, { events })}
                         onRemove={() => removeWidget(widget.id)}
                         onDragStart={handleDragStart}
                         onDragOver={handleDragOver}

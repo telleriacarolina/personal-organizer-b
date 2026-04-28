@@ -1,4 +1,4 @@
-export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals';
+export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar';
 
 export interface BaseWidget {
   id: string;
@@ -58,4 +58,22 @@ export interface GoalsWidget extends BaseWidget {
   goals: Goal[];
 }
 
-export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget;
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description?: string;
+  date: number;
+  startTime?: string;
+  endTime?: string;
+  reminder?: number;
+  reminderSent?: boolean;
+  color?: string;
+  createdAt: number;
+}
+
+export interface CalendarWidget extends BaseWidget {
+  type: 'calendar';
+  events: CalendarEvent[];
+}
+
+export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget;
