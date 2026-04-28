@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useKV } from '@github/spark/hooks';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowsOutCardinal } from '@phosphor-icons/react';
+import { Plus, ArrowsOutCardinal, GridFour } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
@@ -21,6 +21,7 @@ function App() {
   const [showDragHint, setShowDragHint] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showWorkQuestionnaire, setShowWorkQuestionnaire] = useState(false);
+  const [snapToGrid, setSnapToGrid] = useKV<boolean>('organizer-snap-to-grid', false);
   const dragStartTimeRef = useRef<number>(0);
 
   const addWidget = (type: WidgetType) => {
@@ -82,6 +83,11 @@ function App() {
     );
   };
 
+  const toggleSnapToGrid = () => {
+    setSnapToGrid((current) => !current);
+    toast.success(snapToGrid ? 'Grid snapping disabled' : 'Grid snapping enabled');
+  };
+
   const handleReorder = (newOrder: Widget[]) => {
     setWidgets(newOrder.map((w, index) => ({ ...w, position: index })));
   };
@@ -126,6 +132,15 @@ function App() {
               </p>
             </div>
             <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
+              <Button 
+                onClick={toggleSnapToGrid} 
+                size="lg" 
+                variant={snapToGrid ? "default" : "outline"}
+                className="gap-2 flex-shrink-0"
+              >
+                <GridFour size={20} weight={snapToGrid ? "fill" : "regular"} />
+                <span className="hidden lg:inline">{snapToGrid ? 'Grid: On' : 'Grid: Off'}</span>
+              </Button>
               <ThemeCustomizationButton />
               <Button onClick={() => setShowAddDialog(true)} size="lg" className="gap-2 flex-1 sm:flex-initial">
                 <Plus size={20} />
@@ -200,8 +215,11 @@ function App() {
               axis="y"
               values={currentWidgets}
               onReorder={handleReorder}
-              className="flex flex-wrap gap-3 sm:gap-4 relative"
+              className={`flex flex-wrap gap-3 sm:gap-4 relative ${snapToGrid ? 'grid-snap-container' : ''}`}
             >
+              {snapToGrid && (
+                <div className="absolute inset-0 pointer-events-none z-0 grid-background" />
+              )}
               {isDragging && (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -219,6 +237,7 @@ function App() {
                   onDragEnd: handleDragEnd,
                   size: widget.size,
                   onSizeChange: (size: { width: number; height: number }) => updateWidgetSize(widget.id, size),
+                  snapToGrid: snapToGrid,
                 };
 
                 switch (widget.type) {

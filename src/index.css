@@ -23,6 +23,31 @@
   }
 }
 
+.grid-snap-container {
+  position: relative;
+}
+
+.grid-background {
+  background-image: 
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 49px,
+      oklch(var(--primary) / 0.1) 49px,
+      oklch(var(--primary) / 0.1) 50px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 49px,
+      oklch(var(--primary) / 0.1) 49px,
+      oklch(var(--primary) / 0.1) 50px
+    );
+  background-size: 50px 50px;
+  pointer-events: none;
+  border-radius: 0.75rem;
+}
+
 :root {
   --background: oklch(0.95 0.02 85);
   --foreground: oklch(0.25 0.02 35);

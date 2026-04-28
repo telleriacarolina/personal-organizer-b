@@ -15,6 +15,7 @@ interface WidgetContainerProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
 }
 
 export function WidgetContainer({ 
@@ -26,7 +27,8 @@ export function WidgetContainer({
   onDragStart,
   onDragEnd,
   size,
-  onSizeChange
+  onSizeChange,
+  snapToGrid = false
 }: WidgetContainerProps) {
   const dragControls = useDragControls();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -35,10 +37,16 @@ export function WidgetContainer({
   const [isPinching, setIsPinching] = useState(false);
   const [pinchStart, setPinchStart] = useState({ distance: 0, width: 0, height: 0 });
 
+  const GRID_SIZE = 50;
   const defaultWidth = 350;
   const defaultHeight = 400;
   const currentWidth = size?.width || defaultWidth;
   const currentHeight = size?.height || defaultHeight;
+
+  const snapToGridValue = (value: number) => {
+    if (!snapToGrid) return value;
+    return Math.round(value / GRID_SIZE) * GRID_SIZE;
+  };
 
   const handleResizeStart = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -82,8 +90,11 @@ export function WidgetContainer({
       if (isResizing) {
         const deltaX = e.clientX - resizeStart.x;
         const deltaY = e.clientY - resizeStart.y;
-        const newWidth = Math.max(250, Math.min(800, resizeStart.width + deltaX));
-        const newHeight = Math.max(300, Math.min(1000, resizeStart.height + deltaY));
+        let newWidth = Math.max(250, Math.min(800, resizeStart.width + deltaX));
+        let newHeight = Math.max(300, Math.min(1000, resizeStart.height + deltaY));
+        
+        newWidth = snapToGridValue(newWidth);
+        newHeight = snapToGridValue(newHeight);
         
         if (onSizeChange) {
           onSizeChange({ width: newWidth, height: newHeight });
@@ -105,8 +116,11 @@ export function WidgetContainer({
           touch2.clientY - touch1.clientY
         );
         const scale = distance / pinchStart.distance;
-        const newWidth = Math.max(250, Math.min(800, pinchStart.width * scale));
-        const newHeight = Math.max(300, Math.min(1000, pinchStart.height * scale));
+        let newWidth = Math.max(250, Math.min(800, pinchStart.width * scale));
+        let newHeight = Math.max(300, Math.min(1000, pinchStart.height * scale));
+        
+        newWidth = snapToGridValue(newWidth);
+        newHeight = snapToGridValue(newHeight);
         
         if (onSizeChange) {
           onSizeChange({ width: newWidth, height: newHeight });
@@ -134,7 +148,7 @@ export function WidgetContainer({
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange]);
+  }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGrid]);
 
   return (
     <Reorder.Item
