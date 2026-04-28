@@ -10,6 +10,7 @@ import { NotesWidget } from '@/components/widgets/NotesWidget';
 import { HabitsWidget } from '@/components/widgets/HabitsWidget';
 import { GoalsWidget } from '@/components/widgets/GoalsWidget';
 import { CalendarWidget } from '@/components/widgets/CalendarWidget';
+import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { Widget, WidgetType } from '@/types';
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
       ...(type === 'habits' && { habits: [] }),
       ...(type === 'goals' && { goals: [] }),
       ...(type === 'calendar' && { events: [] }),
+      ...(type === 'work' && { clientSlots: [], meals: [], timeEntries: [], jobs: [], shoppingList: [], errands: [] }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
@@ -180,6 +182,24 @@ function App() {
                         widgetId={widget.id}
                         events={widget.events}
                         onUpdate={(events) => updateWidget(widget.id, { events })}
+                        onRemove={() => removeWidget(widget.id)}
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                      />
+                    );
+                  case 'work':
+                    return (
+                      <WorkWidget
+                        key={widget.id}
+                        widgetId={widget.id}
+                        clientSlots={widget.clientSlots}
+                        meals={widget.meals}
+                        timeEntries={widget.timeEntries}
+                        jobs={widget.jobs}
+                        shoppingList={widget.shoppingList}
+                        errands={widget.errands}
+                        onUpdate={(data) => updateWidget(widget.id, data)}
                         onRemove={() => removeWidget(widget.id)}
                         onDragStart={handleDragStart}
                         onDragOver={handleDragOver}

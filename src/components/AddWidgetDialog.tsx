@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ListChecks, Note, Fire, Target, Calendar } from '@phosphor-icons/react';
+import { ListChecks, Note, Fire, Target, Calendar, Briefcase } from '@phosphor-icons/react';
 import { WidgetType } from '@/types';
 
 interface AddWidgetDialogProps {
@@ -47,6 +47,12 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
       description: 'Schedule events with reminders',
       icon: <Calendar size={32} />,
     },
+    {
+      type: 'work' as WidgetType,
+      title: 'Work Dashboard',
+      description: 'Clients, jobs, time tracking, meals, shopping & errands',
+      icon: <Briefcase size={32} />,
+    },
   ];
 
   return (
@@ -63,7 +69,9 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
             <Button
               key={widget.type}
               variant="outline"
-              className="h-auto flex-col gap-3 p-6 hover:border-primary hover:bg-primary/5"
+              className={`h-auto flex-col gap-3 p-6 hover:border-primary hover:bg-primary/5 ${
+                widget.type === 'work' ? 'col-span-2' : ''
+              }`}
               onClick={() => {
                 onAddWidget(widget.type);
                 onOpenChange(false);

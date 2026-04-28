@@ -1,4 +1,4 @@
-export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar';
+export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work';
 
 export interface BaseWidget {
   id: string;
@@ -76,4 +76,79 @@ export interface CalendarWidget extends BaseWidget {
   events: CalendarEvent[];
 }
 
-export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget;
+export interface ClientSlot {
+  id: string;
+  clientName: string;
+  date: number;
+  startTime: string;
+  endTime: string;
+  service?: string;
+  notes?: string;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  createdAt: number;
+}
+
+export interface WorkMeal {
+  id: string;
+  name: string;
+  date: number;
+  time: string;
+  items?: string[];
+  notes?: string;
+  createdAt: number;
+}
+
+export interface TimeEntry {
+  id: string;
+  description: string;
+  startTime: number;
+  endTime?: number;
+  duration?: number;
+  project?: string;
+  createdAt: number;
+}
+
+export interface Job {
+  id: string;
+  title: string;
+  client: string;
+  description?: string;
+  status: 'pending' | 'in-progress' | 'completed' | 'on-hold';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  deadline?: number;
+  estimatedHours?: number;
+  actualHours?: number;
+  createdAt: number;
+}
+
+export interface ShoppingItem {
+  id: string;
+  item: string;
+  quantity?: string;
+  category?: string;
+  purchased: boolean;
+  createdAt: number;
+}
+
+export interface WorkErrand {
+  id: string;
+  title: string;
+  description?: string;
+  location?: string;
+  dueDate?: number;
+  completed: boolean;
+  priority: 'low' | 'medium' | 'high';
+  createdAt: number;
+}
+
+export interface WorkWidget extends BaseWidget {
+  type: 'work';
+  clientSlots: ClientSlot[];
+  meals: WorkMeal[];
+  timeEntries: TimeEntry[];
+  jobs: Job[];
+  shoppingList: ShoppingItem[];
+  errands: WorkErrand[];
+}
+
+export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget;
