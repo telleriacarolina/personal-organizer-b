@@ -48,11 +48,11 @@ This is a complex application because it involves multiple customizable modules 
 - **Success criteria**: Layout persists between sessions, feels smooth and intuitive, prevents overlapping or broken layouts
 
 ### Theme Personalization
-- **Functionality**: Users can select from preset color themes or create custom color schemes
+- **Functionality**: Users can select from preset color themes to customize the appearance of their organizer
 - **Purpose**: Makes the organizer feel personal and visually appealing to individual preferences
-- **Trigger**: User opens theme settings panel
-- **Progression**: User opens settings → Selects theme option → Previews colors → Applies theme → Interface updates immediately
-- **Success criteria**: Theme changes apply instantly, persist between sessions, maintain readability and accessibility
+- **Trigger**: User clicks "Customize Theme" button in header
+- **Progression**: User opens theme dialog → Previews themes by hovering → Selects preferred theme → Theme applies instantly → Preference saves automatically
+- **Success criteria**: Theme changes apply instantly, persist between sessions, maintain readability and accessibility, preview works smoothly on hover
 
 ## Edge Case Handling
 

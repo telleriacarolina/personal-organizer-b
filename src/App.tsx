@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useKV } from '@github/spark/hooks';
 import { Button } from '@/components/ui/button';
 import { Plus } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
+import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
 import { TasksWidget } from '@/components/widgets/TasksWidget';
 import { NotesWidget } from '@/components/widgets/NotesWidget';
 import { HabitsWidget } from '@/components/widgets/HabitsWidget';
@@ -88,10 +89,13 @@ function App() {
                 Your personalized productivity dashboard
               </p>
             </div>
-            <Button onClick={() => setShowAddDialog(true)} size="lg" className="gap-2">
-              <Plus size={20} />
-              Add Widget
-            </Button>
+            <div className="flex gap-3">
+              <ThemeCustomizationButton />
+              <Button onClick={() => setShowAddDialog(true)} size="lg" className="gap-2">
+                <Plus size={20} />
+                Add Widget
+              </Button>
+            </div>
           </div>
 
           {currentWidgets.length === 0 ? (
