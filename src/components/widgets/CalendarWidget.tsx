@@ -161,6 +161,20 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
     return eventColors.find((c) => c.value === colorValue)?.class || eventColors[0].class;
   };
 
+  const getEventsForMonth = () => {
+    const monthStartDate = startOfMonth(currentMonth);
+    const monthEndDate = endOfMonth(currentMonth);
+    
+    return events
+      .filter((event) => {
+        const eventDate = new Date(event.date);
+        return eventDate >= monthStartDate && eventDate <= monthEndDate;
+      })
+      .sort((a, b) => a.date - b.date);
+  };
+
+  const monthEvents = getEventsForMonth();
+
   return (
     <WidgetContainer
       title="Calendar"
@@ -366,6 +380,87 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
             </div>
           </div>
         )}
+
+        <div className="border-t border-border pt-4 mt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-semibold text-sm text-foreground">
+              Events & Plans - {format(currentMonth, 'MMMM yyyy')}
+            </h4>
+            {monthEvents.length > 0 && (
+              <Badge variant="outline" className="text-xs">
+                {monthEvents.length} {monthEvents.length === 1 ? 'event' : 'events'}
+              </Badge>
+            )}
+          </div>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            <AnimatePresence>
+              {monthEvents.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-center py-8"
+                >
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-3">
+                    <Calendar size={24} className="text-muted-foreground" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    No events this month
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Click "Add Event" to get started
+                  </p>
+                </motion.div>
+              ) : (
+                monthEvents.map((event) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -50 }}
+                    className={`p-3 rounded-lg border cursor-pointer group hover:shadow-sm transition-all ${getColorClass(event.color || 'blue')}`}
+                    onClick={() => openEditDialog(event)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold opacity-75">
+                            {format(new Date(event.date), 'EEE, MMM d')}
+                          </span>
+                          {isToday(new Date(event.date)) && (
+                            <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-primary text-primary-foreground">
+                              Today
+                            </Badge>
+                          )}
+                        </div>
+                        <h5 className="font-medium text-sm">{event.title}</h5>
+                        {event.description && (
+                          <p className="text-xs opacity-80 mt-1 line-clamp-2">{event.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {event.startTime && (
+                            <Badge variant="secondary" className="text-xs h-5 gap-1 bg-background/50">
+                              <Clock size={12} />
+                              {event.startTime}
+                              {event.endTime && ` - ${event.endTime}`}
+                            </Badge>
+                          )}
+                          {event.reminder && (
+                            <Badge variant="secondary" className="text-xs h-5 gap-1 bg-background/50">
+                              <Bell size={12} />
+                              {event.reminder}m before
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <Pencil size={14} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1" />
+                    </div>
+                  </motion.div>
+                ))
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
