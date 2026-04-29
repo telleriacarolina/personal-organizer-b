@@ -8,11 +8,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows } from '@phosphor-icons/react';
 import { CalendarEvent, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks } from 'date-fns';
 
 interface CalendarWidgetProps {
   events: CalendarEvent[];
@@ -38,7 +39,9 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -151,6 +154,10 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
   const calendarEnd = endOfWeek(monthEnd);
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
+  const weekStart = startOfWeek(currentWeek);
+  const weekEnd = endOfWeek(currentWeek);
+  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
   const getEventsForDate = (date: Date) => {
     return events.filter((event) => isSameDay(new Date(event.date), date));
   };
@@ -173,7 +180,40 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
       .sort((a, b) => a.date - b.date);
   };
 
+  const getEventsForWeek = () => {
+    const weekStartDate = startOfWeek(currentWeek);
+    const weekEndDate = endOfWeek(currentWeek);
+    
+    return events
+      .filter((event) => {
+        const eventDate = new Date(event.date);
+        return eventDate >= weekStartDate && eventDate <= weekEndDate;
+      })
+      .sort((a, b) => a.date - b.date);
+  };
+
   const monthEvents = getEventsForMonth();
+  const weekEvents = getEventsForWeek();
+
+  const handleNavigatePrev = () => {
+    if (viewMode === 'month') {
+      setCurrentMonth(subMonths(currentMonth, 1));
+    } else {
+      setCurrentWeek(subWeeks(currentWeek, 1));
+    }
+  };
+
+  const handleNavigateNext = () => {
+    if (viewMode === 'month') {
+      setCurrentMonth(addMonths(currentMonth, 1));
+    } else {
+      setCurrentWeek(addWeeks(currentWeek, 1));
+    }
+  };
+
+  const currentDisplayTitle = viewMode === 'month'
+    ? format(currentMonth, 'MMMM yyyy')
+    : `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
 
   return (
     <WidgetContainer
@@ -188,35 +228,53 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
       widgetType="calendar"
     >
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              className="h-8 w-8"
+              onClick={handleNavigatePrev}
+              className="h-8 w-8 flex-shrink-0"
             >
               <CaretLeft size={16} />
             </Button>
-            <h3 className="font-semibold text-foreground min-w-[140px] text-center">
-              {format(currentMonth, 'MMMM yyyy')}
+            <h3 className="font-semibold text-foreground min-w-[140px] text-center text-xs sm:text-sm">
+              {currentDisplayTitle}
             </h3>
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="h-8 w-8"
+              onClick={handleNavigateNext}
+              className="h-8 w-8 flex-shrink-0"
             >
               <CaretRight size={16} />
             </Button>
           </div>
-          <Button onClick={() => openAddDialog()} size="sm" className="gap-2">
-            <Plus size={16} />
-            Add Event
-          </Button>
+          <div className="flex items-center gap-2">
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={(value) => value && setViewMode(value as 'month' | 'week')}
+              className="border rounded-lg p-0.5"
+            >
+              <ToggleGroupItem value="month" aria-label="Month view" className="h-7 px-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                <CalendarBlank size={14} className="sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Month</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="week" aria-label="Week view" className="h-7 px-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                <Rows size={14} className="sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Week</span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Button onClick={() => openAddDialog()} size="sm" className="gap-1.5 h-7 text-xs flex-shrink-0">
+              <Plus size={14} />
+              <span className="hidden sm:inline">Add</span>
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
+        {viewMode === 'month' ? (
+          <div className="grid grid-cols-7 gap-1">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
             <div key={day} className="text-xs font-medium text-muted-foreground text-center py-1">
               {day}
@@ -316,6 +374,73 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
             return <div key={idx}>{calendarCell}</div>;
           })}
         </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="grid grid-cols-7 gap-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                <div key={day} className="text-xs font-medium text-muted-foreground text-center py-1">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {weekDays.map((day, idx) => {
+                const dayEvents = getEventsForDate(day);
+                const isSelected = selectedDate && isSameDay(day, selectedDate);
+                const isTodayDate = isToday(day);
+                const hasEvents = dayEvents.length > 0;
+
+                return (
+                  <div key={idx} className="flex flex-col gap-1">
+                    <button
+                      onClick={() => setSelectedDate(day)}
+                      onDoubleClick={() => openAddDialog(day)}
+                      className={`
+                        p-2 rounded-lg text-sm transition-all relative group
+                        ${isSelected ? 'bg-primary/20 ring-2 ring-primary' : 'hover:bg-accent/50 bg-card border border-border'}
+                        ${isTodayDate ? 'font-bold ring-2 ring-primary/50' : ''}
+                      `}
+                    >
+                      <div className="text-center font-semibold mb-1">
+                        {format(day, 'd')}
+                      </div>
+                      {hasEvents && (
+                        <Badge 
+                          variant="secondary" 
+                          className="h-4 w-full text-[10px] font-semibold bg-primary/80 text-primary-foreground"
+                        >
+                          {dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}
+                        </Badge>
+                      )}
+                    </button>
+                    <div className="space-y-1 min-h-[100px] max-h-[200px] overflow-y-auto">
+                      {dayEvents.slice(0, 3).map((event) => (
+                        <div
+                          key={event.id}
+                          onClick={() => openEditDialog(event)}
+                          className={`p-1.5 rounded text-[10px] cursor-pointer border ${getColorClass(event.color || 'blue')} hover:shadow-sm transition-shadow`}
+                        >
+                          <div className="font-medium truncate">{event.title}</div>
+                          {event.startTime && (
+                            <div className="flex items-center gap-0.5 mt-0.5 opacity-80">
+                              <Clock size={8} />
+                              <span>{event.startTime}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {dayEvents.length > 3 && (
+                        <div className="text-[9px] text-muted-foreground text-center py-0.5">
+                          +{dayEvents.length - 3} more
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {selectedDate && (
           <div className="border-t border-border pt-4">
@@ -384,17 +509,17 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
         <div className="border-t border-border pt-4 mt-4">
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-semibold text-sm text-foreground">
-              Events & Plans - {format(currentMonth, 'MMMM yyyy')}
+              Events & Plans - {viewMode === 'month' ? format(currentMonth, 'MMMM yyyy') : `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`}
             </h4>
-            {monthEvents.length > 0 && (
+            {(viewMode === 'month' ? monthEvents : weekEvents).length > 0 && (
               <Badge variant="outline" className="text-xs">
-                {monthEvents.length} {monthEvents.length === 1 ? 'event' : 'events'}
+                {(viewMode === 'month' ? monthEvents : weekEvents).length} {(viewMode === 'month' ? monthEvents : weekEvents).length === 1 ? 'event' : 'events'}
               </Badge>
             )}
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             <AnimatePresence>
-              {monthEvents.length === 0 ? (
+              {(viewMode === 'month' ? monthEvents : weekEvents).length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -405,14 +530,14 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                     <Calendar size={24} className="text-muted-foreground" />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    No events this month
+                    No events this {viewMode}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Click "Add Event" to get started
+                    Click "Add" to get started
                   </p>
                 </motion.div>
               ) : (
-                monthEvents.map((event) => (
+                (viewMode === 'month' ? monthEvents : weekEvents).map((event) => (
                   <motion.div
                     key={event.id}
                     initial={{ opacity: 0, y: -10 }}
