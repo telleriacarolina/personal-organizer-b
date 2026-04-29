@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,18 +9,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise } from '@phosphor-icons/react';
-import { PersonalShoppingItem, Receipt, ShoppingTrip, WidgetSize, ShoppingCategory } from '@/types';
+import { Switch } from '@/components/ui/switch';
+import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise, Bell, BellSlash, Sparkle, Lightning } from '@phosphor-icons/react';
+import { PersonalShoppingItem, Receipt, ShoppingTrip, ShoppingReminder, WidgetSize, ShoppingCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears } from 'date-fns';
+import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
 
 interface ShoppingWidgetProps {
   items: PersonalShoppingItem[];
   budget?: number;
   receipts?: Receipt[];
   trips?: ShoppingTrip[];
-  onUpdate: (data: { items?: PersonalShoppingItem[]; budget?: number; receipts?: Receipt[]; trips?: ShoppingTrip[] }) => void;
+  reminders?: ShoppingReminder[];
+  onUpdate: (data: { items?: PersonalShoppingItem[]; budget?: number; receipts?: Receipt[]; trips?: ShoppingTrip[]; reminders?: ShoppingReminder[] }) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -66,6 +68,7 @@ export function ShoppingWidget({
   budget,
   receipts = [],
   trips = [],
+  reminders = [],
   onUpdate,
   onRemove,
   widgetId,
@@ -105,6 +108,9 @@ export function ShoppingWidget({
   const [comparisonPeriod, setComparisonPeriod] = useState<'day' | 'week' | 'month' | 'year'>('month');
   const [showTripRevisitsDialog, setShowTripRevisitsDialog] = useState(false);
   const [selectedTripForRevisit, setSelectedTripForRevisit] = useState<ShoppingTrip | null>(null);
+  
+  const [showRemindersDialog, setShowRemindersDialog] = useState(false);
+  const [activeReminders, setActiveReminders] = useState<ShoppingReminder[]>([]);
 
   const addItem = () => {
     if (newItemName.trim()) {
@@ -561,6 +567,174 @@ Be smart about parsing prices and quantities from the text.`;
     return categoryCounts as Record<ShoppingCategory, number>;
   };
 
+  const generateSmartReminders = async () => {
+    if (trips.length < 3) {
+      toast.error('Need at least 3 shopping trips to generate smart reminders');
+      return;
+    }
+
+    const storeTrips: Record<string, ShoppingTrip[]> = {};
+    trips.forEach(trip => {
+      if (!storeTrips[trip.storeName]) {
+        storeTrips[trip.storeName] = [];
+      }
+      storeTrips[trip.storeName].push(trip);
+    });
+
+    const newReminders: ShoppingReminder[] = [];
+
+    for (const [storeName, storeTripsArray] of Object.entries(storeTrips)) {
+      if (storeTripsArray.length < 2) continue;
+
+      const sortedTrips = [...storeTripsArray].sort((a, b) => a.date - b.date);
+      const intervals: number[] = [];
+      
+      for (let i = 1; i < sortedTrips.length; i++) {
+        const daysBetween = differenceInDays(sortedTrips[i].date, sortedTrips[i-1].date);
+        intervals.push(daysBetween);
+      }
+
+      const avgInterval = intervals.reduce((sum, val) => sum + val, 0) / intervals.length;
+      let frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+      let nextDate: number;
+
+      if (avgInterval <= 2) {
+        frequency = 'daily';
+        nextDate = addDays(sortedTrips[sortedTrips.length - 1].date, 1).getTime();
+      } else if (avgInterval <= 9) {
+        frequency = 'weekly';
+        nextDate = addWeeks(sortedTrips[sortedTrips.length - 1].date, 1).getTime();
+      } else if (avgInterval <= 18) {
+        frequency = 'biweekly';
+        nextDate = addWeeks(sortedTrips[sortedTrips.length - 1].date, 2).getTime();
+      } else {
+        frequency = 'monthly';
+        nextDate = addMonths(sortedTrips[sortedTrips.length - 1].date, 1).getTime();
+      }
+
+      const avgSpend = sortedTrips.reduce((sum, t) => sum + t.total, 0) / sortedTrips.length;
+      
+      const storeReceipts = receipts.filter(r => 
+        sortedTrips.some(t => t.receiptIds.includes(r.id))
+      );
+      
+      const itemFrequency: Record<string, number> = {};
+      storeReceipts.forEach(receipt => {
+        receipt.items.forEach(item => {
+          itemFrequency[item.name] = (itemFrequency[item.name] || 0) + 1;
+        });
+      });
+
+      const commonItems = Object.entries(itemFrequency)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 8)
+        .map(([name]) => name);
+
+      const categoryFrequency: Record<ShoppingCategory, number> = {} as Record<ShoppingCategory, number>;
+      storeReceipts.forEach(receipt => {
+        receipt.items.forEach(item => {
+          const cat = item.category || 'other';
+          categoryFrequency[cat as ShoppingCategory] = (categoryFrequency[cat as ShoppingCategory] || 0) + 1;
+        });
+      });
+
+      const primaryCategory = (Object.entries(categoryFrequency).sort(([,a], [,b]) => b - a)[0]?.[0] || 'food') as ShoppingCategory;
+
+      newReminders.push({
+        id: `reminder-${Date.now()}-${storeName}`,
+        storeName,
+        category: primaryCategory,
+        frequency,
+        nextReminderDate: nextDate,
+        averageSpend: avgSpend,
+        commonItems,
+        enabled: true,
+        createdAt: Date.now(),
+      });
+    }
+
+    onUpdate({ reminders: [...reminders, ...newReminders] });
+    toast.success(`Created ${newReminders.length} smart shopping reminders!`);
+    setShowRemindersDialog(true);
+  };
+
+  const toggleReminder = (id: string) => {
+    onUpdate({
+      reminders: reminders.map(r => 
+        r.id === id ? { ...r, enabled: !r.enabled } : r
+      )
+    });
+  };
+
+  const deleteReminder = (id: string) => {
+    onUpdate({
+      reminders: reminders.filter(r => r.id !== id)
+    });
+    toast.success('Reminder deleted');
+  };
+
+  const snoozeReminder = (id: string, days: number) => {
+    const reminder = reminders.find(r => r.id === id);
+    if (!reminder) return;
+
+    const newDate = addDays(new Date(), days).getTime();
+    onUpdate({
+      reminders: reminders.map(r => 
+        r.id === id ? { ...r, nextReminderDate: newDate, lastTriggered: Date.now() } : r
+      )
+    });
+    toast.success(`Reminder snoozed for ${days} days`);
+  };
+
+  useEffect(() => {
+    const now = Date.now();
+    const triggered = reminders.filter(r => 
+      r.enabled && 
+      r.nextReminderDate <= now &&
+      (!r.lastTriggered || (now - r.lastTriggered) > 24 * 60 * 60 * 1000)
+    );
+
+    if (triggered.length > 0) {
+      setActiveReminders(triggered);
+    }
+  }, [reminders]);
+
+  useEffect(() => {
+    if (activeReminders.length > 0) {
+      activeReminders.forEach(reminder => {
+        toast(
+          <div className="flex flex-col gap-1">
+            <div className="font-semibold flex items-center gap-2">
+              <Bell size={18} className="text-primary" />
+              Time to shop at {reminder.storeName}!
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Based on your {reminder.frequency} shopping pattern
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Avg spend: ${reminder.averageSpend.toFixed(2)}
+            </div>
+          </div>,
+          {
+            duration: 10000,
+            action: {
+              label: 'View',
+              onClick: () => setShowRemindersDialog(true)
+            }
+          }
+        );
+      });
+
+      onUpdate({
+        reminders: reminders.map(r => 
+          activeReminders.find(ar => ar.id === r.id)
+            ? { ...r, lastTriggered: Date.now() }
+            : r
+        )
+      });
+    }
+  }, [activeReminders]);
+
   return (
     <WidgetContainer
       title="Shopping List"
@@ -753,6 +927,165 @@ Be smart about parsing prices and quantities from the text.`;
                   )}
                 </Button>
               </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showRemindersDialog} onOpenChange={setShowRemindersDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 relative">
+                <Bell size={16} />
+                <span className="hidden sm:inline">Reminders</span>
+                {reminders.filter(r => r.enabled && r.nextReminderDate <= Date.now()).length > 0 && (
+                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full animate-pulse" />
+                )}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Bell size={20} />
+                  Shopping Reminders
+                </DialogTitle>
+                <DialogDescription>
+                  Automatically remind you when it's time to shop based on your patterns
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                {reminders.length === 0 ? (
+                  <Card className="p-8 text-center bg-muted/20">
+                    <Sparkle size={32} className="mx-auto mb-3 text-muted-foreground" />
+                    <h4 className="font-medium mb-2">No Reminders Yet</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Create smart reminders based on your shopping history
+                    </p>
+                    {trips.length >= 3 ? (
+                      <Button onClick={generateSmartReminders} className="gap-2">
+                        <Lightning size={18} />
+                        Generate Smart Reminders
+                      </Button>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Add at least 3 shopping trips to generate smart reminders
+                      </p>
+                    )}
+                  </Card>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        {reminders.filter(r => r.enabled).length} active reminders
+                      </div>
+                      <Button onClick={generateSmartReminders} size="sm" variant="outline" className="gap-1.5">
+                        <Lightning size={14} />
+                        Update Reminders
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {reminders.map((reminder) => {
+                        const isDue = reminder.nextReminderDate <= Date.now();
+                        const daysUntil = differenceInDays(reminder.nextReminderDate, Date.now());
+                        
+                        return (
+                          <Card key={reminder.id} className={`p-4 ${isDue ? 'border-primary bg-primary/5' : ''}`}>
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Storefront size={18} className="text-primary" />
+                                  <span className="font-semibold">{reminder.storeName}</span>
+                                  <Badge className={categoryColors[reminder.category]}>
+                                    {categoryLabels[reminder.category]}
+                                  </Badge>
+                                  {isDue && (
+                                    <Badge className="bg-primary text-primary-foreground gap-1">
+                                      <Bell size={12} />
+                                      Due Now
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {reminder.frequency.charAt(0).toUpperCase() + reminder.frequency.slice(1)} shopping • 
+                                  Avg: ${reminder.averageSpend.toFixed(2)}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {isDue ? (
+                                    'Reminder is due!'
+                                  ) : daysUntil > 0 ? (
+                                    `Next reminder in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`
+                                  ) : (
+                                    `Next reminder: ${format(reminder.nextReminderDate, 'MMM d, yyyy')}`
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={reminder.enabled}
+                                  onCheckedChange={() => toggleReminder(reminder.id)}
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteReminder(reminder.id)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Trash size={14} className="text-destructive" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            {reminder.commonItems.length > 0 && (
+                              <div className="mt-3 pt-3 border-t">
+                                <div className="text-xs font-medium text-muted-foreground mb-2">Common Items:</div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {reminder.commonItems.slice(0, 6).map((item, idx) => (
+                                    <Badge key={idx} variant="outline" className="text-xs">
+                                      {item}
+                                    </Badge>
+                                  ))}
+                                  {reminder.commonItems.length > 6 && (
+                                    <Badge variant="outline" className="text-xs">
+                                      +{reminder.commonItems.length - 6} more
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {isDue && (
+                              <div className="mt-3 pt-3 border-t flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => snoozeReminder(reminder.id, 1)}
+                                  className="flex-1"
+                                >
+                                  Snooze 1 day
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => snoozeReminder(reminder.id, 3)}
+                                  className="flex-1"
+                                >
+                                  Snooze 3 days
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => snoozeReminder(reminder.id, 7)}
+                                  className="flex-1"
+                                >
+                                  Snooze 1 week
+                                </Button>
+                              </div>
+                            )}
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
             </DialogContent>
           </Dialog>
 

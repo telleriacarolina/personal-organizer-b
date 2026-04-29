@@ -243,12 +243,26 @@ export interface ShoppingTrip {
   receiptIds: string[];
 }
 
+export interface ShoppingReminder {
+  id: string;
+  storeName: string;
+  category: ShoppingCategory;
+  frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+  nextReminderDate: number;
+  averageSpend: number;
+  commonItems: string[];
+  enabled: boolean;
+  lastTriggered?: number;
+  createdAt: number;
+}
+
 export interface ShoppingWidget extends BaseWidget {
   type: 'shopping';
   items: PersonalShoppingItem[];
   budget?: number;
   receipts?: Receipt[];
   trips?: ShoppingTrip[];
+  reminders?: ShoppingReminder[];
 }
 
 export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget;
