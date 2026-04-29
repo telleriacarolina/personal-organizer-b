@@ -7,9 +7,12 @@
         "dev": "vite",
         "kill": "fuser -k 5000/tcp",
         "build": "tsc -b --noCheck && vite build",
+        "build:production": "NODE_ENV=production npm run build",
         "lint": "eslint .",
         "optimize": "vite optimize",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "deploy:preview": "npm run build && npm run preview",
+        "verify:build": "npm run build && echo 'Build verification successful'"
     },
     "dependencies": {
         "@github/spark": ">=0.43.1 <1",
