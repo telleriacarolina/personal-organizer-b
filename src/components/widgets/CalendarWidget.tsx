@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot } from '@phosphor-icons/react';
+import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown } from '@phosphor-icons/react';
 import { CalendarEvent, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -42,7 +42,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentDay, setCurrentDay] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'schedule'>('month');
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -240,6 +240,24 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
     ? `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`
     : format(currentDay, 'EEEE, MMMM d, yyyy');
 
+  const getEventPosition = (event: CalendarEvent) => {
+    if (!event.startTime) return null;
+    
+    const [hours, minutes] = event.startTime.split(':').map(Number);
+    const startMinutes = hours * 60 + minutes;
+    const top = (startMinutes / 60) * 60;
+    
+    let height = 60;
+    if (event.endTime) {
+      const [endHours, endMinutes] = event.endTime.split(':').map(Number);
+      const endMinutesTotal = endHours * 60 + endMinutes;
+      const duration = endMinutesTotal - startMinutes;
+      height = (duration / 60) * 60;
+    }
+    
+    return { top, height };
+  };
+
   return (
     <WidgetContainer
       title="Calendar"
@@ -279,7 +297,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
             <ToggleGroup
               type="single"
               value={viewMode}
-              onValueChange={(value) => value && setViewMode(value as 'month' | 'week' | 'day')}
+              onValueChange={(value) => value && setViewMode(value as 'month' | 'week' | 'day' | 'schedule')}
               className="border rounded-lg p-0.5"
             >
               <ToggleGroupItem value="month" aria-label="Month view" className="h-7 px-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
@@ -293,6 +311,10 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
               <ToggleGroupItem value="day" aria-label="Day view" className="h-7 px-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
                 <CalendarDot size={14} className="sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Day</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="schedule" aria-label="Schedule view" className="h-7 px-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                <ClockCountdown size={14} className="sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Schedule</span>
               </ToggleGroupItem>
             </ToggleGroup>
             <Button onClick={() => openAddDialog()} size="sm" className="gap-1.5 h-7 text-xs flex-shrink-0">
@@ -469,7 +491,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
               })}
             </div>
           </div>
-        ) : (
+        ) : viewMode === 'day' ? (
           <div className="space-y-3">
             <div className="bg-card border border-border rounded-lg p-4">
               <div className="flex items-center justify-between mb-4">
@@ -559,6 +581,139 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                   </Button>
                 </div>
               )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="bg-card border border-border rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-lg text-foreground">
+                    {format(currentDay, 'EEEE')}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {format(currentDay, 'MMMM d, yyyy')}
+                  </p>
+                </div>
+                {isToday(currentDay) && (
+                  <Badge className="bg-primary text-primary-foreground">
+                    Today
+                  </Badge>
+                )}
+              </div>
+              
+              <div className="relative">
+                <div className="max-h-[600px] overflow-y-auto pr-2">
+                  <div className="relative border border-border rounded-lg">
+                    {Array.from({ length: 24 }, (_, i) => i).map((hour) => {
+                      const hourEvents = dayEvents.filter((event) => {
+                        if (!event.startTime) return false;
+                        const [eventHour] = event.startTime.split(':').map(Number);
+                        return eventHour === hour;
+                      });
+
+                      return (
+                        <div
+                          key={hour}
+                          className="relative border-b border-border last:border-b-0 h-[60px] flex hover:bg-accent/30 transition-colors group"
+                        >
+                          <div className="w-16 flex-shrink-0 p-2 border-r border-border bg-muted/30">
+                            <div className="text-xs font-semibold text-muted-foreground">
+                              {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                            </div>
+                          </div>
+                          
+                          <div className="flex-1 relative p-1">
+                            {hourEvents.length > 0 ? (
+                              <div className="space-y-1">
+                                {hourEvents.map((event) => {
+                                  const position = getEventPosition(event);
+                                  const zIndex = 10;
+                                  
+                                  return (
+                                    <motion.div
+                                      key={event.id}
+                                      initial={{ opacity: 0, scale: 0.95 }}
+                                      animate={{ opacity: 1, scale: 1 }}
+                                      onClick={() => openEditDialog(event)}
+                                      className={`absolute left-1 right-1 rounded-md p-2 cursor-pointer group/event hover:shadow-lg transition-all border-l-4 ${getColorClass(event.color || 'blue')}`}
+                                      style={{
+                                        top: position ? `${(position.top % 60)}px` : '0px',
+                                        height: position ? `${Math.min(position.height, 58)}px` : 'auto',
+                                        zIndex,
+                                      }}
+                                    >
+                                      <div className="flex items-start justify-between gap-2 h-full overflow-hidden">
+                                        <div className="flex-1 min-w-0 overflow-hidden">
+                                          <div className="font-semibold text-xs truncate">
+                                            {event.title}
+                                          </div>
+                                          <div className="flex items-center gap-1 mt-0.5">
+                                            <Clock size={10} className="flex-shrink-0" />
+                                            <span className="text-[10px] opacity-90">
+                                              {event.startTime}
+                                              {event.endTime && ` - ${event.endTime}`}
+                                            </span>
+                                          </div>
+                                          {event.description && position && position.height > 40 && (
+                                            <p className="text-[10px] opacity-80 mt-1 line-clamp-1">
+                                              {event.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <Pencil 
+                                          size={12} 
+                                          className="opacity-0 group-hover/event:opacity-100 transition-opacity flex-shrink-0" 
+                                        />
+                                      </div>
+                                    </motion.div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  const hourStr = hour.toString().padStart(2, '0');
+                                  setStartTime(`${hourStr}:00`);
+                                  openAddDialog(currentDay);
+                                }}
+                                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              >
+                                <Plus size={16} className="text-muted-foreground" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {dayEvents.filter(e => !e.startTime).length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      All-Day Events
+                    </h4>
+                    {dayEvents.filter(e => !e.startTime).map((event) => (
+                      <div
+                        key={event.id}
+                        onClick={() => openEditDialog(event)}
+                        className={`p-2 rounded-lg border cursor-pointer group hover:shadow-sm transition-all ${getColorClass(event.color || 'blue')}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h5 className="font-medium text-sm">{event.title}</h5>
+                            {event.description && (
+                              <p className="text-xs opacity-80 mt-1 line-clamp-1">{event.description}</p>
+                            )}
+                          </div>
+                          <Pencil size={14} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -651,7 +806,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                     <Calendar size={24} className="text-muted-foreground" />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    No events this {viewMode}
+                    No events this {viewMode === 'schedule' ? 'day' : viewMode}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Click "Add" to get started
