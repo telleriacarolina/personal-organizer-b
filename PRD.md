@@ -2,7 +2,8 @@
 
 A web application that empowers users to design and build their own personalized organizational systems by combining customizable widgets, layouts, and tracking modules into a unified dashboard.
 
-**Experience Qualities**: 
+**Experience Qualities**:
+
 1. **Empowering** - Users should feel in control, with the freedom to craft an organization system that perfectly fits their unique needs and workflow.
 2. **Flexible** - The interface should adapt fluidly to different organizational styles, from minimalist daily planners to comprehensive life management systems.
 3. **Delightful** - Interactions should feel smooth and satisfying, making the act of organizing genuinely enjoyable rather than a chore.
@@ -13,6 +14,7 @@ This is a complex application because it involves multiple customizable modules 
 ## Essential Features
 
 ### Widget Library
+
 - **Functionality**: Provides a collection of pre-built organizational modules (tasks, notes, habits, goals, calendar view, quick links) that users can add to their dashboard
 - **Purpose**: Gives users building blocks to construct their ideal organizational system
 - **Trigger**: User clicks "Add Widget" button or opens widget drawer
@@ -20,6 +22,7 @@ This is a complex application because it involves multiple customizable modules 
 - **Success criteria**: Users can browse, preview, and successfully add any widget to their dashboard; widget appears with default settings and is immediately usable
 
 ### Task Manager Widget
+
 - **Functionality**: Allows users to create, complete, edit, and delete tasks with priority levels and due dates
 - **Purpose**: Central tool for tracking to-dos and managing daily responsibilities
 - **Trigger**: User clicks into task widget or "Add Task" button
@@ -27,6 +30,7 @@ This is a complex application because it involves multiple customizable modules 
 - **Success criteria**: Tasks persist between sessions, can be marked complete with satisfying animation, and display in clean organized list
 
 ### Notes Widget
+
 - **Functionality**: Quick-capture text area for jotting down thoughts, ideas, or information
 - **Purpose**: Provides a low-friction space for capturing information without complex structure
 - **Trigger**: User clicks into notes widget
@@ -34,6 +38,7 @@ This is a complex application because it involves multiple customizable modules 
 - **Success criteria**: Notes save automatically without manual action, support multiple simultaneous notes, and maintain formatting
 
 ### Habit Tracker Widget
+
 - **Functionality**: Lets users define habits and track daily completion with visual streak indicators
 - **Purpose**: Builds consistency and motivation through visual progress tracking
 - **Trigger**: User adds habit tracker widget or clicks "Add Habit"
@@ -41,6 +46,7 @@ This is a complex application because it involves multiple customizable modules 
 - **Success criteria**: Habits show clear visual feedback for completion, display current streak count, and reset tracking at midnight
 
 ### Shopping List & Expense Tracking Widget
+
 - **Functionality**: Comprehensive shopping management with barcode scanning, receipt processing via AI, expense tracking, and period-over-period spending analytics
 - **Purpose**: Helps users manage shopping lists, track actual spending, compare shopping trips, and analyze spending habits across time periods
 - **Trigger**: User adds shopping widget, then can scan barcodes/receipts or manually add items
@@ -48,6 +54,7 @@ This is a complex application because it involves multiple customizable modules 
 - **Success criteria**: Receipt scanning accurately extracts items and prices, spending analytics show meaningful trends, items categorize intelligently, trip comparisons provide actionable insights, all data persists between sessions
 
 ### Dashboard Customization
+
 - **Functionality**: Users can add, remove, resize, and rearrange widgets on their dashboard with flexible layout that allows widgets to fit next to each other based on their individual sizes, plus global lock/unlock and grid snap features
 - **Purpose**: Enables personalization so each user's organizer reflects their priorities and workflow
 - **Trigger**: User drags widget or resizes via corner handle or pinch gesture, or toggles grid snap/lock controls
@@ -55,6 +62,7 @@ This is a complex application because it involves multiple customizable modules 
 - **Success criteria**: Layout persists between sessions, feels smooth and intuitive, widgets fit flexibly next to each other without rigid grid constraints, resizing is responsive and intuitive, grid snapping provides precise alignment, global lock prevents unwanted changes
 
 ### Theme Personalization
+
 - **Functionality**: Users can select from preset color themes, create custom color schemes using color pickers, or upload background images to personalize their organizer
 - **Purpose**: Makes the organizer feel personal and visually appealing to individual preferences with extensive customization options
 - **Trigger**: User clicks "Customize Theme" button in header
@@ -79,8 +87,9 @@ The design should evoke feelings of calm control, creative freedom, and gentle m
 A warm, sophisticated palette with earthy tones and vibrant accent colors that inspire creativity and focus. Users can now customize these colors or upload their own background images for full personalization.
 
 **Default Theme Colors:**
+
 - **Primary Color**: Deep Terracotta `oklch(0.48 0.12 35)` - Grounding and warm, communicates stability and creative energy
-- **Secondary Colors**: 
+- **Secondary Colors**:
   - Soft Cream `oklch(0.95 0.02 85)` - Gentle background that reduces eye strain
   - Sage Green `oklch(0.72 0.08 145)` - Calming accent for positive actions and completed states
   - Warm Sand `oklch(0.85 0.04 75)` - Muted surfaces for cards and secondary elements
@@ -88,17 +97,19 @@ A warm, sophisticated palette with earthy tones and vibrant accent colors that i
 
 **Custom Color Options:**
 Users can override the default theme by selecting custom colors for:
+
 - Primary color (buttons and key UI elements)
 - Accent color (highlights and interactive elements)
 - Background color (main page background)
 
 **Background Image Support:**
 Users can upload personal images (max 5MB) as dashboard backgrounds with:
+
 - Adjustable opacity (0-90%) to maintain content readability
 - Fixed attachment for parallax-like effect
 - Automatic overlay to ensure text remains legible
 
-- **Foreground/Background Pairings**: 
+- **Foreground/Background Pairings**:
   - Background Cream (oklch(0.95 0.02 85)): Deep Brown text (oklch(0.25 0.02 35)) - Ratio 11.8:1 ✓
   - Primary Terracotta (oklch(0.48 0.12 35)): White text (oklch(1 0 0)) - Ratio 5.2:1 ✓
   - Accent Coral (oklch(0.68 0.18 25)): Deep Brown text (oklch(0.25 0.02 35)) - Ratio 7.1:1 ✓
@@ -111,7 +122,7 @@ Typefaces should balance modern professionalism with approachable warmth, convey
 - **Primary Font**: Instrument Sans - A contemporary geometric sans-serif with friendly curves that feels both professional and welcoming
 - **Secondary Font**: Space Grotesk - Used sparingly for widget titles and numbers, adds technical precision and visual interest
 
-- **Typographic Hierarchy**: 
+- **Typographic Hierarchy**:
   - H1 (Dashboard Title): Instrument Sans Bold/32px/tight letter-spacing (-0.02em)
   - H2 (Widget Titles): Space Grotesk Medium/20px/normal letter-spacing
   - H3 (Section Headers): Instrument Sans Semibold/16px/normal
@@ -125,7 +136,7 @@ Animations should feel organic and purposeful, celebrating user actions while ma
 
 ## Component Selection
 
-- **Components**: 
+- **Components**:
   - Card: Primary container for all widgets, using shadow-sm for subtle elevation
   - Button: Primary actions (add widget, save), with variants for secondary actions (edit, delete)
   - Dialog: Widget configuration and settings panels, theme customization
@@ -140,7 +151,7 @@ Animations should feel organic and purposeful, celebrating user actions while ma
   - Separator: Visual division between widget sections
   - Label: Form field labels in customization panels
   
-- **Customizations**: 
+- **Customizations**:
   - Custom flexible layout system for widget placement (Flexbox with wrap enabled)
   - Custom widget header component with consistent title, actions, and drag handle
   - Custom empty state illustrations using SVG patterns
@@ -149,13 +160,13 @@ Animations should feel organic and purposeful, celebrating user actions while ma
   - Custom background image overlay system with opacity control
   - Custom widget sizing with both desktop (drag corners) and mobile (pinch) support
   
-- **States**: 
+- **States**:
   - Buttons: Soft shadow on hover, scale down slightly on press, muted when disabled
   - Inputs: Border color shift and subtle glow on focus, error state with red border + shake
   - Cards: Subtle lift on hover when interactive, pulsing border during drag operations
   - Checkboxes: Smooth checkmark animation with color transition, celebratory bounce on complete
   
-- **Icon Selection**: 
+- **Icon Selection**:
   - Plus icon: Adding widgets/items
   - X icon: Removing/closing
   - GearSix: Settings and configuration
@@ -171,14 +182,14 @@ Animations should feel organic and purposeful, celebrating user actions while ma
   - Upload: Image upload interface
   - Trash: Remove background image
   
-- **Spacing**: 
+- **Spacing**:
   - Widget padding: p-6 (24px)
   - Widget gaps: gap-4 (16px) in grid
   - Internal widget spacing: gap-3 (12px) between items
   - Section margins: mb-6 (24px)
   - Tight spacing for lists: gap-2 (8px)
   
-- **Mobile**: 
+- **Mobile**:
   - Single column layout below 768px
   - Widgets stack vertically with full width
   - Drag handles replaced with reorder buttons

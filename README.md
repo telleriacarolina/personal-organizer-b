@@ -47,7 +47,9 @@ This project includes automated deployment workflows using GitHub Actions.
 ### Available Workflows
 
 #### 1. **CI/CD Pipeline** (`ci-cd.yml`)
+
 Runs on every push and pull request to `main` and `develop` branches.
+
 - Lints code with ESLint
 - Runs TypeScript checks
 - Executes tests
@@ -55,22 +57,27 @@ Runs on every push and pull request to `main` and `develop` branches.
 - Uploads build artifacts
 
 #### 2. **Deploy to Production** (`deploy-production.yml`)
+
 Triggered when a new release is published or manually via workflow dispatch.
+
 - Builds the application
 - Deploys to production environment
 - Runs health checks
 - Sends deployment notifications
 
 **Manual Trigger:**
+
 1. Go to Actions → Deploy to Production
 2. Click "Run workflow"
 3. Select environment (production/staging)
 4. Click "Run workflow"
 
 #### 3. **Create Release** (`create-release.yml`)
+
 Creates a new GitHub release with automated changelog generation.
 
 **To Create a Release:**
+
 1. Go to Actions → Create Release
 2. Click "Run workflow"
 3. Enter version (e.g., v1.0.0)
@@ -79,9 +86,11 @@ Creates a new GitHub release with automated changelog generation.
 6. Click "Run workflow"
 
 #### 4. **Rollback Deployment** (`rollback.yml`)
+
 Rolls back to a previous version in case of issues.
 
 **To Rollback:**
+
 1. Go to Actions → Rollback Deployment
 2. Click "Run workflow"
 3. Enter version to rollback to (e.g., v1.0.0)
@@ -89,18 +98,23 @@ Rolls back to a previous version in case of issues.
 5. Click "Run workflow"
 
 #### 5. **Security and Maintenance** (`security-maintenance.yml`)
+
 Runs weekly security audits and dependency checks.
+
 - Performs security audits
 - Checks for outdated dependencies
 - Verifies builds
 - Reports bundle sizes
 
 **Manual Trigger:**
+
 1. Go to Actions → Security and Maintenance
 2. Click "Run workflow"
 
 #### 6. **Copilot Setup Steps** (`copilot-setup-steps.yml`)
+
 Sets up development environment with GitHub Copilot CLI.
+
 - Runs on pull requests and pushes to main
 - Installs dependencies
 - Sets up GitHub Copilot CLI
@@ -110,6 +124,7 @@ Sets up development environment with GitHub Copilot CLI.
 ### Semantic Versioning
 
 This project follows [Semantic Versioning](https://semver.org/):
+
 - **MAJOR** version for incompatible API changes
 - **MINOR** version for new functionality in a backwards compatible manner
 - **PATCH** version for backwards compatible bug fixes
@@ -141,6 +156,7 @@ If a deployment causes issues:
 ## 📦 Build Artifacts
 
 Build artifacts are automatically:
+
 - Generated on every successful build
 - Stored for 7 days (CI/CD builds)
 - Stored for 30 days (production builds)
