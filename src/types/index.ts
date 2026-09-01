@@ -68,14 +68,40 @@ export interface GoalsWidget extends BaseWidget {
 export interface CalendarEvent {
   id: string;
   title: string;
+  type: CalendarEntryType;
   description?: string;
   date: number;
   startTime?: string;
   endTime?: string;
+  allDay?: boolean;
+  location?: string;
   reminder?: number;
   reminderSent?: boolean;
   color?: string;
   createdAt: number;
+}
+
+export type CalendarEntryType = 'appointment' | 'event' | 'occasion';
+export type FamilyCalendarVisibility = 'private' | 'family' | 'selected';
+
+export interface FamilyCalendarPlannerEvent {
+  id: string;
+  calendarId: string;
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime: string;
+  allDay: boolean;
+  visibility: FamilyCalendarVisibility;
+  selectedMembers?: string[];
+  requiresApproval: boolean;
+  createdBy: string;
+  attendees: string[];
+  location?: string;
+  reminders: number[];
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CalendarWidget extends BaseWidget {
