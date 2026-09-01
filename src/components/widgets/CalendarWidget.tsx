@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useKV } from '@github/spark/hooks';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,12 +8,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight } from '@phosphor-icons/react';
-import { CalendarEvent, WidgetSize } from '@/types';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown } from '@phosphor-icons/react';
+import { CalendarEntryType, CalendarEvent, FamilyCalendarPlannerEvent, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
 
 interface CalendarWidgetProps {
   events: CalendarEvent[];
@@ -34,11 +37,21 @@ const eventColors = [
   { value: 'red', label: 'Red', class: 'bg-red-500/20 border-red-500 text-red-700' },
 ];
 
+const eventTypes: { value: CalendarEntryType; label: string }[] = [
+  { value: 'appointment', label: 'Appointment' },
+  { value: 'event', label: 'Event' },
+  { value: 'occasion', label: 'Occasion' },
+];
+
 export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: CalendarWidgetProps) {
+  const [, setPlannerEvents] = useKV<FamilyCalendarPlannerEvent[]>('family-calendar-planner-events', []);
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [currentDay, setCurrentDay] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'schedule'>('month');
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -47,6 +60,9 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
   const [endTime, setEndTime] = useState('');
   const [reminder, setReminder] = useState('none');
   const [color, setColor] = useState('blue');
+  const [eventType, setEventType] = useState<CalendarEntryType>('event');
+  const [allDay, setAllDay] = useState(false);
+  const [location, setLocation] = useState('');
 
   useEffect(() => {
     const checkReminders = () => {
@@ -83,6 +99,9 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
     setEndTime('');
     setReminder('none');
     setColor('blue');
+    setEventType('event');
+    setAllDay(false);
+    setLocation('');
     setEditingEvent(null);
   };
 
@@ -103,7 +122,65 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
     setEndTime(event.endTime || '');
     setReminder(event.reminder?.toString() || 'none');
     setColor(event.color || 'blue');
+    setEventType(event.type || 'event');
+    setAllDay(Boolean(event.allDay));
+    setLocation(event.location || '');
     setShowDialog(true);
+  };
+
+  const buildDateTimeIso = (dateMs: number, time?: string, fallbackTime = '09:00') => {
+    const date = new Date(dateMs);
+    const [hours, minutes] = (time || fallbackTime).split(':').map(Number);
+    date.setHours(hours || 0, minutes || 0, 0, 0);
+    return date.toISOString();
+  };
+
+  const mapToFamilyCalendarPlannerEvent = (event: CalendarEvent): FamilyCalendarPlannerEvent => {
+    const start = buildDateTimeIso(event.date, event.startTime, '09:00');
+    const end = buildDateTimeIso(event.date, event.endTime || event.startTime, '10:00');
+
+    return {
+      id: event.id,
+      calendarId: 'family-calendar-default',
+      title: event.title,
+      description: event.description || undefined,
+      startTime: start,
+      endTime: end,
+      allDay: Boolean(event.allDay),
+      visibility: 'private',
+      requiresApproval: false,
+      createdBy: 'personal-organizer-user',
+      attendees: ['personal-organizer-user'],
+      location: event.location || undefined,
+      reminders: event.reminder ? [event.reminder] : [],
+      color: event.color,
+      createdAt: new Date(event.createdAt).toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  };
+
+  const syncFamilyCalendarPlanner = async (calendarEvents: CalendarEvent[]) => {
+    const mappedEvents = calendarEvents.map(mapToFamilyCalendarPlannerEvent);
+    setPlannerEvents(mappedEvents);
+
+    const apiBaseUrl = import.meta.env.VITE_FAMILY_CALENDAR_API_URL;
+    if (!apiBaseUrl) return;
+
+    try {
+      const response = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/events/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ events: mappedEvents }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Sync failed with status ${response.status}`);
+      }
+    } catch {
+      toast.error('Unable to sync with Family Calendar Planner API');
+    }
   };
 
   const saveEvent = () => {
@@ -116,21 +193,29 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
     const newEvent: CalendarEvent = {
       id: editingEvent?.id || Date.now().toString(),
       title: title.trim(),
+      type: eventType,
       description: description.trim(),
       date: eventDateTime,
-      startTime: startTime || undefined,
-      endTime: endTime || undefined,
+      startTime: allDay ? undefined : startTime || undefined,
+      endTime: allDay ? undefined : endTime || undefined,
+      allDay: allDay,
+      location: location.trim() || undefined,
       reminder: reminder !== 'none' ? parseInt(reminder) : undefined,
       reminderSent: false,
       color: color,
       createdAt: editingEvent?.createdAt || Date.now(),
     };
 
+    const updatedEvents = editingEvent
+      ? events.map((e) => (e.id === editingEvent.id ? newEvent : e))
+      : [...events, newEvent];
+
+    onUpdate(updatedEvents);
+    void syncFamilyCalendarPlanner(updatedEvents);
+
     if (editingEvent) {
-      onUpdate(events.map((e) => (e.id === editingEvent.id ? newEvent : e)));
       toast.success('Event updated');
     } else {
-      onUpdate([...events, newEvent]);
       toast.success('Event added');
     }
 
@@ -139,7 +224,9 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
   };
 
   const deleteEvent = (id: string) => {
-    onUpdate(events.filter((e) => e.id !== id));
+    const updatedEvents = events.filter((e) => e.id !== id);
+    onUpdate(updatedEvents);
+    void syncFamilyCalendarPlanner(updatedEvents);
     toast.success('Event deleted');
     setShowDialog(false);
     resetForm();
@@ -151,6 +238,10 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
   const calendarEnd = endOfWeek(monthEnd);
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
+  const weekStart = startOfWeek(currentWeek);
+  const weekEnd = endOfWeek(currentWeek);
+  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
   const getEventsForDate = (date: Date) => {
     return events.filter((event) => isSameDay(new Date(event.date), date));
   };
@@ -159,6 +250,105 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
 
   const getColorClass = (colorValue: string) => {
     return eventColors.find((c) => c.value === colorValue)?.class || eventColors[0].class;
+  };
+
+  const getEventTypeLabel = (type: CalendarEntryType) => {
+    return eventTypes.find((eventTypeOption) => eventTypeOption.value === type)?.label || 'Event';
+  };
+
+  const getEventTimeLabel = (event: CalendarEvent) => {
+    if (event.allDay) return 'All day';
+    if (!event.startTime) return '';
+    return `${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}`;
+  };
+
+  const getEventsForMonth = () => {
+    const monthStartDate = startOfMonth(currentMonth);
+    const monthEndDate = endOfMonth(currentMonth);
+    
+    return events
+      .filter((event) => {
+        const eventDate = new Date(event.date);
+        return eventDate >= monthStartDate && eventDate <= monthEndDate;
+      })
+      .sort((a, b) => a.date - b.date);
+  };
+
+  const getEventsForWeek = () => {
+    const weekStartDate = startOfWeek(currentWeek);
+    const weekEndDate = endOfWeek(currentWeek);
+    
+    return events
+      .filter((event) => {
+        const eventDate = new Date(event.date);
+        return eventDate >= weekStartDate && eventDate <= weekEndDate;
+      })
+      .sort((a, b) => a.date - b.date);
+  };
+
+  const getEventsForDay = () => {
+    const dayStartDate = startOfDay(currentDay);
+    const dayEndDate = endOfDay(currentDay);
+    
+    return events
+      .filter((event) => {
+        const eventDate = new Date(event.date);
+        return eventDate >= dayStartDate && eventDate <= dayEndDate;
+      })
+      .sort((a, b) => {
+        if (!a.startTime && !b.startTime) return a.date - b.date;
+        if (!a.startTime) return 1;
+        if (!b.startTime) return -1;
+        return a.startTime.localeCompare(b.startTime);
+      });
+  };
+
+  const monthEvents = getEventsForMonth();
+  const weekEvents = getEventsForWeek();
+  const dayEvents = getEventsForDay();
+
+  const handleNavigatePrev = () => {
+    if (viewMode === 'month') {
+      setCurrentMonth(subMonths(currentMonth, 1));
+    } else if (viewMode === 'week') {
+      setCurrentWeek(subWeeks(currentWeek, 1));
+    } else {
+      setCurrentDay(subDays(currentDay, 1));
+    }
+  };
+
+  const handleNavigateNext = () => {
+    if (viewMode === 'month') {
+      setCurrentMonth(addMonths(currentMonth, 1));
+    } else if (viewMode === 'week') {
+      setCurrentWeek(addWeeks(currentWeek, 1));
+    } else {
+      setCurrentDay(addDays(currentDay, 1));
+    }
+  };
+
+  const currentDisplayTitle = viewMode === 'month'
+    ? format(currentMonth, 'MMMM yyyy')
+    : viewMode === 'week'
+    ? `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`
+    : format(currentDay, 'EEEE, MMMM d, yyyy');
+
+  const getEventPosition = (event: CalendarEvent) => {
+    if (!event.startTime) return null;
+    
+    const [hours, minutes] = event.startTime.split(':').map(Number);
+    const startMinutes = hours * 60 + minutes;
+    const top = (startMinutes / 60) * 60;
+    
+    let height = 60;
+    if (event.endTime) {
+      const [endHours, endMinutes] = event.endTime.split(':').map(Number);
+      const endMinutesTotal = endHours * 60 + endMinutes;
+      const duration = endMinutesTotal - startMinutes;
+      height = (duration / 60) * 60;
+    }
+    
+    return { top, height };
   };
 
   return (
@@ -174,41 +364,67 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
       widgetType="calendar"
     >
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              className="h-8 w-8"
+              onClick={handleNavigatePrev}
+              className="h-8 w-8 flex-shrink-0"
             >
               <CaretLeft size={16} />
             </Button>
-            <h3 className="font-semibold text-foreground min-w-[140px] text-center">
-              {format(currentMonth, 'MMMM yyyy')}
+            <h3 className="font-semibold text-foreground min-w-[140px] text-center text-xs sm:text-sm">
+              {currentDisplayTitle}
             </h3>
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="h-8 w-8"
+              onClick={handleNavigateNext}
+              className="h-8 w-8 flex-shrink-0"
             >
               <CaretRight size={16} />
             </Button>
           </div>
-          <Button onClick={() => openAddDialog()} size="sm" className="gap-2">
-            <Plus size={16} />
-            Add Event
-          </Button>
+          <div className="flex items-center gap-2">
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={(value) => value && setViewMode(value as 'month' | 'week' | 'day' | 'schedule')}
+              className="border rounded-lg p-0.5"
+            >
+              <ToggleGroupItem value="month" aria-label="Month view" className="h-7 px-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                <CalendarBlank size={14} className="sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Month</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="week" aria-label="Week view" className="h-7 px-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                <Rows size={14} className="sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Week</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="day" aria-label="Day view" className="h-7 px-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                <CalendarDot size={14} className="sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Day</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="schedule" aria-label="Schedule view" className="h-7 px-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                <ClockCountdown size={14} className="sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Schedule</span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Button onClick={() => openAddDialog()} size="sm" className="gap-1.5 h-7 text-xs flex-shrink-0">
+              <Plus size={14} />
+              <span className="hidden sm:inline">Add</span>
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div key={day} className="text-xs font-medium text-muted-foreground text-center py-1">
-              {day}
-            </div>
-          ))}
-          {calendarDays.map((day, idx) => {
+        {viewMode === 'month' ? (
+          <div className="grid grid-cols-7 gap-1">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              <div key={day} className="text-xs font-medium text-muted-foreground text-center py-1">
+                {day}
+              </div>
+            ))}
+            {calendarDays.map((day, idx) => {
             const dayEvents = getEventsForDate(day);
             const isCurrentMonth = isSameMonth(day, currentMonth);
             const isSelected = selectedDate && isSameDay(day, selectedDate);
@@ -276,12 +492,16 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                               </div>
                             )}
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                              {event.startTime && (
+                              {(event.startTime || event.allDay) && (
                                 <div className="flex items-center gap-1 opacity-90">
                                   <Clock size={10} />
-                                  <span>{event.startTime}</span>
-                                  {event.endTime && <span>- {event.endTime}</span>}
+                                  <span>{getEventTimeLabel(event)}</span>
                                 </div>
+                              )}
+                              {event.location && (
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                                  {event.location}
+                                </Badge>
                               )}
                               {event.reminder && (
                                 <div className="flex items-center gap-1 opacity-90">
@@ -302,6 +522,307 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
             return <div key={idx}>{calendarCell}</div>;
           })}
         </div>
+        ) : viewMode === 'week' ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-7 gap-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                <div key={day} className="text-xs font-medium text-muted-foreground text-center py-1">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {weekDays.map((day, idx) => {
+                const dayEvents = getEventsForDate(day);
+                const isSelected = selectedDate && isSameDay(day, selectedDate);
+                const isTodayDate = isToday(day);
+                const hasEvents = dayEvents.length > 0;
+
+                return (
+                  <div key={idx} className="flex flex-col gap-1">
+                    <button
+                      onClick={() => setSelectedDate(day)}
+                      onDoubleClick={() => openAddDialog(day)}
+                      className={`
+                        p-2 rounded-lg text-sm transition-all relative group
+                        ${isSelected ? 'bg-primary/20 ring-2 ring-primary' : 'hover:bg-accent/50 bg-card border border-border'}
+                        ${isTodayDate ? 'font-bold ring-2 ring-primary/50' : ''}
+                      `}
+                    >
+                      <div className="text-center font-semibold mb-1">
+                        {format(day, 'd')}
+                      </div>
+                      {hasEvents && (
+                        <Badge 
+                          variant="secondary" 
+                          className="h-4 w-full text-[10px] font-semibold bg-primary/80 text-primary-foreground"
+                        >
+                          {dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}
+                        </Badge>
+                      )}
+                    </button>
+                    <div className="space-y-1 min-h-[100px] max-h-[200px] overflow-y-auto">
+                      {dayEvents.slice(0, 3).map((event) => (
+                        <div
+                          key={event.id}
+                          onClick={() => openEditDialog(event)}
+                          className={`p-1.5 rounded text-[10px] cursor-pointer border ${getColorClass(event.color || 'blue')} hover:shadow-sm transition-shadow`}
+                        >
+                          <div className="font-medium truncate">{event.title}</div>
+                          {(event.startTime || event.allDay) && (
+                            <div className="flex items-center gap-0.5 mt-0.5 opacity-80">
+                              <Clock size={8} />
+                              <span>{getEventTimeLabel(event)}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {dayEvents.length > 3 && (
+                        <div className="text-[9px] text-muted-foreground text-center py-0.5">
+                          +{dayEvents.length - 3} more
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : viewMode === 'day' ? (
+          <div className="space-y-3">
+            <div className="bg-card border border-border rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-lg text-foreground">
+                    {format(currentDay, 'EEEE')}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {format(currentDay, 'MMMM d, yyyy')}
+                  </p>
+                </div>
+                {isToday(currentDay) && (
+                  <Badge className="bg-primary text-primary-foreground">
+                    Today
+                  </Badge>
+                )}
+              </div>
+              
+              {dayEvents.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {dayEvents.length} {dayEvents.length === 1 ? 'Event' : 'Events'} Scheduled
+                  </div>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {dayEvents.map((event, idx) => (
+                      <motion.div
+                        key={event.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        onClick={() => openEditDialog(event)}
+                        className={`p-3 rounded-lg border-l-4 cursor-pointer group hover:shadow-md transition-all ${getColorClass(event.color || 'blue')}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-base text-foreground mb-1">
+                              {event.title}
+                            </h4>
+                            {event.description && (
+                              <p className="text-sm opacity-90 mb-2 line-clamp-2">
+                                {event.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-3 flex-wrap">
+                              {(event.startTime || event.allDay) && (
+                                <div className="flex items-center gap-1.5 text-sm">
+                                  <Clock size={16} className="opacity-70" />
+                                  <span className="font-medium">
+                                    {getEventTimeLabel(event)}
+                                  </span>
+                                </div>
+                              )}
+                              {event.location && (
+                                <Badge variant="secondary" className="text-xs h-5 bg-background/50">
+                                  {event.location}
+                                </Badge>
+                              )}
+                              {event.reminder && (
+                                <div className="flex items-center gap-1.5 text-sm">
+                                  <Bell size={16} className="opacity-70" />
+                                  <span>{event.reminder}m before</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <Pencil 
+                            size={16} 
+                            className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1" 
+                          />
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                    <Calendar size={32} className="text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    No events scheduled for this day
+                  </p>
+                  <Button 
+                    onClick={() => openAddDialog(currentDay)} 
+                    size="sm" 
+                    variant="outline"
+                    className="gap-2 mt-2"
+                  >
+                    <Plus size={16} />
+                    Add Event
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="bg-card border border-border rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-lg text-foreground">
+                    {format(currentDay, 'EEEE')}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {format(currentDay, 'MMMM d, yyyy')}
+                  </p>
+                </div>
+                {isToday(currentDay) && (
+                  <Badge className="bg-primary text-primary-foreground">
+                    Today
+                  </Badge>
+                )}
+              </div>
+              
+              <div className="relative">
+                <div className="max-h-[600px] overflow-y-auto pr-2">
+                  <div className="relative border border-border rounded-lg">
+                    {Array.from({ length: 24 }, (_, i) => i).map((hour) => {
+                      const hourEvents = dayEvents.filter((event) => {
+                        if (!event.startTime) return false;
+                        const [eventHour] = event.startTime.split(':').map(Number);
+                        return eventHour === hour;
+                      });
+
+                      return (
+                        <div
+                          key={hour}
+                          className="relative border-b border-border last:border-b-0 h-[60px] flex hover:bg-accent/30 transition-colors group"
+                        >
+                          <div className="w-16 flex-shrink-0 p-2 border-r border-border bg-muted/30">
+                            <div className="text-xs font-semibold text-muted-foreground">
+                              {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                            </div>
+                          </div>
+                          
+                          <div className="flex-1 relative p-1">
+                            {hourEvents.length > 0 ? (
+                              <div className="space-y-1">
+                                {hourEvents.map((event) => {
+                                  const position = getEventPosition(event);
+                                  const zIndex = 10;
+                                  
+                                  return (
+                                    <motion.div
+                                      key={event.id}
+                                      initial={{ opacity: 0, scale: 0.95 }}
+                                      animate={{ opacity: 1, scale: 1 }}
+                                      onClick={() => openEditDialog(event)}
+                                      className={`absolute left-1 right-1 rounded-md p-2 cursor-pointer group/event hover:shadow-lg transition-all border-l-4 ${getColorClass(event.color || 'blue')}`}
+                                      style={{
+                                        top: position ? `${(position.top % 60)}px` : '0px',
+                                        height: position ? `${Math.min(position.height, 58)}px` : 'auto',
+                                        zIndex,
+                                      }}
+                                    >
+                                      <div className="flex items-start justify-between gap-2 h-full overflow-hidden">
+                                        <div className="flex-1 min-w-0 overflow-hidden">
+                                          <div className="font-semibold text-xs truncate">
+                                            {event.title}
+                                          </div>
+                                          <div className="flex items-center gap-1 mt-0.5">
+                                            <Clock size={10} className="flex-shrink-0" />
+                                            <span className="text-[10px] opacity-90">
+                                              {event.startTime}
+                                              {event.endTime && ` - ${event.endTime}`}
+                                            </span>
+                                          </div>
+                                          {event.description && position && position.height > 40 && (
+                                            <p className="text-[10px] opacity-80 mt-1 line-clamp-1">
+                                              {event.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <Pencil 
+                                          size={12} 
+                                          className="opacity-0 group-hover/event:opacity-100 transition-opacity flex-shrink-0" 
+                                        />
+                                      </div>
+                                    </motion.div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  const hourStr = hour.toString().padStart(2, '0');
+                                  setStartTime(`${hourStr}:00`);
+                                  openAddDialog(currentDay);
+                                }}
+                                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              >
+                                <Plus size={16} className="text-muted-foreground" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {dayEvents.filter(e => !e.startTime).length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      All-Day Events
+                    </h4>
+                    {dayEvents.filter(e => !e.startTime).map((event) => (
+                      <div
+                        key={event.id}
+                        onClick={() => openEditDialog(event)}
+                        className={`p-2 rounded-lg border cursor-pointer group hover:shadow-sm transition-all ${getColorClass(event.color || 'blue')}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mt-1">
+                              <h5 className="font-medium text-sm">{event.title}</h5>
+                              <Badge variant="outline" className="text-[10px] h-4 px-1 bg-background/50">
+                                {getEventTypeLabel(event.type || 'event')}
+                              </Badge>
+                            </div>
+                            {event.description && (
+                              <p className="text-xs opacity-80 mt-1 line-clamp-1">{event.description}</p>
+                            )}
+                          </div>
+                          <Pencil size={14} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {selectedDate && (
           <div className="border-t border-border pt-4">
@@ -342,11 +863,15 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                             <p className="text-xs opacity-80 truncate">{event.description}</p>
                           )}
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            {event.startTime && (
+                            {(event.startTime || event.allDay) && (
                               <Badge variant="secondary" className="text-xs h-5 gap-1">
                                 <Clock size={12} />
-                                {event.startTime}
-                                {event.endTime && ` - ${event.endTime}`}
+                                {getEventTimeLabel(event)}
+                              </Badge>
+                            )}
+                            {event.location && (
+                              <Badge variant="secondary" className="text-xs h-5">
+                                {event.location}
                               </Badge>
                             )}
                             {event.reminder && (
@@ -366,6 +891,91 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
             </div>
           </div>
         )}
+
+        <div className="border-t border-border pt-4 mt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-semibold text-sm text-foreground">
+              Events & Plans - {viewMode === 'month' ? format(currentMonth, 'MMMM yyyy') : viewMode === 'week' ? `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}` : format(currentDay, 'MMMM d, yyyy')}
+            </h4>
+            {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length > 0 && (
+              <Badge variant="outline" className="text-xs">
+                {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length} {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length === 1 ? 'event' : 'events'}
+              </Badge>
+            )}
+          </div>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            <AnimatePresence>
+              {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-center py-8"
+                >
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-3">
+                    <Calendar size={24} className="text-muted-foreground" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    No events this {viewMode === 'schedule' ? 'day' : viewMode}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Click "Add" to get started
+                  </p>
+                </motion.div>
+              ) : (
+                (viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).map((event) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -50 }}
+                    className={`p-3 rounded-lg border cursor-pointer group hover:shadow-sm transition-all ${getColorClass(event.color || 'blue')}`}
+                    onClick={() => openEditDialog(event)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold opacity-75">
+                            {format(new Date(event.date), 'EEE, MMM d')}
+                          </span>
+                          {isToday(new Date(event.date)) && (
+                            <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-primary text-primary-foreground">
+                              Today
+                            </Badge>
+                          )}
+                        </div>
+                        <h5 className="font-medium text-sm">{event.title}</h5>
+                        {event.description && (
+                          <p className="text-xs opacity-80 mt-1 line-clamp-2">{event.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {(event.startTime || event.allDay) && (
+                            <Badge variant="secondary" className="text-xs h-5 gap-1 bg-background/50">
+                              <Clock size={12} />
+                              {getEventTimeLabel(event)}
+                            </Badge>
+                          )}
+                          {event.location && (
+                            <Badge variant="secondary" className="text-xs h-5 bg-background/50">
+                              {event.location}
+                            </Badge>
+                          )}
+                          {event.reminder && (
+                            <Badge variant="secondary" className="text-xs h-5 gap-1 bg-background/50">
+                              <Bell size={12} />
+                              {event.reminder}m before
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <Pencil size={14} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1" />
+                    </div>
+                  </motion.div>
+                ))
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -402,27 +1012,57 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                 onChange={(e) => setEventDate(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="start-time">Start Time</Label>
-                <Input
-                  id="start-time"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
+            <div className="flex items-center gap-2">
+              <Switch id="all-day" checked={allDay} onCheckedChange={setAllDay} />
+              <Label htmlFor="all-day">All day</Label>
+            </div>
+            {!allDay && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="start-time">Start Time</Label>
+                  <Input
+                    id="start-time"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end-time">End Time</Label>
+                  <Input
+                    id="end-time"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="end-time">End Time</Label>
-                <Input
-                  id="end-time"
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="event-location">Location</Label>
+              <Input
+                id="event-location"
+                placeholder="Location"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="event-type">Type</Label>
+                <Select value={eventType} onValueChange={(value) => setEventType(value as CalendarEntryType)}>
+                  <SelectTrigger id="event-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {eventTypes.map((eventTypeOption) => (
+                      <SelectItem key={eventTypeOption.value} value={eventTypeOption.value}>
+                        {eventTypeOption.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="reminder">Reminder</Label>
                 <Select value={reminder} onValueChange={setReminder}>
@@ -439,7 +1079,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-2">
                 <Label htmlFor="color">Color</Label>
                 <Select value={color} onValueChange={setColor}>
                   <SelectTrigger id="color">
