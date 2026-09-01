@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useKV } from '@github/spark/hooks';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,10 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown } from '@phosphor-icons/react';
-import { CalendarEntryType, CalendarEvent, WidgetSize } from '@/types';
+import { CalendarEntryType, CalendarEvent, FamilyCalendarPlannerEvent, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
@@ -42,6 +44,7 @@ const eventTypes: { value: CalendarEntryType; label: string }[] = [
 ];
 
 export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: CalendarWidgetProps) {
+  const [, setPlannerEvents] = useKV<FamilyCalendarPlannerEvent[]>('family-calendar-planner-events', []);
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -58,6 +61,8 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
   const [reminder, setReminder] = useState('none');
   const [color, setColor] = useState('blue');
   const [eventType, setEventType] = useState<CalendarEntryType>('event');
+  const [allDay, setAllDay] = useState(false);
+  const [location, setLocation] = useState('');
 
   useEffect(() => {
     const checkReminders = () => {
@@ -95,6 +100,8 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
     setReminder('none');
     setColor('blue');
     setEventType('event');
+    setAllDay(false);
+    setLocation('');
     setEditingEvent(null);
   };
 
@@ -116,7 +123,64 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
     setReminder(event.reminder?.toString() || 'none');
     setColor(event.color || 'blue');
     setEventType(event.type || 'event');
+    setAllDay(Boolean(event.allDay));
+    setLocation(event.location || '');
     setShowDialog(true);
+  };
+
+  const buildDateTimeIso = (dateMs: number, time?: string, fallbackTime = '09:00') => {
+    const date = new Date(dateMs);
+    const [hours, minutes] = (time || fallbackTime).split(':').map(Number);
+    date.setHours(hours || 0, minutes || 0, 0, 0);
+    return date.toISOString();
+  };
+
+  const mapToFamilyCalendarPlannerEvent = (event: CalendarEvent): FamilyCalendarPlannerEvent => {
+    const start = buildDateTimeIso(event.date, event.startTime, '09:00');
+    const end = buildDateTimeIso(event.date, event.endTime || event.startTime, '10:00');
+
+    return {
+      id: event.id,
+      calendarId: 'family-calendar-default',
+      title: event.title,
+      description: event.description || undefined,
+      startTime: start,
+      endTime: end,
+      allDay: Boolean(event.allDay),
+      visibility: 'private',
+      requiresApproval: false,
+      createdBy: 'personal-organizer-user',
+      attendees: ['personal-organizer-user'],
+      location: event.location || undefined,
+      reminders: event.reminder ? [event.reminder] : [],
+      color: event.color,
+      createdAt: new Date(event.createdAt).toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  };
+
+  const syncFamilyCalendarPlanner = async (calendarEvents: CalendarEvent[]) => {
+    const mappedEvents = calendarEvents.map(mapToFamilyCalendarPlannerEvent);
+    setPlannerEvents(mappedEvents);
+
+    const apiBaseUrl = import.meta.env.VITE_FAMILY_CALENDAR_API_URL;
+    if (!apiBaseUrl) return;
+
+    try {
+      const response = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/events/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ events: mappedEvents }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Sync failed with status ${response.status}`);
+      }
+    } catch {
+      toast.error('Unable to sync with Family Calendar Planner API');
+    }
   };
 
   const saveEvent = () => {
@@ -132,19 +196,26 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
       type: eventType,
       description: description.trim(),
       date: eventDateTime,
-      startTime: startTime || undefined,
-      endTime: endTime || undefined,
+      startTime: allDay ? undefined : startTime || undefined,
+      endTime: allDay ? undefined : endTime || undefined,
+      allDay: allDay,
+      location: location.trim() || undefined,
       reminder: reminder !== 'none' ? parseInt(reminder) : undefined,
       reminderSent: false,
       color: color,
       createdAt: editingEvent?.createdAt || Date.now(),
     };
 
+    const updatedEvents = editingEvent
+      ? events.map((e) => (e.id === editingEvent.id ? newEvent : e))
+      : [...events, newEvent];
+
+    onUpdate(updatedEvents);
+    void syncFamilyCalendarPlanner(updatedEvents);
+
     if (editingEvent) {
-      onUpdate(events.map((e) => (e.id === editingEvent.id ? newEvent : e)));
       toast.success('Event updated');
     } else {
-      onUpdate([...events, newEvent]);
       toast.success('Event added');
     }
 
@@ -153,7 +224,9 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
   };
 
   const deleteEvent = (id: string) => {
-    onUpdate(events.filter((e) => e.id !== id));
+    const updatedEvents = events.filter((e) => e.id !== id);
+    onUpdate(updatedEvents);
+    void syncFamilyCalendarPlanner(updatedEvents);
     toast.success('Event deleted');
     setShowDialog(false);
     resetForm();
@@ -181,6 +254,12 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
 
   const getEventTypeLabel = (type: CalendarEntryType) => {
     return eventTypes.find((eventTypeOption) => eventTypeOption.value === type)?.label || 'Event';
+  };
+
+  const getEventTimeLabel = (event: CalendarEvent) => {
+    if (event.allDay) return 'All day';
+    if (!event.startTime) return '';
+    return `${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}`;
   };
 
   const getEventsForMonth = () => {
@@ -413,12 +492,16 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                               </div>
                             )}
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                              {event.startTime && (
+                              {(event.startTime || event.allDay) && (
                                 <div className="flex items-center gap-1 opacity-90">
                                   <Clock size={10} />
-                                  <span>{event.startTime}</span>
-                                  {event.endTime && <span>- {event.endTime}</span>}
+                                  <span>{getEventTimeLabel(event)}</span>
                                 </div>
+                              )}
+                              {event.location && (
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                                  {event.location}
+                                </Badge>
                               )}
                               {event.reminder && (
                                 <div className="flex items-center gap-1 opacity-90">
@@ -486,10 +569,10 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                           className={`p-1.5 rounded text-[10px] cursor-pointer border ${getColorClass(event.color || 'blue')} hover:shadow-sm transition-shadow`}
                         >
                           <div className="font-medium truncate">{event.title}</div>
-                          {event.startTime && (
+                          {(event.startTime || event.allDay) && (
                             <div className="flex items-center gap-0.5 mt-0.5 opacity-80">
                               <Clock size={8} />
-                              <span>{event.startTime}</span>
+                              <span>{getEventTimeLabel(event)}</span>
                             </div>
                           )}
                         </div>
@@ -550,14 +633,18 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                               </p>
                             )}
                             <div className="flex items-center gap-3 flex-wrap">
-                              {event.startTime && (
+                              {(event.startTime || event.allDay) && (
                                 <div className="flex items-center gap-1.5 text-sm">
                                   <Clock size={16} className="opacity-70" />
                                   <span className="font-medium">
-                                    {event.startTime}
-                                    {event.endTime && ` - ${event.endTime}`}
+                                    {getEventTimeLabel(event)}
                                   </span>
                                 </div>
+                              )}
+                              {event.location && (
+                                <Badge variant="secondary" className="text-xs h-5 bg-background/50">
+                                  {event.location}
+                                </Badge>
                               )}
                               {event.reminder && (
                                 <div className="flex items-center gap-1.5 text-sm">
@@ -776,11 +863,15 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                             <p className="text-xs opacity-80 truncate">{event.description}</p>
                           )}
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            {event.startTime && (
+                            {(event.startTime || event.allDay) && (
                               <Badge variant="secondary" className="text-xs h-5 gap-1">
                                 <Clock size={12} />
-                                {event.startTime}
-                                {event.endTime && ` - ${event.endTime}`}
+                                {getEventTimeLabel(event)}
+                              </Badge>
+                            )}
+                            {event.location && (
+                              <Badge variant="secondary" className="text-xs h-5">
+                                {event.location}
                               </Badge>
                             )}
                             {event.reminder && (
@@ -858,11 +949,15 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                           <p className="text-xs opacity-80 mt-1 line-clamp-2">{event.description}</p>
                         )}
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          {event.startTime && (
+                          {(event.startTime || event.allDay) && (
                             <Badge variant="secondary" className="text-xs h-5 gap-1 bg-background/50">
                               <Clock size={12} />
-                              {event.startTime}
-                              {event.endTime && ` - ${event.endTime}`}
+                              {getEventTimeLabel(event)}
+                            </Badge>
+                          )}
+                          {event.location && (
+                            <Badge variant="secondary" className="text-xs h-5 bg-background/50">
+                              {event.location}
                             </Badge>
                           )}
                           {event.reminder && (
@@ -917,25 +1012,40 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                 onChange={(e) => setEventDate(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="start-time">Start Time</Label>
-                <Input
-                  id="start-time"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
+            <div className="flex items-center gap-2">
+              <Switch id="all-day" checked={allDay} onCheckedChange={setAllDay} />
+              <Label htmlFor="all-day">All day</Label>
+            </div>
+            {!allDay && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="start-time">Start Time</Label>
+                  <Input
+                    id="start-time"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end-time">End Time</Label>
+                  <Input
+                    id="end-time"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="end-time">End Time</Label>
-                <Input
-                  id="end-time"
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="event-location">Location</Label>
+              <Input
+                id="event-location"
+                placeholder="Location"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
