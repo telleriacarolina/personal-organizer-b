@@ -1,23 +1,26 @@
-# ✨ Welcome to Your Spark Template!
-You've just launched your brand-new Spark Template Codespace — everything’s fired up and ready for you to explore, build, and create with Spark!
+Welcome to Your Project!
 
-This template is your blank canvas. It comes with a minimal setup to help you get started quickly with Spark development.
+You’ve just launched a new project — everything is ready for you to explore, build, and create.
 
-🚀 What's Inside?
-- A clean, minimal Spark environment
-- Pre-configured for local development
-- Ready to scale with your ideas
-  
+This repository provides a clean starting point for development, testing, and experimentation.
+
+🚀 What’s Inside?
+
+* A clean, minimal project structure
+* Pre-configured for development
+* Ready to expand and customize
+* Suitable for local development and continued project growth
+
 🧠 What Can You Do?
 
-Right now, this is just a starting point — the perfect place to begin building and testing your Spark applications.
+This project provides a starting point for building, testing, and developing your ideas.
+
+You can customize the application, add new features, integrate additional services, and adapt the project structure to meet your needs.
 
 🧹 Just Exploring?
-No problem! If you were just checking things out and don’t need to keep this code:
 
-- Simply delete your Spark.
-- Everything will be cleaned up — no traces left behind.
+No problem! If you’re experimenting with the project and decide you don’t need the code, you can remove the repository or any files you no longer need.
 
-📄 License For Spark Template Resources 
+📄 License
 
-The Spark Template files and resources from GitHub are licensed under the terms of the MIT license, Copyright GitHub, Inc.
+See the repository’s license file for information about the applicable license and terms.
