@@ -68,6 +68,7 @@ export interface GoalsWidget extends BaseWidget {
 export interface CalendarEvent {
   id: string;
   title: string;
+  type: CalendarEntryType;
   description?: string;
   date: number;
   startTime?: string;
@@ -77,6 +78,8 @@ export interface CalendarEvent {
   color?: string;
   createdAt: number;
 }
+
+export type CalendarEntryType = 'appointment' | 'event' | 'occasion';
 
 export interface CalendarWidget extends BaseWidget {
   type: 'calendar';

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown } from '@phosphor-icons/react';
-import { CalendarEvent, WidgetSize } from '@/types';
+import { CalendarEntryType, CalendarEvent, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
@@ -35,6 +35,12 @@ const eventColors = [
   { value: 'red', label: 'Red', class: 'bg-red-500/20 border-red-500 text-red-700' },
 ];
 
+const eventTypes: { value: CalendarEntryType; label: string }[] = [
+  { value: 'appointment', label: 'Appointment' },
+  { value: 'event', label: 'Event' },
+  { value: 'occasion', label: 'Occasion' },
+];
+
 export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: CalendarWidgetProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
@@ -51,6 +57,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
   const [endTime, setEndTime] = useState('');
   const [reminder, setReminder] = useState('none');
   const [color, setColor] = useState('blue');
+  const [eventType, setEventType] = useState<CalendarEntryType>('event');
 
   useEffect(() => {
     const checkReminders = () => {
@@ -87,6 +94,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
     setEndTime('');
     setReminder('none');
     setColor('blue');
+    setEventType('event');
     setEditingEvent(null);
   };
 
@@ -107,6 +115,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
     setEndTime(event.endTime || '');
     setReminder(event.reminder?.toString() || 'none');
     setColor(event.color || 'blue');
+    setEventType(event.type || 'event');
     setShowDialog(true);
   };
 
@@ -120,6 +129,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
     const newEvent: CalendarEvent = {
       id: editingEvent?.id || Date.now().toString(),
       title: title.trim(),
+      type: eventType,
       description: description.trim(),
       date: eventDateTime,
       startTime: startTime || undefined,
@@ -167,6 +177,10 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
 
   const getColorClass = (colorValue: string) => {
     return eventColors.find((c) => c.value === colorValue)?.class || eventColors[0].class;
+  };
+
+  const getEventTypeLabel = (type: CalendarEntryType) => {
+    return eventTypes.find((eventTypeOption) => eventTypeOption.value === type)?.label || 'Event';
   };
 
   const getEventsForMonth = () => {
@@ -702,7 +716,12 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <h5 className="font-medium text-sm">{event.title}</h5>
+                            <div className="flex items-center gap-2 mt-1">
+                              <h5 className="font-medium text-sm">{event.title}</h5>
+                              <Badge variant="outline" className="text-[10px] h-4 px-1 bg-background/50">
+                                {getEventTypeLabel(event.type || 'event')}
+                              </Badge>
+                            </div>
                             {event.description && (
                               <p className="text-xs opacity-80 mt-1 line-clamp-1">{event.description}</p>
                             )}
@@ -920,6 +939,21 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
+                <Label htmlFor="event-type">Type</Label>
+                <Select value={eventType} onValueChange={(value) => setEventType(value as CalendarEntryType)}>
+                  <SelectTrigger id="event-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {eventTypes.map((eventTypeOption) => (
+                      <SelectItem key={eventTypeOption.value} value={eventTypeOption.value}>
+                        {eventTypeOption.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="reminder">Reminder</Label>
                 <Select value={reminder} onValueChange={setReminder}>
                   <SelectTrigger id="reminder">
@@ -935,7 +969,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-2">
                 <Label htmlFor="color">Color</Label>
                 <Select value={color} onValueChange={setColor}>
                   <SelectTrigger id="color">
