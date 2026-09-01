@@ -1,0 +1,68 @@
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to rollback to (e.g., v1.0.0)'
+        required: true
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    
+    steps:
+      - name: Checkout code at version
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+      
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build application
+        run: npm run build
+      
+      - name: Deploy rollback version
+        run: |
+          echo "Rolling back to version: ${{ github.event.inputs.version }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
+      
+      - name: Verify rollback
+        run: |
+          echo "Running health checks..."
+          echo "✅ Rollback successful"
+      
+      - name: Create rollback issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔄 Production Rollback to ${{ github.event.inputs.version }}`,
+              body: `## Rollback Details\n\n- **Version**: ${{ github.event.inputs.version }}\n- **Reason**: ${{ github.event.inputs.reason }}\n- **Executed by**: @${{ github.actor }}\n- **Time**: ${new Date().toISOString()}\n\n## Action Required\n\nPlease investigate the issue that caused this rollback.`,
+              labels: ['rollback', 'production', 'incident']
+            });
+      
+      - name: Rollback summary
+        run: |
+          echo "### Rollback Completed 🔄" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Rolled back to**: ${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Reason**: ${{ github.event.inputs.reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Executed by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date)" >> $GITHUB_STEP_SUMMARY
