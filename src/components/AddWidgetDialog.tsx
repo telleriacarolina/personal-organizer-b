@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ListChecks, Note, Fire, Target, Calendar, Briefcase, ShoppingCart } from '@phosphor-icons/react';
+import { CheckSquareOffset, Note, Fire, Target, Calendar, Briefcase, ShoppingCart } from '@phosphor-icons/react';
 import { WidgetType } from '@/types';
 
 interface AddWidgetDialogProps {
@@ -21,7 +21,7 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
       type: 'tasks' as WidgetType,
       title: 'Tasks',
       description: 'Manage your to-do list with priorities',
-      icon: <ListChecks size={32} />,
+      icon: <CheckSquare size={32} />,
     },
     {
       type: 'notes' as WidgetType,

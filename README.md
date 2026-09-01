@@ -1,50 +1,26 @@
-Welcome to Your Project!
-
-You’ve just launched a new project — everything is ready for you to explore, build, and create.
-
-This repository provides a clean starting point for development, testing, and experimentation.
-
-🚀 What’s Inside?
-
-* A clean, minimal project structure
-* Pre-configured for development
-* Ready to expand and customize
-* Suitable for local development and continued project growth
-
-🧠 What Can You Do?
-
-This project provides a starting point for building, testing, and developing your ideas.
-
-You can customize the application, add new features, integrate additional services, and adapt the project structure to meet your needs.
-
-🧹 Just Exploring?
-
-No problem! If you’re experimenting with the project and decide you don’t need the code, you can remove the repository or any files you no longer need.
-
-📄 License
 # Personal Organizer
 
 A comprehensive personal productivity dashboard with customizable widgets for tasks, notes, habits, goals, calendar, work management, and shopping.
 
 ## 🚀 Features
 
-- **Customizable Widgets**: Tasks, Notes, Habits, Goals, Calendar, Work Management, Shopping
-- **Drag & Drop**: Rearrange widgets with intuitive drag-and-drop
-- **Responsive Design**: Mobile-friendly interface with touch support
-- **Theme Customization**: Custom color picker and theme settings
-- **Widget Resizing**: Pinch corners to resize widgets
-- **Grid Snapping**: Snap widgets to grid for precise alignment
-- **Lock/Unlock**: Lock all widgets to prevent accidental changes
-- **Barcode Scanning**: Add shopping items via barcode
-- **Receipt Scanning**: Track expenses and compare shopping trips
-- **Work Organization**: Multiple work routines for different jobs and schedules
+* **Customizable Widgets**: Tasks, Notes, Habits, Goals, Calendar, Work Management, Shopping
+* **Drag & Drop**: Rearrange widgets with intuitive drag-and-drop
+* **Responsive Design**: Mobile-friendly interface with touch support
+* **Theme Customization**: Custom color picker and theme settings
+* **Widget Resizing**: Pinch corners to resize widgets
+* **Grid Snapping**: Snap widgets to grid for precise alignment
+* **Lock/Unlock**: Lock all widgets to prevent accidental changes
+* **Barcode Scanning**: Add shopping items via barcode
+* **Receipt Scanning**: Track expenses and compare shopping trips
+* **Work Organization**: Multiple work routines for different jobs and schedules
 
 ## 🛠️ Development
 
 ### Prerequisites
 
-- Node.js 20 or higher
-- npm
+* Node.js 20 or higher
+* npm
 
 ### Installation
 
@@ -74,20 +50,20 @@ This project includes automated deployment workflows using GitHub Actions.
 
 Runs on every push and pull request to `main` and `develop` branches.
 
-- Lints code with ESLint
-- Runs TypeScript checks
-- Executes tests
-- Builds the application
-- Uploads build artifacts
+* Lints code with ESLint
+* Runs TypeScript checks
+* Executes tests
+* Builds the application
+* Uploads build artifacts
 
 #### 2. **Deploy to Production** (`deploy-production.yml`)
 
 Triggered when a new release is published or manually via workflow dispatch.
 
-- Builds the application
-- Deploys to production environment
-- Runs health checks
-- Sends deployment notifications
+* Builds the application
+* Deploys to production environment
+* Runs health checks
+* Sends deployment notifications
 
 **Manual Trigger:**
 
@@ -125,10 +101,10 @@ Rolls back to a previous version in case of issues.
 
 Runs weekly security audits and dependency checks.
 
-- Performs security audits
-- Checks for outdated dependencies
-- Verifies builds
-- Reports bundle sizes
+* Performs security audits
+* Checks for outdated dependencies
+* Verifies builds
+* Reports bundle sizes
 
 **Manual Trigger:**
 
@@ -139,9 +115,9 @@ Runs weekly security audits and dependency checks.
 
 Sets up development environment with GitHub Copilot CLI.
 
-- Runs on pull requests and pushes to main
-- Installs dependencies
-- Sets up GitHub Copilot CLI
+* Runs on pull requests and pushes to main
+* Installs dependencies
+* Sets up GitHub Copilot CLI
 
 ## 📋 Release Process
 
@@ -149,9 +125,9 @@ Sets up development environment with GitHub Copilot CLI.
 
 This project follows [Semantic Versioning](https://semver.org/):
 
-- **MAJOR** version for incompatible API changes
-- **MINOR** version for new functionality in a backwards compatible manner
-- **PATCH** version for backwards compatible bug fixes
+* **MAJOR** version for incompatible API changes
+* **MINOR** version for new functionality in a backwards compatible manner
+* **PATCH** version for backwards compatible bug fixes
 
 ### Creating a Production Release
 
@@ -172,19 +148,19 @@ If a deployment causes issues:
 
 ## 🔒 Security
 
-- Weekly automated security audits
-- Dependency vulnerability scanning
-- No secrets or API keys in code
-- All data stored locally in browser
+* Weekly automated security audits
+* Dependency vulnerability scanning
+* No secrets or API keys in code
+* All data stored locally in browser
 
 ## 📦 Build Artifacts
 
 Build artifacts are automatically:
 
-- Generated on every successful build
-- Stored for 7 days (CI/CD builds)
-- Stored for 30 days (production builds)
-- Available for download from workflow runs
+* Generated on every successful build
+* Stored for 7 days (CI/CD builds)
+* Stored for 30 days (production builds)
+* Available for download from workflow runs
 
 ## 🤝 Contributing
 
