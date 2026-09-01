@@ -30,7 +30,3 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
-      - name: Install GitHub Copilot CLI
-        run: gh extension install github/gh-copilot
-        env:
-          GH_TOKEN: ${{ github.token }}
