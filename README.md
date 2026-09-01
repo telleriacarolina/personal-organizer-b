@@ -1,26 +1,60 @@
-Welcome to Your Project!
+# Personal Organizer
 
-You’ve just launched a new project — everything is ready for you to explore, build, and create.
+Your personalized productivity dashboard for organizing tasks, notes, habits, goals, calendar items, work, and shopping in one place.
 
-This repository provides a clean starting point for development, testing, and experimentation.
+## What’s Inside?
 
-🚀 What’s Inside?
+- A clean, modern React + TypeScript app built with Vite
+- Drag-and-drop dashboard widgets
+- Resize and lock widget layouts
+- Optional snap-to-grid behavior
+- Theme customization
+- Persistent widget state in the browser
 
-* A clean, minimal project structure
-* Pre-configured for development
-* Ready to expand and customize
-* Suitable for local development and continued project growth
+## Available Widgets
 
-🧠 What Can You Do?
+- Tasks
+- Notes
+- Habits
+- Goals
+- Calendar
+- Work
+- Shopping
 
-This project provides a starting point for building, testing, and developing your ideas.
+The Work widget includes a short questionnaire so you can choose how you want to organize work by date, week, month, time of day, or job-based workflow.
 
-You can customize the application, add new features, integrate additional services, and adapt the project structure to meet your needs.
+## Tech Stack
 
-🧹 Just Exploring?
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- Radix UI components
+- Framer Motion
+- Sonner for toast notifications
 
-No problem! If you’re experimenting with the project and decide you don’t need the code, you can remove the repository or any files you no longer need.
+## Getting Started
 
-📄 License
+```bash
+npm install
+npm run dev
+```
 
-See the repository’s license file for information about the applicable license and terms.
+Then open the local Vite URL shown in the terminal.
+
+## Available Scripts
+
+- `npm run dev` - start the development server
+- `npm run build` - build the app for production
+- `npm run lint` - run ESLint
+- `npm run preview` - preview the production build
+- `npm run optimize` - optimize the Vite dependency graph
+- `npm run kill` - stop processes using port 5000
+
+## Customization
+
+This repo is a starting point for building and extending your own organizer. You can add new widgets, connect external services, adjust the layout, or adapt the existing dashboard to fit your workflow.
+
+## License
+
+See the repository’s license file for the applicable license and terms.
