@@ -44,7 +44,7 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
     {
       type: 'calendar' as WidgetType,
       title: 'Calendar',
-      description: 'Schedule events with reminders',
+      description: 'Save appointments, events, and occasions',
       icon: <Calendar size={32} />,
     },
     {
