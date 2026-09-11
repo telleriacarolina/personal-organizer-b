@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise, Bell, BellSlash, Sparkle, Lightning } from '@phosphor-icons/react';
+import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise, Bell, BellSlash, Lightning } from '@phosphor-icons/react';
 import { PersonalShoppingItem, Receipt, ShoppingTrip, ShoppingReminder, WidgetSize, ShoppingCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -134,40 +134,29 @@ export function ShoppingWidget({
     }
   };
 
-  const handleBarcodeSubmit = async () => {
+  const handleBarcodeSubmit = () => {
     if (!barcodeInput.trim()) return;
-    
+
     setIsScanning(true);
+
     try {
-      const prompt = window.spark.llmPrompt`You are a product information assistant. Given this barcode number: ${barcodeInput}, provide the most likely product name and category.
-
-Return a JSON object with:
-- name: the product name (string)
-- category: one of: food, clothes, personal-items, work, gifts, home-supplies, health, electronics, other
-- estimatedPrice: a reasonable estimated price in USD (number)
-
-Be realistic and use common knowledge about products.`;
-
-      const result = await window.spark.llm(prompt, 'gpt-4o-mini', true);
-      const productInfo = JSON.parse(result);
-      
+      const barcodeValue = barcodeInput.trim();
       const item: PersonalShoppingItem = {
         id: Date.now().toString(),
-        name: productInfo.name,
-        category: productInfo.category,
-        estimatedPrice: productInfo.estimatedPrice,
+        name: `Barcode ${barcodeValue}`,
+        category: selectedCategory,
         purchased: false,
         priority: 'medium',
-        barcode: barcodeInput,
+        barcode: barcodeValue,
         createdAt: Date.now(),
       };
-      
+
       onUpdate({ items: [...items, item] });
-      toast.success(`Added ${productInfo.name} from barcode`);
+      toast.success(`Added Barcode ${barcodeValue}`);
       setBarcodeInput('');
       setShowBarcodeDialog(false);
-    } catch (error) {
-      toast.error('Failed to identify product from barcode');
+    } catch {
+      toast.error('Failed to add item from barcode');
     } finally {
       setIsScanning(false);
     }
@@ -176,67 +165,52 @@ Be realistic and use common knowledge about products.`;
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     setReceiptImageInput(file);
     setIsProcessingReceipt(true);
-    
+
     try {
       const reader = new FileReader();
-      const imageData = await new Promise<string>((resolve) => {
-        reader.onload = (e) => resolve(e.target?.result as string);
+      await new Promise<void>((resolve) => {
+        reader.onload = () => resolve();
         reader.readAsDataURL(file);
       });
-      
-      const prompt = window.spark.llmPrompt`You are an expert receipt OCR system. Analyze this receipt image and extract:
-1. Store name
-2. Date (if visible)
-3. All items with their names, quantities (if shown), and prices
-4. Total amount
-5. Tax and subtotal (if shown)
 
-Return a JSON object with these exact properties:
-{
-  "storeName": "store name as string",
-  "date": "YYYY-MM-DD format if found, otherwise today's date",
-  "items": [{"name": "item name", "quantity": "qty if shown", "price": price_as_number, "category": "best_guess_category"}],
-  "total": total_as_number,
-  "tax": tax_as_number_or_null,
-  "subtotal": subtotal_as_number_or_null
-}
+      if (!receiptStoreName.trim()) {
+        setReceiptStoreName(file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '));
+      }
 
-Categories must be one of: food, clothes, personal-items, work, gifts, home-supplies, health, electronics, other
-
-If the image doesn't contain a receipt, return null for all fields except items (empty array).`;
-
-      const result = await window.spark.llm(prompt, 'gpt-4o', true);
-      const extracted = JSON.parse(result);
-      
-      if (extracted.storeName) {
-        setReceiptStoreName(extracted.storeName);
-      }
-      
-      if (extracted.date) {
-        setReceiptDate(extracted.date);
-      }
-      
-      if (extracted.items && extracted.items.length > 0) {
-        const itemsText = extracted.items.map((item: any) => 
-          `${item.name}${item.quantity ? ` (${item.quantity})` : ''} ${item.price}`
-        ).join('\n');
-        setReceiptItems(itemsText);
-      }
-      
-      if (extracted.total) {
-        setReceiptTotal(extracted.total.toString());
-      }
-      
-      toast.success('Receipt scanned! Review and confirm the details.');
-    } catch (error) {
-      console.error('Image processing error:', error);
-      toast.error('Failed to process receipt image. You can manually enter the details.');
+      toast.success('Receipt image added. Review and confirm the details below.');
+    } catch {
+      toast.error('Failed to load receipt image. You can manually enter the details instead.');
     } finally {
       setIsProcessingReceipt(false);
     }
+  };
+
+  const parseReceiptLines = (value: string) => {
+    return value
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const quantityMatch = line.match(/(\d+)\s*(?:x|X)?\s*/);
+        const priceMatch = line.match(/\$?(\d+(?:\.\d{1,2})?)/);
+        const price = priceMatch ? Number(priceMatch[1]) : 0;
+        const name = line
+          .replace(priceMatch?.[0] ?? '', '')
+          .replace(quantityMatch?.[0] ?? '', '')
+          .replace(/^[-•*\s]+/, '')
+          .trim();
+
+        return {
+          name: name || 'Unnamed item',
+          quantity: quantityMatch ? quantityMatch[1] : undefined,
+          price,
+          category: selectedCategory,
+        };
+      })
+      .filter((item) => item.price > 0 || item.name.length > 0);
   };
 
   const handleReceiptScan = async () => {
@@ -247,25 +221,10 @@ If the image doesn't contain a receipt, return null for all fields except items 
 
     setIsProcessingReceipt(true);
     try {
-      const prompt = window.spark.llmPrompt`You are a receipt parser. Parse this receipt information:
-Store: ${receiptStoreName}
-Items text: ${receiptItems}
-Total: ${receiptTotal || 'unknown'}
-
-Return a JSON object with a single property "items" that contains an array of objects with:
-- name: item name (string)
-- quantity: quantity if mentioned (string or undefined)
-- price: price per item in USD (number)
-- category: best guess from: food, clothes, personal-items, work, gifts, home-supplies, health, electronics, other
-
-Be smart about parsing prices and quantities from the text.`;
-
-      const result = await window.spark.llm(prompt, 'gpt-4o', true);
-      const parsed = JSON.parse(result);
-      
+      const parsedItems = parseReceiptLines(receiptItems || '');
       const receiptId = Date.now().toString();
-      const receiptDate_ts = new Date(receiptDate).getTime();
-      
+      const receiptDateTs = new Date(receiptDate).getTime();
+
       let imageData: string | undefined;
       if (receiptImageInput) {
         const reader = new FileReader();
@@ -274,15 +233,20 @@ Be smart about parsing prices and quantities from the text.`;
           reader.readAsDataURL(receiptImageInput);
         });
       }
-      
-      const calculatedTotal = parsed.items.reduce((sum: number, item: any) => sum + (item.price || 0), 0);
+
+      const calculatedTotal = parsedItems.reduce((sum, item) => sum + (item.price || 0), 0);
       const total = receiptTotal ? parseFloat(receiptTotal) : calculatedTotal;
-      
+
       const newReceipt: Receipt = {
         id: receiptId,
         storeName: receiptStoreName,
-        date: receiptDate_ts,
-        items: parsed.items,
+        date: receiptDateTs,
+        items: parsedItems.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          category: item.category,
+        })),
         total: total,
         subtotal: calculatedTotal,
         tax: total - calculatedTotal,
@@ -291,7 +255,7 @@ Be smart about parsing prices and quantities from the text.`;
         createdAt: Date.now(),
       };
 
-      const newItems = parsed.items.map((item: any) => ({
+      const newItems = parsedItems.map((item) => ({
         id: `${receiptId}-${Date.now()}-${Math.random()}`,
         name: item.name,
         quantity: item.quantity,
@@ -302,28 +266,28 @@ Be smart about parsing prices and quantities from the text.`;
         priority: 'medium' as const,
         receiptId: receiptId,
         createdAt: Date.now(),
-        purchasedAt: receiptDate_ts,
+        purchasedAt: receiptDateTs,
       }));
 
       const existingTrip = trips.find(t => 
         t.storeName === receiptStoreName && 
-        startOfDay(t.date).getTime() === startOfDay(receiptDate_ts).getTime()
+        startOfDay(t.date).getTime() === startOfDay(receiptDateTs).getTime()
       );
 
       let newTrips = [...trips];
       if (existingTrip) {
         newTrips = trips.map(t => 
           t.id === existingTrip.id 
-            ? { ...t, total: t.total + total, itemCount: t.itemCount + parsed.items.length, receiptIds: [...t.receiptIds, receiptId] }
+            ? { ...t, total: t.total + total, itemCount: t.itemCount + parsedItems.length, receiptIds: [...t.receiptIds, receiptId] }
             : t
         );
       } else {
         newTrips.push({
           id: `trip-${Date.now()}`,
-          date: receiptDate_ts,
+          date: receiptDateTs,
           storeName: receiptStoreName,
           total: total,
-          itemCount: parsed.items.length,
+          itemCount: parsedItems.length,
           receiptIds: [receiptId],
         });
       }
@@ -333,8 +297,8 @@ Be smart about parsing prices and quantities from the text.`;
         receipts: [...receipts, newReceipt],
         trips: newTrips
       });
-      
-      toast.success(`Receipt added: ${parsed.items.length} items from ${receiptStoreName}`);
+
+      toast.success(`Receipt added: ${parsedItems.length} items from ${receiptStoreName}`);
       setShowReceiptDialog(false);
       setReceiptStoreName('');
       setReceiptDate(format(new Date(), 'yyyy-MM-dd'));
@@ -342,9 +306,10 @@ Be smart about parsing prices and quantities from the text.`;
       setReceiptTotal('');
       setReceiptNotes('');
       setReceiptImageInput(null);
-    } catch (error) {
-      console.error('Receipt scan error:', error);
+    } catch {
       toast.error('Failed to parse receipt');
+    } finally {
+      setIsProcessingReceipt(false);
     }
   };
 
@@ -953,7 +918,7 @@ Be smart about parsing prices and quantities from the text.`;
               <div className="space-y-6 py-4">
                 {reminders.length === 0 ? (
                   <Card className="p-8 text-center bg-muted/20">
-                    <Sparkle size={32} className="mx-auto mb-3 text-muted-foreground" />
+                    <ShoppingCart size={32} className="mx-auto mb-3 text-muted-foreground" />
                     <h4 className="font-medium mb-2">No Reminders Yet</h4>
                     <p className="text-sm text-muted-foreground mb-4">
                       Create smart reminders based on your shopping history

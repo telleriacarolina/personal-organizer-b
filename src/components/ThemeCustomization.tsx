@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Palette, Check, Image as ImageIcon, Trash, Upload } from '@phosphor-icons/react';
-import { useKV } from '@github/spark/hooks';
+import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { toast } from 'sonner';
 
 interface ThemePreset {
@@ -206,9 +206,9 @@ interface ThemeCustomizationProps {
 }
 
 export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationProps) {
-  const [selectedTheme, setSelectedTheme] = useKV<string>('organizer-theme', 'Warm Terracotta');
-  const [customColors, setCustomColors] = useKV<CustomColors | null>('organizer-custom-colors', null);
-  const [backgroundImage, setBackgroundImage] = useKV<BackgroundImage | null>('organizer-bg-image', null);
+  const [selectedTheme, setSelectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
+  const [customColors, setCustomColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
+  const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
   const [previewTheme, setPreviewTheme] = useState<string | null>(null);
   const [localPrimary, setLocalPrimary] = useState('#7a5c3d');
   const [localAccent, setLocalAccent] = useState('#ae6745');

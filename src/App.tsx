@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useKV } from '@github/spark/hooks';
+import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
@@ -17,13 +17,13 @@ import { Widget, WidgetType } from '@/types';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
 function App() {
-  const [widgets, setWidgets] = useKV<Widget[]>('organizer-widgets', []);
+  const [widgets, setWidgets] = useLocalStorageState<Widget[]>('organizer-widgets', []);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showWorkQuestionnaire, setShowWorkQuestionnaire] = useState(false);
-  const [snapToGrid, setSnapToGrid] = useKV<boolean>('organizer-snap-to-grid', false);
-  const [globalLock, setGlobalLock] = useKV<boolean>('organizer-global-lock', false);
+  const [snapToGrid, setSnapToGrid] = useLocalStorageState<boolean>('organizer-snap-to-grid', false);
+  const [globalLock, setGlobalLock] = useLocalStorageState<boolean>('organizer-global-lock', false);
   const dragStartTimeRef = useRef<number>(0);
 
   const addWidget = (type: WidgetType) => {
