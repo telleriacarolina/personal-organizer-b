@@ -9,6 +9,8 @@
         "build": "tsc -b --noCheck && vite build",
         "build:production": "NODE_ENV=production npm run build",
         "lint": "eslint .",
+        "test": "vitest run",
+        "test:watch": "vitest",
         "optimize": "vite optimize",
         "preview": "vite preview",
         "deploy:preview": "npm run build && npm run preview",
@@ -69,8 +71,6 @@
         "react-resizable-panels": "^2.1.7",
         "recharts": "^3.10.1",
         "sonner": "^2.0.1",
-        "tailwind-merge": "^3.5.0",
-        "three": "^0.175.0",
         "tailwind-merge": "^3.0.2",
         "three": "^0.184.0",
         "tw-animate-css": "^1.2.4",
@@ -81,6 +81,8 @@
     "devDependencies": {
         "@eslint/js": "^9.21.0",
         "@tailwindcss/postcss": "^4.1.8",
+        "@testing-library/jest-dom": "^7.0.1",
+        "@testing-library/react": "^16.3.3",
         "@types/react": "^19.0.10",
         "@types/react-dom": "^19.0.4",
         "@vitejs/plugin-react-swc": "^4.3.0",
@@ -88,10 +90,12 @@
         "eslint-plugin-react-hooks": "^5.2.0",
         "eslint-plugin-react-refresh": "^0.5.2",
         "globals": "^16.0.0",
+        "jsdom": "^30.0.1",
         "tailwindcss": "^4.1.11",
         "typescript": "~5.7.2",
         "typescript-eslint": "^8.38.0",
-        "vite": "^7.2.6"
+        "vite": "^7.2.6",
+        "vitest": "^5.0.0"
     },
     "workspaces": {
         "packages": [
