@@ -3,10 +3,10 @@ import * as RechartsPrimitive from "recharts"
 
 import {
   CHART_CONTAINER_CLASS_NAME,
-  ChartConfig,
   getPayloadConfigFromPayload,
   THEMES,
 } from "@/components/ui/chart-config"
+import type { ChartConfig } from "@/components/ui/chart-config"
 import { cn } from "@/lib/utils"
 
 type ChartContextProps = {
