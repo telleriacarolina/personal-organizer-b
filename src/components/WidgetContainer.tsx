@@ -1,4 +1,4 @@
-import { ReactNode, useState, useRef, useEffect } from 'react';
+import { ReactNode, useState, useRef, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, DotsSixVertical, CornersOut, Lock, LockOpen } from '@phosphor-icons/react';
@@ -72,10 +72,10 @@ export function WidgetContainer({
   const currentHeight = size?.height || defaultHeight;
   const isLocked = globalLock || size?.locked || false;
 
-  const snapToGridValue = (value: number) => {
+  const snapToGridValue = useCallback((value: number) => {
     if (!snapToGrid) return value;
     return Math.round(value / GRID_SIZE) * GRID_SIZE;
-  };
+  }, [snapToGrid]);
 
   const toggleLock = () => {
     if (onSizeChange) {
@@ -190,7 +190,7 @@ export function WidgetContainer({
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGrid, minWidth, minHeight]);
+  }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGridValue, minWidth, minHeight]);
 
   return (
     <Reorder.Item

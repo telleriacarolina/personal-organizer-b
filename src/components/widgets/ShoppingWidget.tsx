@@ -111,6 +111,11 @@ export function ShoppingWidget({
   
   const [showRemindersDialog, setShowRemindersDialog] = useState(false);
   const [activeReminders, setActiveReminders] = useState<ShoppingReminder[]>([]);
+  const remindersRef = useRef(reminders);
+  const onUpdateRef = useRef(onUpdate);
+
+  remindersRef.current = reminders;
+  onUpdateRef.current = onUpdate;
 
   const addItem = () => {
     if (newItemName.trim()) {
@@ -691,8 +696,8 @@ export function ShoppingWidget({
         );
       });
 
-      onUpdate({
-        reminders: reminders.map(r => 
+      onUpdateRef.current({
+        reminders: remindersRef.current.map(r => 
           activeReminders.find(ar => ar.id === r.id)
             ? { ...r, lastTriggered: Date.now() }
             : r
