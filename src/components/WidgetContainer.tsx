@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, DotsSixVertical, CornersOut, Lock, LockOpen } from '@phosphor-icons/react';
 import { Reorder, useDragControls } from 'framer-motion';
-import { WidgetSize, WidgetType } from '@/types';
+import { Widget, WidgetSize, WidgetType } from '@/types';
 import { toast } from 'sonner';
 
 interface WidgetContainerProps {
@@ -11,7 +11,7 @@ interface WidgetContainerProps {
   icon: ReactNode;
   onRemove: () => void;
   children: ReactNode;
-  value: any;
+  value: Widget;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   size?: WidgetSize;
