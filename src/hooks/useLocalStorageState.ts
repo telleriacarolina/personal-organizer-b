@@ -2,6 +2,7 @@ import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
 
 export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispatch<SetStateAction<T>>] {
   const previousKeyRef = useRef(key);
+  const initialValueRef = useRef(initialValue);
   const [value, setValue] = useState<T>(() => {
     if (typeof window === 'undefined') {
       return initialValue;
@@ -26,6 +27,10 @@ export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispa
   }, [key, value]);
 
   useEffect(() => {
+    initialValueRef.current = initialValue;
+  }, [initialValue]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
@@ -37,16 +42,16 @@ export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispa
 
     const serializedValue = window.localStorage.getItem(key);
     if (serializedValue === null) {
-      setValue(initialValue);
+      setValue(initialValueRef.current);
       return;
     }
 
     try {
       setValue(JSON.parse(serializedValue) as T);
     } catch {
-      setValue(initialValue);
+      setValue(initialValueRef.current);
     }
-  }, [key, initialValue]);
+  }, [key]);
 
   return [value, setValue];
 }
