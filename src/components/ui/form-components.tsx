@@ -16,6 +16,19 @@ import { useFormField } from "@/components/ui/use-form-field"
 
 const Form = FormProvider
 
+const FormField = <
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+>({
+  ...props
+}: ControllerProps<TFieldValues, TName>) => {
+  return (
+    <FormFieldContext.Provider value={{ name: props.name }}>
+      <Controller {...props} />
+    </FormFieldContext.Provider>
+  )
+}
+
 function FormItem({ className, ...props }: ComponentProps<"div">) {
   const id = useId()
 
