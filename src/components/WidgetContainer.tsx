@@ -14,7 +14,6 @@ interface WidgetContainerProps {
   onRemove: () => void;
   children: ReactNode;
   value: WidgetContainerValue;
-  value: Widget;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   size?: WidgetSize;

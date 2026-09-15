@@ -21,7 +21,7 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
       type: 'tasks' as WidgetType,
       title: 'Tasks',
       description: 'Manage your to-do list with priorities',
-      icon: <CheckSquareOffset size={32} />,
+      icon: <CheckSquare size={32} />,
     },
     {
       type: 'notes' as WidgetType,
