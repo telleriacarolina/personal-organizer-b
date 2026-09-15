@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
-import { Palette, Check, Image as ImageIcon, Trash, Upload } from '@phosphor-icons/react';
+import { Palette, Check, Trash, Upload } from '@phosphor-icons/react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { toast } from 'sonner';
 
@@ -634,9 +634,9 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
 
 export function ThemeCustomizationButton() {
   const [open, setOpen] = useState(false);
-  const [selectedTheme] = useKV<string>('organizer-theme', 'Warm Terracotta');
-  const [customColors] = useKV<CustomColors | null>('organizer-custom-colors', null);
-  const [backgroundImage] = useKV<BackgroundImage | null>('organizer-bg-image', null);
+  const [selectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
+  const [customColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
+  const [backgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
 
   useEffect(() => {
     if (customColors) {

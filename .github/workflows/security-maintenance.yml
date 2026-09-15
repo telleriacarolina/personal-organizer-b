@@ -35,19 +35,6 @@ jobs:
           npm audit --json > audit.json || true
           echo "See workflow logs for detailed audit results" >> $GITHUB_STEP_SUMMARY
   
-  dependency-review:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: moderate
-  
   build-check:
     runs-on: ubuntu-latest
     

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -331,17 +331,6 @@ export function WorkWidget({
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-success text-success-foreground';
-      case 'in-progress': return 'bg-primary text-primary-foreground';
-      case 'scheduled': return 'bg-accent text-accent-foreground';
-      case 'cancelled': return 'bg-muted text-muted-foreground';
-      case 'on-hold': return 'bg-muted text-muted-foreground';
-      default: return 'bg-secondary text-secondary-foreground';
-    }
-  };
-
   const getOrganizationLabel = (type?: string) => {
     switch (type) {
       case 'date': return 'By Date';
@@ -445,7 +434,6 @@ export function WorkWidget({
               showDialog={showJobDialog}
               setShowDialog={setShowJobDialog}
               getPriorityColor={getPriorityColor}
-              getStatusColor={getStatusColor}
             />
           </TabsContent>
 
@@ -980,7 +968,6 @@ function JobsTab({
   showDialog,
   setShowDialog,
   getPriorityColor,
-  getStatusColor
 }: {
   jobs: Job[];
   onAdd: (data: Omit<Job, 'id' | 'createdAt'>) => void;
@@ -989,7 +976,6 @@ function JobsTab({
   showDialog: boolean;
   setShowDialog: (show: boolean) => void;
   getPriorityColor: (priority: string) => string;
-  getStatusColor: (status: string) => string;
 }) {
   const [formData, setFormData] = useState({
     title: '',

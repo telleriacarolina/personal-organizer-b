@@ -6,12 +6,14 @@ import { Reorder, useDragControls } from 'framer-motion';
 import { Widget, WidgetSize, WidgetType } from '@/types';
 import { toast } from 'sonner';
 
+type WidgetContainerValue = Pick<Widget, 'id' | 'type'> & Record<string, unknown>;
+
 interface WidgetContainerProps {
   title: string;
   icon: ReactNode;
   onRemove: () => void;
   children: ReactNode;
-  value: Widget;
+  value: WidgetContainerValue;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   size?: WidgetSize;
