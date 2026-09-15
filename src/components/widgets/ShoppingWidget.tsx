@@ -114,9 +114,6 @@ export function ShoppingWidget({
   const remindersRef = useRef(reminders);
   const onUpdateRef = useRef(onUpdate);
 
-  remindersRef.current = reminders;
-  onUpdateRef.current = onUpdate;
-
   const addItem = () => {
     if (newItemName.trim()) {
       const item: PersonalShoppingItem = {
@@ -669,6 +666,11 @@ export function ShoppingWidget({
       setActiveReminders(triggered);
     }
   }, [reminders]);
+
+  useEffect(() => {
+    remindersRef.current = reminders;
+    onUpdateRef.current = onUpdate;
+  }, [reminders, onUpdate]);
 
   useEffect(() => {
     if (activeReminders.length > 0) {
