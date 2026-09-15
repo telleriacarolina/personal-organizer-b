@@ -2,6 +2,7 @@ import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
 
 export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispatch<SetStateAction<T>>] {
   const initialValueRef = useRef(initialValue);
+  const isInitialMountRef = useRef(true);
   initialValueRef.current = initialValue;
   const [value, setValue] = useState<T>(() => {
     if (typeof window === 'undefined') {
@@ -28,6 +29,10 @@ export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispa
 
   useEffect(() => {
     if (typeof window === 'undefined') {
+      return;
+    }
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
       return;
     }
 
