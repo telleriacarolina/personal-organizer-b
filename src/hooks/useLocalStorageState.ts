@@ -1,8 +1,8 @@
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
 
 export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispatch<SetStateAction<T>>] {
-  const previousKeyRef = useRef(key);
   const initialValueRef = useRef(initialValue);
+  initialValueRef.current = initialValue;
   const [value, setValue] = useState<T>(() => {
     if (typeof window === 'undefined') {
       return initialValue;
@@ -27,17 +27,8 @@ export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispa
   }, [key, value]);
 
   useEffect(() => {
-    initialValueRef.current = initialValue;
-  }, [initialValue]);
-
-  useEffect(() => {
     if (typeof window === 'undefined') {
       return;
-    }
-
-    if (previousKeyRef.current !== key) {
-      window.localStorage.removeItem(previousKeyRef.current);
-      previousKeyRef.current = key;
     }
 
     const serializedValue = window.localStorage.getItem(key);
