@@ -18,7 +18,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import { SidebarContext } from "@/components/ui/sidebar-context"
+import { SidebarContext, type SidebarContextProps } from "@/components/ui/sidebar-context"
 import {
   Tooltip,
   TooltipContent,
