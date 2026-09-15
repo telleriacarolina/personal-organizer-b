@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise, Bell, BellSlash, Lightning } from '@phosphor-icons/react';
+import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise, Bell, Lightning } from '@phosphor-icons/react';
 import { PersonalShoppingItem, Receipt, ShoppingTrip, ShoppingReminder, WidgetSize, ShoppingCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -351,9 +351,10 @@ export function ShoppingWidget({
 
   const sortedItems = [...items].sort((a, b) => {
     switch (sortBy) {
-      case 'priority':
+      case 'priority': {
         const priorityOrder = { high: 0, medium: 1, low: 2 };
         return priorityOrder[a.priority] - priorityOrder[b.priority];
+      }
       case 'category':
         return a.category.localeCompare(b.category);
       case 'price':

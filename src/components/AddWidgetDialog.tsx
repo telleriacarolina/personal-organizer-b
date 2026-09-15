@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CheckSquareOffset, Note, Fire, Target, Calendar, Briefcase, ShoppingCart } from '@phosphor-icons/react';
+import { CheckSquare, Note, Fire, Target, Calendar, Briefcase, ShoppingCart } from '@phosphor-icons/react';
 import { WidgetType } from '@/types';
 
 interface AddWidgetDialogProps {
