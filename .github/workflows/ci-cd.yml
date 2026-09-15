@@ -11,6 +11,17 @@ on:
       - develop
 
 jobs:
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+
   lint:
     runs-on: ubuntu-latest
     
@@ -29,11 +40,9 @@ jobs:
       
       - name: Run ESLint
         run: npm run lint --if-present
-        continue-on-error: true
       
       - name: Check TypeScript
         run: npx tsc --noEmit
-        continue-on-error: true
   
   test:
     runs-on: ubuntu-latest
@@ -53,7 +62,6 @@ jobs:
       
       - name: Run tests
         run: npm test --if-present
-        continue-on-error: true
   
   build:
     runs-on: ubuntu-latest

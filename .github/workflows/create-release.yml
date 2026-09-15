@@ -46,7 +46,6 @@ jobs:
       
       - name: Run tests
         run: npm test --if-present
-        continue-on-error: true
       
       - name: Build application
         run: npm run build
@@ -61,7 +60,7 @@ jobs:
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ github.event.inputs.version }}" >> CHANGELOG.md
       
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2.3.3
         with:
           tag_name: ${{ github.event.inputs.version }}
           name: Release ${{ github.event.inputs.version }}
