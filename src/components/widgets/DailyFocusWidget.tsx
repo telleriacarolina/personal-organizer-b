@@ -93,10 +93,8 @@ export function DailyFocusWidget({
   };
 
   const incompleteTasks = normalizedTasks.filter((task) => !task.completed);
-  const completedTasks = normalizedTasks
-    .filter((task) => task.completed)
-    .sort(sortByPriorityThenDate)
-    .slice(0, 5);
+  const completedTaskCount = normalizedTasks.filter((task) => task.completed).length;
+  const completedTasks = normalizedTasks.filter((task) => task.completed).sort(sortByPriorityThenDate).slice(0, 5);
   const overdueTasks = incompleteTasks.filter(isOverdue).sort(sortByPriorityThenDate);
   const todayTasks = incompleteTasks
     .filter((task) => task.dueDate === today && !isOverdue(task))
@@ -286,7 +284,7 @@ export function DailyFocusWidget({
             <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">Completed</h3>
-                <Badge variant="secondary">{completedTasks.length}</Badge>
+                <Badge variant="secondary">{completedTaskCount}</Badge>
               </div>
               {completedTasks.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No completed tasks yet.</p>
