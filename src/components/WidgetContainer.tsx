@@ -60,6 +60,8 @@ export function WidgetContainer({
         return { minWidth: 400, minHeight: 550 };
       case 'work':
         return { minWidth: 450, minHeight: 600 };
+      case 'daily-focus':
+        return { minWidth: 380, minHeight: 480 };
       default:
         return { minWidth: 280, minHeight: 350 };
     }
