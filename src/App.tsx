@@ -5,6 +5,7 @@ import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-ico
 import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
+import { AIConfigButton } from '@/components/ai/AIConfigButton';
 import { WorkOrganizationQuestionnaire, WorkOrganizationPreference } from '@/components/WorkOrganizationQuestionnaire';
 import { TasksWidget } from '@/components/widgets/TasksWidget';
 import { NotesWidget } from '@/components/widgets/NotesWidget';
@@ -244,6 +245,7 @@ function App() {
                 )}
                 <span className="hidden lg:inline">{globalLock ? 'Locked' : 'Unlocked'}</span>
               </Button>
+              <AIConfigButton />
               <ThemeCustomizationButton />
               <Button onClick={() => setShowAddDialog(true)} size="lg" className="gap-2 flex-1 sm:flex-initial">
                 <Plus size={20} />

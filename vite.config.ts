@@ -16,4 +16,9 @@ export default defineConfig({
       '@': resolve(projectRoot, 'src')
     }
   },
+  test: {
+    environment: 'node',
+    globals: true,
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+  },
 });
