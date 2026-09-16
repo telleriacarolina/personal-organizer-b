@@ -16,6 +16,13 @@ interface AISuggestionPanelProps {
   context: AIRequestContext['context'];
   /** Serialisable snapshot of the widget's current data for the AI to reason about */
   data: unknown;
+  /**
+   * Whether the AI service is currently enabled.
+   * Pass this from the parent (updated via onConfigChange) so the panel
+   * re-renders correctly when the config changes.
+   * Defaults to the current singleton state at first render.
+   */
+  isEnabled?: boolean;
   /** Called when the user clicks Apply on a suggestion */
   onApply?: (suggestion: AISuggestion) => void;
   className?: string;
@@ -37,6 +44,7 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
 export function AISuggestionPanel({
   context,
   data,
+  isEnabled = aiService.isEnabled,
   onApply,
   className = '',
 }: AISuggestionPanelProps) {
@@ -87,7 +95,7 @@ export function AISuggestionPanel({
 
   const pendingCount = suggestions.filter((s) => s.status === 'pending').length;
 
-  if (!aiService.isEnabled) return null;
+  if (!isEnabled) return null;
 
   return (
     <div className={`rounded-lg border border-primary/20 bg-primary/5 ${className}`}>
