@@ -2,7 +2,7 @@
 // AIConfigPanel – privacy & configuration UX (Phase 1)
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sparkle, Info } from '@phosphor-icons/react';
@@ -35,10 +35,6 @@ export function AIConfigPanel({ onConfigChange }: AIConfigPanelProps) {
   const [config, setConfig] = useState<AIConfig>(aiService.currentConfig);
   const [showPrivacyNote, setShowPrivacyNote] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-
-  useEffect(() => {
-    setConfig(aiService.currentConfig);
-  }, []);
 
   const handleModeChange = (mode: AIMode) => {
     setConfig((prev) => ({ ...prev, mode }));

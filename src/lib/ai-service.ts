@@ -161,6 +161,11 @@ function buildProvider(mode: AIMode): AIProvider {
   switch (mode) {
     case 'mock':
       return new MockProvider();
+    case 'openai':
+      // OpenAI provider is planned but not yet implemented (Phase 2+).
+      // Return a disabled provider so isEnabled stays false and the UI
+      // reflects that no provider is actually available.
+      return new DisabledProvider();
     case 'off':
     default:
       return new DisabledProvider();
@@ -182,7 +187,7 @@ export class AIService {
   }
 
   get isEnabled(): boolean {
-    return this.config.mode !== 'off';
+    return this.config.mode !== 'off' && this.provider.isAvailable() && this.provider.mode !== 'off';
   }
 
   configure(updates: Partial<AIConfig>): void {
