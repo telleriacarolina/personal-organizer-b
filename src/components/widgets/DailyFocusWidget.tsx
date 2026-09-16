@@ -286,7 +286,7 @@ export function DailyFocusWidget({
             <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">Completed</h3>
-                <Badge variant="secondary">{completedTasks.length}</Badge>
+                <Badge variant="secondary">{completedTaskCount}</Badge>
               </div>
               {completedTaskCount > completedTasks.length && (
                 <p className="text-xs text-muted-foreground">
