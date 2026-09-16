@@ -737,9 +737,9 @@ export function ShoppingWidget({
   };
 
   const handleApplyAction = (insightId: string, action: AIInsightAction) => {
+    void insightId;
     void action;
     toast.info('AI apply actions will be enabled in Phase 2');
-    updateInsightStatus(insightId, 'active');
   };
 
   return (

@@ -56,17 +56,21 @@ const createSystemInsight = (
   title: string,
   summary: string,
   rationale: string,
-): AIInsight => ({
-  id: `${request.feature}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-  kind: 'system',
-  title,
-  summary,
-  rationale,
-  confidence: 0.99,
-  generatedAt: Date.now(),
-  status: 'active',
-  bullets: request.dataSummary,
-});
+): AIInsight => {
+  const generatedAt = Date.now();
+
+  return {
+    id: `${request.feature}-${generatedAt}-${Math.random().toString(36).slice(2, 8)}`,
+    kind: 'system',
+    title,
+    summary,
+    rationale,
+    confidence: 0.99,
+    generatedAt,
+    status: 'active',
+    bullets: request.dataSummary,
+  };
+};
 
 class DisabledAIProvider implements OrganizerAIProvider {
   mode: WidgetAIState['providerMode'] = 'off';

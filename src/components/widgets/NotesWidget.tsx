@@ -16,10 +16,6 @@ interface NotesWidgetProps {
   notes: Note[];
   onUpdate: (notes: Note[]) => void;
   taskSources: { id: string; tasks: Task[] }[];
-  onAddTask?: (
-    sourceWidgetId: string,
-    task: Pick<Task, 'text' | 'priority' | 'dueDate' | 'category'>
-  ) => void;
   aiState?: WidgetAIState;
   onAIStateChange: (state: WidgetAIState) => void;
   onRemove: () => void;
@@ -34,7 +30,6 @@ export function NotesWidget({
   notes,
   onUpdate,
   taskSources,
-  onAddTask,
   aiState,
   onAIStateChange,
   onRemove,
@@ -44,7 +39,6 @@ export function NotesWidget({
   size,
   onSizeChange,
 }: NotesWidgetProps) {
-  void onAddTask;
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
@@ -113,9 +107,9 @@ export function NotesWidget({
   };
 
   const handleApplyAction = (insightId: string, action: AIInsightAction) => {
+    void insightId;
     void action;
     toast.info('AI apply actions will be enabled in Phase 2');
-    updateInsightStatus(insightId, 'active');
   };
 
   return (

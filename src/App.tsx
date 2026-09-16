@@ -372,7 +372,6 @@ function App() {
                         {...widgetProps}
                         notes={widget.notes}
                         taskSources={taskSources}
-                        onAddTask={addTaskToSource}
                         aiState={widgetAIState?.[widget.id]}
                         onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
                         onUpdate={(notes) => updateWidget(widget.id, { notes })}
