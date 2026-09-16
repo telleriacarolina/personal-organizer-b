@@ -92,6 +92,62 @@ describe('AIService disabled provider', () => {
 });
 
 // ---------------------------------------------------------------------------
+// AIService – openai mode maps to disabled (Phase 1)
+// ---------------------------------------------------------------------------
+
+describe('AIService openai mode', () => {
+  it('isEnabled returns false when mode is openai (provider not yet implemented)', () => {
+    const service = new AIService();
+    service.configure({ mode: 'openai', providerLabel: 'OpenAI', privacyAccepted: true });
+    expect(service.isEnabled).toBe(false);
+  });
+
+  it('returns empty suggestions when mode is openai', async () => {
+    const service = new AIService();
+    service.configure({ mode: 'openai', providerLabel: 'OpenAI', privacyAccepted: true });
+    const results = await service.generateSuggestions({ context: 'tasks', data: [] });
+    expect(results).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AIService – configure() storage security and roundtrip
+// ---------------------------------------------------------------------------
+
+describe('AIService configure()', () => {
+  it('never persists apiKey to localStorage', () => {
+    const service = new AIService();
+    service.configure({
+      mode: 'mock',
+      providerLabel: 'Demo',
+      privacyAccepted: true,
+      apiKey: 'sk-super-secret-key',
+    });
+    const stored = localStorageMock.getItem('organizer-ai-config');
+    expect(stored).not.toBeNull();
+    expect(stored).not.toContain('super-secret-key');
+    expect(stored).not.toContain('apiKey');
+  });
+
+  it('persists non-sensitive fields to localStorage', () => {
+    const service = new AIService();
+    service.configure({ mode: 'mock', providerLabel: 'Demo', privacyAccepted: true });
+    const stored = JSON.parse(localStorageMock.getItem('organizer-ai-config')!);
+    expect(stored.mode).toBe('mock');
+    expect(stored.providerLabel).toBe('Demo');
+    expect(stored.privacyAccepted).toBe(true);
+  });
+
+  it('currentConfig reflects the last configure() call', () => {
+    const service = new AIService();
+    service.configure({ mode: 'mock', providerLabel: 'Demo', privacyAccepted: true });
+    expect(service.currentConfig.mode).toBe('mock');
+    service.configure({ mode: 'off', providerLabel: 'Disabled', privacyAccepted: false });
+    expect(service.currentConfig.mode).toBe('off');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // AIService – mock provider
 // ---------------------------------------------------------------------------
 
