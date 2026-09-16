@@ -79,7 +79,7 @@ class DisabledAIProvider implements OrganizerAIProvider {
   model = 'disabled';
 
   async generate<TInput>(request: AIProviderRequest<TInput>) {
-    return createState(providerRegistry.off, request, [
+    return createState(this, request, [
       createSystemInsight(
         request,
         'AI is disabled',
@@ -97,7 +97,7 @@ class MockAIProvider implements OrganizerAIProvider {
   model = 'mock-organizer-v1';
 
   async generate<TInput>(request: AIProviderRequest<TInput>) {
-    return createState(providerRegistry.mock, request, [
+    return createState(this, request, [
       createSystemInsight(
         request,
         'Mock provider active',
