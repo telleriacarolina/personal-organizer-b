@@ -34,6 +34,26 @@ npm ci
 npm run dev
 ```
 
+### AI Organizer Configuration
+
+AI is disabled by default. Phase 1 adds the provider boundary, persistence, and review UI shell without enabling live AI mutations.
+
+Optional environment variables:
+
+```bash
+VITE_ORGANIZER_AI_MODE=off   # off | mock | api
+VITE_ORGANIZER_AI_PROVIDER=OpenAI
+VITE_ORGANIZER_AI_API_URL=https://your-ai-service.example.com
+```
+
+Current behavior:
+
+* `off`: AI panels stay functional for configuration review and do not send data anywhere
+* `mock`: demo provider for UI testing without credentials; data stays in the browser
+* `api`: marks an external provider as configured, but live provider requests are intentionally deferred beyond Phase 1
+
+The AI review flow is always explicit: generate → review → apply or dismiss. Suggestions are stored separately from widget source data.
+
 ### Building for Production
 
 ```bash

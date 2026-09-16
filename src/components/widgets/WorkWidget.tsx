@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
 import { 
   Plus, 
   X, 
@@ -34,9 +35,10 @@ import {
   ArrowRight
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference, WorkOrganizationType, WidgetSize } from '@/types';
+import { AIInsightAction, ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference, WorkOrganizationType, WidgetAIState, WidgetSize } from '@/types';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
 
 interface WorkWidgetProps {
   widgetId: string;
@@ -49,6 +51,8 @@ interface WorkWidgetProps {
   routines?: WorkRoutine[];
   activeRoutineId?: string;
   organizationPreference?: WorkOrganizationPreference;
+  aiState?: WidgetAIState;
+  onAIStateChange: (state: WidgetAIState) => void;
   onUpdate: (data: {
     clientSlots?: ClientSlot[];
     meals?: WorkMeal[];
@@ -78,6 +82,8 @@ export function WorkWidget({
   routines = [],
   activeRoutineId,
   organizationPreference,
+  aiState,
+  onAIStateChange,
   onUpdate,
   onRemove,
   onDragStart,
@@ -92,6 +98,7 @@ export function WorkWidget({
   const [showErrandDialog, setShowErrandDialog] = useState(false);
   const [showRoutineDialog, setShowRoutineDialog] = useState(false);
   const [showOrganizationDialog, setShowOrganizationDialog] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
   const addClientSlot = (data: Omit<ClientSlot, 'id' | 'createdAt'>) => {
     const newSlot: ClientSlot = {
@@ -342,6 +349,48 @@ export function WorkWidget({
     }
   };
 
+  const aiInput = {
+    clientSlots,
+    meals,
+    timeEntries,
+    jobs,
+    errands,
+    routines,
+    organizationPreference,
+  };
+  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+
+  const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
+    if (!aiState) return;
+    onAIStateChange(updateAIInsightStatus(aiState, insightId, status));
+  };
+
+  const handleGenerateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const nextState = await generateWidgetAIState({
+        widgetId,
+        feature: 'work',
+        input: { clientSlots, meals, timeEntries, jobs, errands, routines, organizationPreference },
+        dataSummary: [
+          'Feature: work organization review',
+          `${clientSlots.length} client slots`,
+          `${jobs.length} jobs, ${errands.length} errands, ${timeEntries.length} time entries`,
+          `${routines.length} saved routines available for future recommendations`,
+        ],
+      });
+      onAIStateChange(nextState);
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  const handleApplyAction = (insightId: string, action: AIInsightAction) => {
+    void insightId;
+    void action;
+    toast.info('AI apply actions will be enabled in Phase 2');
+  };
+
   return (
     <WidgetContainer
       title="Work Dashboard"
@@ -354,6 +403,17 @@ export function WorkWidget({
       onSizeChange={onSizeChange}
       widgetType="work"
     >
+      <AISuggestionsPanel
+        title="AI Work Recommendations"
+        featureLabel="work"
+        state={aiState}
+        isGenerating={isGeneratingInsights}
+        isStale={isAIStale}
+        onGenerate={handleGenerateInsights}
+        onApplyAction={handleApplyAction}
+        onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
+      />
+
       <Card className="col-span-1 md:col-span-2 lg:col-span-3 border-0 shadow-none">
       <CardHeader className="flex flex-row items-center justify-between pb-3 px-0">
         <div className="flex items-center gap-2 flex-wrap">

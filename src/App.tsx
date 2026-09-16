@@ -14,7 +14,7 @@ import { CalendarWidget } from '@/components/widgets/CalendarWidget';
 import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
-import { Task, Widget, WidgetType } from '@/types';
+import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
 function App() {
@@ -25,6 +25,7 @@ function App() {
   const [showWorkQuestionnaire, setShowWorkQuestionnaire] = useState(false);
   const [snapToGrid, setSnapToGrid] = useLocalStorageState<boolean>('organizer-snap-to-grid', false);
   const [globalLock, setGlobalLock] = useLocalStorageState<boolean>('organizer-global-lock', false);
+  const [widgetAIState, setWidgetAIState] = useLocalStorageState<Record<string, WidgetAIState>>('organizer-widget-ai', {});
   const dragStartTimeRef = useRef<number>(0);
 
   const addWidget = (type: WidgetType) => {
@@ -73,6 +74,11 @@ function App() {
 
   const removeWidget = (id: string) => {
     setWidgets((current) => (current || []).filter((w) => w.id !== id));
+    setWidgetAIState((current) => {
+      const nextState = { ...(current || {}) };
+      delete nextState[id];
+      return nextState;
+    });
     toast.success('Widget removed');
   };
 
@@ -134,6 +140,13 @@ function App() {
 
   const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {
     updateWidget(widgetId, { sourceWidgetId });
+  };
+
+  const updateWidgetAIState = (widgetId: string, state: WidgetAIState) => {
+    setWidgetAIState((current) => ({
+      ...(current || {}),
+      [widgetId]: state,
+    }));
   };
 
   const toggleSnapToGrid = () => {
@@ -358,6 +371,9 @@ function App() {
                       <NotesWidget
                         {...widgetProps}
                         notes={widget.notes}
+                        taskSources={taskSources}
+                        aiState={widgetAIState?.[widget.id]}
+                        onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
                         onUpdate={(notes) => updateWidget(widget.id, { notes })}
                       />
                     );
@@ -382,6 +398,8 @@ function App() {
                       <CalendarWidget
                         {...widgetProps}
                         events={widget.events}
+                        aiState={widgetAIState?.[widget.id]}
+                        onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
                         onUpdate={(events) => updateWidget(widget.id, { events })}
                       />
                     );
@@ -394,6 +412,8 @@ function App() {
                         receipts={widget.receipts}
                         trips={widget.trips}
                         reminders={widget.reminders}
+                        aiState={widgetAIState?.[widget.id]}
+                        onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
                         onUpdate={(data) => updateWidget(widget.id, data)}
                       />
                     );
@@ -410,6 +430,8 @@ function App() {
                         routines={widget.routines}
                         activeRoutineId={widget.activeRoutineId}
                         organizationPreference={widget.organizationPreference}
+                        aiState={widgetAIState?.[widget.id]}
+                        onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
                         onUpdate={(data) => updateWidget(widget.id, data)}
                       />
                     );
@@ -422,6 +444,8 @@ function App() {
                         onSourceWidgetChange={(sourceWidgetId) =>
                           updateDailyFocusSourceWidget(widget.id, sourceWidgetId)
                         }
+                        aiState={widgetAIState?.[widget.id]}
+                        onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
                         onAddTask={addTaskToSource}
                         onToggleTask={toggleTaskInSource}
                         onPriorityChange={updateTaskPriorityInSource}
