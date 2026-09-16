@@ -127,7 +127,7 @@ export function NotesWidget({
       <div className="space-y-3">
         <AISuggestionsPanel
           title="AI Note Assistant"
-          featureLabel="note"
+          featureLabel="notes"
           state={aiState}
           isGenerating={isGeneratingInsights}
           isStale={isAIStale}

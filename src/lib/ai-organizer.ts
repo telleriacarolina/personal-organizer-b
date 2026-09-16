@@ -60,7 +60,7 @@ const createSystemInsight = (
   const generatedAt = Date.now();
 
   return {
-    id: `${request.feature}-${generatedAt}-${Math.random().toString(36).slice(2, 8)}`,
+    id: crypto.randomUUID(),
     kind: 'system',
     title,
     summary,
