@@ -20,8 +20,8 @@ export function AIConfigButton() {
   const [open, setOpen] = useState(false);
   const [isEnabled, setIsEnabled] = useState(() => aiService.isEnabled);
 
-  const handleConfigChange = (config: AIConfig) => {
-    setIsEnabled(config.mode !== 'off');
+  const handleConfigChange = (_config: AIConfig) => {
+    setIsEnabled(aiService.isEnabled);
   };
 
   return (

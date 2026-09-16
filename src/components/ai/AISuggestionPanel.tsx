@@ -213,7 +213,7 @@ function SuggestionCard({ suggestion, onApply, onDismiss }: SuggestionCardProps)
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: isDone ? 0.5 : 1, y: 0 }}
       className={`rounded-md border bg-background p-2.5 text-sm ${
-        isDone ? 'opacity-50 pointer-events-none' : ''
+        isDone ? 'pointer-events-none' : ''
       }`}
     >
       <div className="flex items-start gap-2">
