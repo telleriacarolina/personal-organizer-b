@@ -99,7 +99,9 @@ export function DailyFocusWidget({
   const todayTasks = incompleteTasks
     .filter((task) => task.dueDate === today && !isOverdue(task))
     .sort(sortByPriorityThenDate);
-  const fallbackTasks = incompleteTasks.filter((task) => !isOverdue(task)).sort(sortByPriorityThenDate);
+  const fallbackTasks = incompleteTasks
+    .filter((task) => !isOverdue(task) && task.dueDate !== today)
+    .sort(sortByPriorityThenDate);
   const focusTasks = (todayTasks.length > 0 ? todayTasks : fallbackTasks).slice(0, 8);
 
   const handleQuickAdd = () => {
@@ -284,8 +286,13 @@ export function DailyFocusWidget({
             <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">Completed</h3>
-                <Badge variant="secondary">{completedTaskCount}</Badge>
+                <Badge variant="secondary">{completedTasks.length}</Badge>
               </div>
+              {completedTaskCount > completedTasks.length && (
+                <p className="text-xs text-muted-foreground">
+                  Showing {completedTasks.length} of {completedTaskCount} completed tasks
+                </p>
+              )}
               {completedTasks.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No completed tasks yet.</p>
               ) : (
