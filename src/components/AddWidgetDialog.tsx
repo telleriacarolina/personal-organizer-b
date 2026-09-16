@@ -24,6 +24,12 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
       icon: <CheckSquareOffset size={32} />,
     },
     {
+      type: 'daily-focus' as WidgetType,
+      title: 'Daily Focus',
+      description: 'Today and overdue high-priority tasks',
+      icon: <Target size={32} />,
+    },
+    {
       type: 'notes' as WidgetType,
       title: 'Notes',
       description: 'Quick capture for thoughts and ideas',

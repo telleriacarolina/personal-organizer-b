@@ -13,7 +13,8 @@ import { GoalsWidget } from '@/components/widgets/GoalsWidget';
 import { CalendarWidget } from '@/components/widgets/CalendarWidget';
 import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
-import { Widget, WidgetType } from '@/types';
+import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
+import { Task, Widget, WidgetType } from '@/types';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
       type,
       position: (widgets || []).length,
       ...(type === 'tasks' && { tasks: [] }),
+      ...(type === 'daily-focus' && { sourceWidgetId: (widgets || []).find((widget) => widget.type === 'tasks')?.id ?? null }),
       ...(type === 'notes' && { notes: [] }),
       ...(type === 'habits' && { habits: [] }),
       ...(type === 'goals' && { goals: [] }),
@@ -84,6 +86,54 @@ function App() {
     setWidgets((current) =>
       (current || []).map((w) => (w.id === id ? { ...w, size } as Widget : w))
     );
+  };
+
+  const updateTasksWidget = (sourceWidgetId: string, updater: (tasks: Task[]) => Task[]) => {
+    setWidgets((current) =>
+      (current || []).map((widget) =>
+        widget.id === sourceWidgetId && widget.type === 'tasks'
+          ? ({ ...widget, tasks: updater(widget.tasks) } as Widget)
+          : widget
+      )
+    );
+  };
+
+  const addTaskToSource = (
+    sourceWidgetId: string,
+    task: Pick<Task, 'text' | 'priority' | 'dueDate' | 'category'>
+  ) => {
+    updateTasksWidget(sourceWidgetId, (tasks) => [
+      ...tasks,
+      {
+        id: Date.now().toString(),
+        text: task.text,
+        completed: false,
+        priority: task.priority,
+        dueDate: task.dueDate ?? null,
+        category: task.category ?? null,
+        createdAt: Date.now(),
+      },
+    ]);
+  };
+
+  const toggleTaskInSource = (sourceWidgetId: string, taskId: string) => {
+    updateTasksWidget(sourceWidgetId, (tasks) =>
+      tasks.map((task) => (task.id === taskId ? { ...task, completed: !task.completed } : task))
+    );
+  };
+
+  const updateTaskPriorityInSource = (
+    sourceWidgetId: string,
+    taskId: string,
+    priority: 'low' | 'medium' | 'high'
+  ) => {
+    updateTasksWidget(sourceWidgetId, (tasks) =>
+      tasks.map((task) => (task.id === taskId ? { ...task, priority } : task))
+    );
+  };
+
+  const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {
+    updateWidget(widgetId, { sourceWidgetId });
   };
 
   const toggleSnapToGrid = () => {
@@ -142,6 +192,9 @@ function App() {
   };
 
   const currentWidgets = widgets || [];
+  const taskSources = currentWidgets
+    .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
+    .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
 
   useEffect(() => {
     if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !localStorage.getItem('drag-hint-shown')) {
@@ -358,6 +411,20 @@ function App() {
                         activeRoutineId={widget.activeRoutineId}
                         organizationPreference={widget.organizationPreference}
                         onUpdate={(data) => updateWidget(widget.id, data)}
+                      />
+                    );
+                  case 'daily-focus':
+                    return (
+                      <DailyFocusWidget
+                        {...widgetProps}
+                        taskSources={taskSources}
+                        sourceWidgetId={widget.sourceWidgetId}
+                        onSourceWidgetChange={(sourceWidgetId) =>
+                          updateDailyFocusSourceWidget(widget.id, sourceWidgetId)
+                        }
+                        onAddTask={addTaskToSource}
+                        onToggleTask={toggleTaskInSource}
+                        onPriorityChange={updateTaskPriorityInSource}
                       />
                     );
                   default:

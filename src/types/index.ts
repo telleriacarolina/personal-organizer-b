@@ -1,4 +1,4 @@
-export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work' | 'shopping';
+export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work' | 'shopping' | 'daily-focus';
 
 export interface WidgetSize {
   width: number;
@@ -18,12 +18,28 @@ export interface Task {
   text: string;
   completed: boolean;
   priority?: 'low' | 'medium' | 'high';
+  dueDate?: string | null;
+  category?: string | null;
   createdAt: number;
+}
+
+export interface DailyFocusItem {
+  id: string;
+  title: string;
+  completed: boolean;
+  priority: 'low' | 'medium' | 'high';
+  dueDate: string | null;
+  category: string | null;
 }
 
 export interface TasksWidget extends BaseWidget {
   type: 'tasks';
   tasks: Task[];
+}
+
+export interface DailyFocusWidget extends BaseWidget {
+  type: 'daily-focus';
+  sourceWidgetId?: string | null;
 }
 
 export interface Note {
@@ -291,4 +307,4 @@ export interface ShoppingWidget extends BaseWidget {
   reminders?: ShoppingReminder[];
 }
 
-export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget;
+export type Widget = TasksWidget | DailyFocusWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget;
