@@ -10,11 +10,13 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
 import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise, Bell, Lightning } from '@phosphor-icons/react';
-import { PersonalShoppingItem, Receipt, ShoppingTrip, ShoppingReminder, WidgetSize, ShoppingCategory } from '@/types';
+import { AIInsightAction, PersonalShoppingItem, Receipt, ShoppingTrip, ShoppingReminder, WidgetAIState, WidgetSize, ShoppingCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
+import { buildAIInputHash, generateWidgetAIState } from '@/lib/ai-organizer';
 
 interface ShoppingWidgetProps {
   items: PersonalShoppingItem[];
@@ -22,6 +24,8 @@ interface ShoppingWidgetProps {
   receipts?: Receipt[];
   trips?: ShoppingTrip[];
   reminders?: ShoppingReminder[];
+  aiState?: WidgetAIState;
+  onAIStateChange: (state: WidgetAIState) => void;
   onUpdate: (data: { items?: PersonalShoppingItem[]; budget?: number; receipts?: Receipt[]; trips?: ShoppingTrip[]; reminders?: ShoppingReminder[] }) => void;
   onRemove: () => void;
   widgetId: string;
@@ -69,6 +73,8 @@ export function ShoppingWidget({
   receipts = [],
   trips = [],
   reminders = [],
+  aiState,
+  onAIStateChange,
   onUpdate,
   onRemove,
   widgetId,
@@ -111,6 +117,7 @@ export function ShoppingWidget({
   
   const [showRemindersDialog, setShowRemindersDialog] = useState(false);
   const [activeReminders, setActiveReminders] = useState<ShoppingReminder[]>([]);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
   const addItem = () => {
     if (newItemName.trim()) {
@@ -701,6 +708,44 @@ export function ShoppingWidget({
     }
   }, [activeReminders]);
 
+  const aiInput = { items, budget, receipts, trips, reminders };
+  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+
+  const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
+    if (!aiState) return;
+    onAIStateChange({
+      ...aiState,
+      insights: aiState.insights.map((insight) =>
+        insight.id === insightId ? { ...insight, status } : insight
+      ),
+    });
+  };
+
+  const handleGenerateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const nextState = await generateWidgetAIState({
+        widgetId,
+        feature: 'shopping',
+        input: aiInput,
+        dataSummary: [
+          'Feature: receipt extraction and shopping review',
+          `${items.length} shopping list items`,
+          `${receipts.length} receipts and ${trips.length} shopping trips available`,
+          `${reminders.length} current shopping reminders`,
+        ],
+      });
+      onAIStateChange(nextState);
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  const handleApplyAction = (insightId: string, action: AIInsightAction) => {
+    void action;
+    updateInsightStatus(insightId, 'applied');
+  };
+
   return (
     <WidgetContainer
       title="Shopping List"
@@ -715,6 +760,17 @@ export function ShoppingWidget({
       snapToGrid={snapToGrid}
       globalLock={globalLock}
     >
+      <AISuggestionsPanel
+        title="AI Shopping Review"
+        featureLabel="shopping"
+        state={aiState}
+        isGenerating={isGeneratingInsights}
+        isStale={isAIStale}
+        onGenerate={handleGenerateInsights}
+        onApplyAction={handleApplyAction}
+        onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
+      />
+
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">
           <Dialog open={showBarcodeDialog} onOpenChange={setShowBarcodeDialog}>

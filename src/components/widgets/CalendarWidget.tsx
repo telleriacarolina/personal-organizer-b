@@ -11,15 +11,19 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
 import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown } from '@phosphor-icons/react';
-import { CalendarEntryType, CalendarEvent, FamilyCalendarPlannerEvent, WidgetSize } from '@/types';
+import { AIInsightAction, CalendarEntryType, CalendarEvent, FamilyCalendarPlannerEvent, WidgetAIState, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
+import { buildAIInputHash, generateWidgetAIState } from '@/lib/ai-organizer';
 
 interface CalendarWidgetProps {
   events: CalendarEvent[];
   onUpdate: (events: CalendarEvent[]) => void;
+  aiState?: WidgetAIState;
+  onAIStateChange: (state: WidgetAIState) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -43,7 +47,18 @@ const eventTypes: { value: CalendarEntryType; label: string }[] = [
   { value: 'occasion', label: 'Occasion' },
 ];
 
-export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: CalendarWidgetProps) {
+export function CalendarWidget({
+  events,
+  onUpdate,
+  aiState,
+  onAIStateChange,
+  onRemove,
+  widgetId,
+  onDragStart,
+  onDragEnd,
+  size,
+  onSizeChange,
+}: CalendarWidgetProps) {
   const [, setPlannerEvents] = useLocalStorageState<FamilyCalendarPlannerEvent[]>('family-calendar-planner-events', []);
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
@@ -63,6 +78,7 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
   const [eventType, setEventType] = useState<CalendarEntryType>('event');
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState('');
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
   useEffect(() => {
     const checkReminders = () => {
@@ -256,6 +272,44 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
     return eventTypes.find((eventTypeOption) => eventTypeOption.value === type)?.label || 'Event';
   };
 
+  const aiInput = { events };
+  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+
+  const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
+    if (!aiState) return;
+    onAIStateChange({
+      ...aiState,
+      insights: aiState.insights.map((insight) =>
+        insight.id === insightId ? { ...insight, status } : insight
+      ),
+    });
+  };
+
+  const handleGenerateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const nextState = await generateWidgetAIState({
+        widgetId,
+        feature: 'calendar',
+        input: aiInput,
+        dataSummary: [
+          'Feature: calendar conflict review',
+          `${events.length} events considered`,
+          `${events.filter((event) => !event.allDay).length} timed events available for future conflict checks`,
+          'Calendar suggestions remain advisory until Phase 2',
+        ],
+      });
+      onAIStateChange(nextState);
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  const handleApplyAction = (insightId: string, action: AIInsightAction) => {
+    void action;
+    updateInsightStatus(insightId, 'applied');
+  };
+
   const getEventTimeLabel = (event: CalendarEvent) => {
     if (event.allDay) return 'All day';
     if (!event.startTime) return '';
@@ -363,6 +417,17 @@ export function CalendarWidget({ events, onUpdate, onRemove, widgetId, onDragSta
       onSizeChange={onSizeChange}
       widgetType="calendar"
     >
+      <AISuggestionsPanel
+        title="AI Calendar Review"
+        featureLabel="calendar"
+        state={aiState}
+        isGenerating={isGeneratingInsights}
+        isStale={isAIStale}
+        onGenerate={handleGenerateInsights}
+        onApplyAction={handleApplyAction}
+        onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
+      />
+
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">

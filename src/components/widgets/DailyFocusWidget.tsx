@@ -8,7 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alarm, Plus } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { DailyFocusItem, Task, WidgetSize } from '@/types';
+import { AIInsightAction, DailyFocusItem, Task, WidgetAIState, WidgetSize } from '@/types';
+import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
+import { buildAIInputHash, generateWidgetAIState } from '@/lib/ai-organizer';
 
 interface TaskSource {
   id: string;
@@ -26,6 +28,8 @@ interface DailyFocusWidgetProps {
   ) => void;
   onToggleTask: (sourceWidgetId: string, taskId: string) => void;
   onPriorityChange: (sourceWidgetId: string, taskId: string, priority: 'low' | 'medium' | 'high') => void;
+  aiState?: WidgetAIState;
+  onAIStateChange: (state: WidgetAIState) => void;
   onRemove: () => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
@@ -50,6 +54,8 @@ export function DailyFocusWidget({
   onAddTask,
   onToggleTask,
   onPriorityChange,
+  aiState,
+  onAIStateChange,
   onRemove,
   onDragStart,
   onDragEnd,
@@ -60,6 +66,7 @@ export function DailyFocusWidget({
   const [quickTaskTitle, setQuickTaskTitle] = useState('');
   const [quickTaskPriority, setQuickTaskPriority] = useState<'low' | 'medium' | 'high'>('high');
   const [quickTaskDueDate, setQuickTaskDueDate] = useState(today);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
   const selectedSourceId =
     sourceWidgetId && taskSources.some((source) => source.id === sourceWidgetId)
@@ -103,6 +110,8 @@ export function DailyFocusWidget({
     .filter((task) => !isOverdue(task) && task.dueDate !== today)
     .sort(sortByPriorityThenDate);
   const focusTasks = (todayTasks.length > 0 ? todayTasks : fallbackTasks).slice(0, 8);
+  const aiInput = { tasks: selectedSource?.tasks ?? [] };
+  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
 
   const handleQuickAdd = () => {
     if (!selectedSourceId) {
@@ -120,6 +129,45 @@ export function DailyFocusWidget({
     setQuickTaskTitle('');
   };
 
+  const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
+    if (!aiState) return;
+    onAIStateChange({
+      ...aiState,
+      insights: aiState.insights.map((insight) =>
+        insight.id === insightId ? { ...insight, status } : insight
+      ),
+    });
+  };
+
+  const handleGenerateInsights = async () => {
+    if (!selectedSource) {
+      toast.error('Add a Tasks widget first');
+      return;
+    }
+    setIsGeneratingInsights(true);
+    try {
+      const nextState = await generateWidgetAIState({
+        widgetId,
+        feature: 'tasks',
+        input: { tasks: selectedSource.tasks },
+        dataSummary: [
+          'Feature: task prioritization review',
+          `${selectedSource.tasks.length} total tasks from the selected Tasks widget`,
+          `${selectedSource.tasks.filter((task) => !task.completed).length} incomplete tasks considered`,
+          'Suggested changes must be confirmed before any task mutation',
+        ],
+      });
+      onAIStateChange(nextState);
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  const handleApplyAction = (insightId: string, action: AIInsightAction) => {
+    void action;
+    updateInsightStatus(insightId, 'applied');
+  };
+
   return (
     <WidgetContainer
       title="Daily Focus"
@@ -133,6 +181,17 @@ export function DailyFocusWidget({
       widgetType="daily-focus"
     >
       <div className="space-y-3">
+        <AISuggestionsPanel
+          title="AI Focus Suggestions"
+          featureLabel="task"
+          state={aiState}
+          isGenerating={isGeneratingInsights}
+          isStale={isAIStale}
+          onGenerate={handleGenerateInsights}
+          onApplyAction={handleApplyAction}
+          onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
+        />
+
         <div className="space-y-2">
           <Label htmlFor={`daily-focus-source-${widgetId}`} className="text-xs text-muted-foreground">
             Task source

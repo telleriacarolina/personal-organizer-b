@@ -23,6 +23,83 @@ export interface Task {
   createdAt: number;
 }
 
+export type AIProviderMode = 'mock' | 'api' | 'off';
+export type AIPrivacyMode = 'local-only' | 'remote';
+export type AIInsightStatus = 'active' | 'applied' | 'dismissed';
+export type AIWidgetFeature = 'tasks' | 'notes' | 'work' | 'shopping' | 'calendar';
+export type AIInsightKind =
+  | 'system'
+  | 'task-focus'
+  | 'note-summary'
+  | 'note-task-extraction'
+  | 'work-organization'
+  | 'shopping-insight'
+  | 'calendar-suggestion';
+export type AIInsightActionType =
+  | 'reprioritize-task'
+  | 'add-tasks-to-source'
+  | 'set-work-organization'
+  | 'set-event-reminders'
+  | 'generate-shopping-reminders';
+
+export interface ExtractedTaskDraft {
+  text: string;
+  priority: 'low' | 'medium' | 'high';
+  dueDate?: string | null;
+  category?: string | null;
+}
+
+export interface TaskPriorityUpdate {
+  taskId: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface EventReminderUpdate {
+  eventId: string;
+  reminder: number;
+}
+
+export type AIInsightActionPayload =
+  | { taskUpdates: TaskPriorityUpdate[] }
+  | { tasks: ExtractedTaskDraft[] }
+  | { organizationPreference: WorkOrganizationPreference }
+  | { reminderUpdates: EventReminderUpdate[] }
+  | { generator: 'shopping-reminders' };
+
+export interface AIInsightAction {
+  id: string;
+  label: string;
+  type: AIInsightActionType;
+  payload?: AIInsightActionPayload;
+}
+
+export interface AIInsight {
+  id: string;
+  kind: AIInsightKind;
+  title: string;
+  summary: string;
+  rationale: string;
+  confidence: number;
+  generatedAt: number;
+  status: AIInsightStatus;
+  bullets?: string[];
+  actions?: AIInsightAction[];
+}
+
+export interface WidgetAIState {
+  widgetId: string;
+  feature: AIWidgetFeature;
+  generatedAt: number;
+  sourceHash: string;
+  providerMode: AIProviderMode;
+  providerLabel: string;
+  privacyMode: AIPrivacyMode;
+  model: string;
+  dataSummary: string[];
+  insights: AIInsight[];
+  error?: string;
+}
+
 export interface DailyFocusItem {
   id: string;
   title: string;
