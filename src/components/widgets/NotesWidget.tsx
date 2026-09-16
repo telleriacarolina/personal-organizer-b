@@ -11,6 +11,7 @@ import { AIInsightAction, Note, Task, WidgetAIState, WidgetSize } from '@/types'
 import { motion, AnimatePresence } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { toast } from 'sonner';
 
 interface NotesWidgetProps {
   notes: Note[];
