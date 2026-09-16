@@ -10,7 +10,7 @@ import { Alarm, Plus } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { AIInsightAction, DailyFocusItem, Task, WidgetAIState, WidgetSize } from '@/types';
 import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
-import { buildAIInputHash, generateWidgetAIState } from '@/lib/ai-organizer';
+import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
 
 interface TaskSource {
   id: string;
@@ -131,12 +131,7 @@ export function DailyFocusWidget({
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;
-    onAIStateChange({
-      ...aiState,
-      insights: aiState.insights.map((insight) =>
-        insight.id === insightId ? { ...insight, status } : insight
-      ),
-    });
+    onAIStateChange(updateAIInsightStatus(aiState, insightId, status));
   };
 
   const handleGenerateInsights = async () => {
@@ -165,7 +160,8 @@ export function DailyFocusWidget({
 
   const handleApplyAction = (insightId: string, action: AIInsightAction) => {
     void action;
-    updateInsightStatus(insightId, 'applied');
+    toast.info('AI apply actions will be enabled in Phase 2');
+    updateInsightStatus(insightId, 'active');
   };
 
   return (

@@ -16,7 +16,7 @@ import { AIInsightAction, PersonalShoppingItem, Receipt, ShoppingTrip, ShoppingR
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
-import { buildAIInputHash, generateWidgetAIState } from '@/lib/ai-organizer';
+import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
 
 interface ShoppingWidgetProps {
   items: PersonalShoppingItem[];
@@ -713,12 +713,7 @@ export function ShoppingWidget({
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;
-    onAIStateChange({
-      ...aiState,
-      insights: aiState.insights.map((insight) =>
-        insight.id === insightId ? { ...insight, status } : insight
-      ),
-    });
+    onAIStateChange(updateAIInsightStatus(aiState, insightId, status));
   };
 
   const handleGenerateInsights = async () => {
@@ -743,7 +738,8 @@ export function ShoppingWidget({
 
   const handleApplyAction = (insightId: string, action: AIInsightAction) => {
     void action;
-    updateInsightStatus(insightId, 'applied');
+    toast.info('AI apply actions will be enabled in Phase 2');
+    updateInsightStatus(insightId, 'active');
   };
 
   return (

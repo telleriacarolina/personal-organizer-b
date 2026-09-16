@@ -73,8 +73,8 @@ export function AISuggestionsPanel({
         <div className="rounded-lg border bg-background p-3">
           <p className="text-xs font-medium">Data reviewed for this request</p>
           <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-            {state.dataSummary.map((entry) => (
-              <li key={entry}>• {entry}</li>
+            {state.dataSummary.map((entry, index) => (
+              <li key={`summary-${index}`}>• {entry}</li>
             ))}
           </ul>
         </div>
@@ -103,8 +103,8 @@ export function AISuggestionsPanel({
               <p className="mt-1 text-xs text-muted-foreground">{insight.rationale}</p>
               {insight.bullets && insight.bullets.length > 0 && (
                 <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                  {insight.bullets.map((bullet) => (
-                    <li key={bullet}>• {bullet}</li>
+                  {insight.bullets.map((bullet, index) => (
+                    <li key={`${insight.id}-bullet-${index}`}>• {bullet}</li>
                   ))}
                 </ul>
               )}

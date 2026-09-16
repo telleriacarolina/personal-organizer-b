@@ -150,3 +150,14 @@ export const getOrganizerAIProvider = (): OrganizerAIProvider => {
 
 export const generateWidgetAIState = async <TInput>(request: AIProviderRequest<TInput>) =>
   getOrganizerAIProvider().generate(request);
+
+export const updateAIInsightStatus = (
+  state: WidgetAIState,
+  insightId: string,
+  status: AIInsight['status'],
+): WidgetAIState => ({
+  ...state,
+  insights: state.insights.map((insight) =>
+    insight.id === insightId ? { ...insight, status } : insight
+  ),
+});
