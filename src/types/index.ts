@@ -1,4 +1,4 @@
-export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work' | 'shopping' | 'daily-focus';
+export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work' | 'shopping' | 'daily-focus' | 'ai-chat' | 'record-note';
 
 export interface WidgetSize {
   width: number;
@@ -171,6 +171,9 @@ export interface CalendarEvent {
   reminder?: number;
   reminderSent?: boolean;
   color?: string;
+  sourceType?: 'work';
+  sourceId?: string;
+  sourceWidgetId?: string;
   createdAt: number;
 }
 
@@ -384,4 +387,38 @@ export interface ShoppingWidget extends BaseWidget {
   reminders?: ShoppingReminder[];
 }
 
-export type Widget = TasksWidget | DailyFocusWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget;
+export interface AIChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  timestamp: number;
+  /** If this message produced suggestions, they are stored here */
+  suggestions?: AIInsight[];
+  /** Which widget type these suggestions target */
+  targetWidget?: string;
+}
+
+export interface AIChatWidget extends BaseWidget {
+  type: 'ai-chat';
+  messages: AIChatMessage[];
+  appliedSuggestionIds?: string[];
+}
+
+export type RecordNoteMediaType = 'voice' | 'video' | 'photo';
+
+export interface RecordNote {
+  id: string;
+  title: string;
+  mediaType: RecordNoteMediaType;
+  dataUrl: string;
+  duration?: number;
+  transcription?: string;
+  createdAt: number;
+}
+
+export interface RecordNoteWidget extends BaseWidget {
+  type: 'record-note';
+  records: RecordNote[];
+}
+
+export type Widget = TasksWidget | DailyFocusWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget | AIChatWidget | RecordNoteWidget;

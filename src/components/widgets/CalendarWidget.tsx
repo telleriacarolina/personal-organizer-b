@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
-import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown } from '@phosphor-icons/react';
+import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown, Sparkle } from '@phosphor-icons/react';
 import { AIInsightAction, CalendarEntryType, CalendarEvent, FamilyCalendarPlannerEvent, WidgetAIState, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -79,6 +79,7 @@ export function CalendarWidget({
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState('');
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(true);
 
   useEffect(() => {
     const checkReminders = () => {
@@ -413,16 +414,29 @@ export function CalendarWidget({
       onSizeChange={onSizeChange}
       widgetType="calendar"
     >
-      <AISuggestionsPanel
-        title="AI Calendar Review"
-        featureLabel="calendar"
-        state={aiState}
-        isGenerating={isGeneratingInsights}
-        isStale={isAIStale}
-        onGenerate={handleGenerateInsights}
-        onApplyAction={handleApplyAction}
-        onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
-      />
+      {showAIPanel ? (
+        <AISuggestionsPanel
+          title="AI Calendar Review"
+          featureLabel="calendar"
+          state={aiState}
+          isGenerating={isGeneratingInsights}
+          isStale={isAIStale}
+          onGenerate={handleGenerateInsights}
+          onApplyAction={handleApplyAction}
+          onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
+          onClose={() => setShowAIPanel(false)}
+        />
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 text-xs text-muted-foreground w-full"
+          onClick={() => setShowAIPanel(true)}
+        >
+          <Sparkle size={13} />
+          Show AI Suggestions
+        </Button>
+      )}
 
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">

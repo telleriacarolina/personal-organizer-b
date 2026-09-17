@@ -7,6 +7,7 @@ import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
 import { AIConfigButton } from '@/components/ai/AIConfigButton';
 import { OrganizerAgentButton } from '@/components/ai/OrganizerAgentButton';
+import { AIChatWidget } from '@/components/widgets/AIChatWidget';
 import { WorkOrganizationQuestionnaire, WorkOrganizationPreference } from '@/components/WorkOrganizationQuestionnaire';
 import { TasksWidget } from '@/components/widgets/TasksWidget';
 import { NotesWidget } from '@/components/widgets/NotesWidget';
@@ -16,7 +17,9 @@ import { CalendarWidget } from '@/components/widgets/CalendarWidget';
 import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
+import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
 import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
+import { appendImportedCalendarEvent, type CalendarImportDraft } from '@/lib/calendar-imports';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import type { AgentContext, AgentHandlers } from '@/types/agent';
 
@@ -49,6 +52,8 @@ function App() {
       ...(type === 'goals' && { goals: [] }),
       ...(type === 'calendar' && { events: [] }),
       ...(type === 'shopping' && { items: [], receipts: [], trips: [], reminders: [] }),
+      ...(type === 'ai-chat' && { messages: [], appliedSuggestionIds: [] }),
+      ...(type === 'record-note' && { records: [] }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
@@ -141,6 +146,43 @@ function App() {
     );
   };
 
+  const addCalendarEventToSource = (
+    destinationWidgetId: string,
+    event: CalendarImportDraft
+  ): { added: boolean; reason?: 'invalid-destination' | 'duplicate' } => {
+    let result: { added: boolean; reason?: 'invalid-destination' | 'duplicate' } = {
+      added: false,
+      reason: 'invalid-destination',
+    };
+
+    setWidgets((current) => {
+      const currentWidgets = current || [];
+      const destinationWidget = currentWidgets.find(
+        (widget): widget is Extract<Widget, { type: 'calendar' }> =>
+          widget.id === destinationWidgetId && widget.type === 'calendar'
+      );
+      if (!destinationWidget) {
+        result = { added: false, reason: 'invalid-destination' };
+        return currentWidgets;
+      }
+
+      const importResult = appendImportedCalendarEvent(destinationWidget.events, event);
+      if (!importResult.added) {
+        result = { added: false, reason: 'duplicate' };
+        return currentWidgets;
+      }
+
+      result = { added: true };
+      return currentWidgets.map((widget) =>
+        widget.id === destinationWidgetId && widget.type === 'calendar'
+          ? ({ ...widget, events: importResult.events } as Widget)
+          : widget
+      );
+    });
+
+    return result;
+  };
+
   const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {
     updateWidget(widgetId, { sourceWidgetId });
   };
@@ -211,6 +253,9 @@ function App() {
   const taskSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
     .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
+  const calendarSources = currentWidgets
+    .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
+    .map((widget) => ({ id: widget.id }));
 
   const agentHandlers: AgentHandlers = useMemo(() => ({
     onAddTask: (widgetId, taskData) => {
@@ -591,8 +636,10 @@ function App() {
                         routines={widget.routines}
                         activeRoutineId={widget.activeRoutineId}
                         organizationPreference={widget.organizationPreference}
+                        calendarSources={calendarSources}
                         aiState={widgetAIState?.[widget.id]}
                         onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
+                        onAddCalendarEvent={addCalendarEventToSource}
                         onUpdate={(data) => updateWidget(widget.id, data)}
                       />
                     );
@@ -610,6 +657,29 @@ function App() {
                         onAddTask={addTaskToSource}
                         onToggleTask={toggleTaskInSource}
                         onPriorityChange={updateTaskPriorityInSource}
+                      />
+                    );
+                  case 'ai-chat':
+                    return (
+                      <AIChatWidget
+                        {...widgetProps}
+                        messages={widget.messages}
+                        appliedSuggestionIds={widget.appliedSuggestionIds ?? []}
+                        onUpdate={(messages) => updateWidget(widget.id, { messages })}
+                        onApplySuggestion={(id) =>
+                          updateWidget(widget.id, {
+                            appliedSuggestionIds: [...(widget.appliedSuggestionIds ?? []), id],
+                          })
+                        }
+                        availableWidgets={currentWidgets.map((w) => ({ id: w.id, type: w.type }))}
+                      />
+                    );
+                  case 'record-note':
+                    return (
+                      <RecordNoteWidget
+                        {...widgetProps}
+                        records={widget.records}
+                        onUpdate={(records) => updateWidget(widget.id, { records })}
                       />
                     );
                   default:
