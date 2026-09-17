@@ -17,9 +17,11 @@ interface TasksWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
-export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: TasksWidgetProps) {
+export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange, snapToGrid, globalLock }: TasksWidgetProps) {
   const [newTask, setNewTask] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
 
@@ -72,6 +74,8 @@ export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, 
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="tasks"
     >
       <div className="flex gap-2">
@@ -80,7 +84,7 @@ export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, 
           placeholder="Add a new task..."
           value={newTask}
           onChange={(e) => setNewTask(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           className="flex-1"
         />
         <div className="flex gap-1">

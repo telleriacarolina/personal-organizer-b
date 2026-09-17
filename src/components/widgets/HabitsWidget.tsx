@@ -17,9 +17,11 @@ interface HabitsWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
-export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: HabitsWidgetProps) {
+export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange, snapToGrid, globalLock }: HabitsWidgetProps) {
   const [newHabit, setNewHabit] = useState('');
 
   const addHabit = () => {
@@ -93,6 +95,8 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="habits"
     >
       <div className="flex gap-2">
@@ -101,7 +105,7 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
           placeholder="Add a new habit..."
           value={newHabit}
           onChange={(e) => setNewHabit(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           className="flex-1"
         />
         <Button onClick={addHabit} size="icon" className="h-10 w-10">

@@ -25,6 +25,8 @@ interface NotesWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
 export function NotesWidget({
@@ -39,6 +41,8 @@ export function NotesWidget({
   onDragEnd,
   size,
   onSizeChange,
+  snapToGrid,
+  globalLock,
 }: NotesWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -124,6 +128,8 @@ export function NotesWidget({
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="notes"
     >
       <div className="space-y-3">

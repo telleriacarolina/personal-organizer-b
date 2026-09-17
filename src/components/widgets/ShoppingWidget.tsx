@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { reduceShoppingWidget, type ShoppingDomainAction } from '@/lib/domain/shopping-domain';
 
 interface ShoppingWidgetProps {
   items: PersonalShoppingItem[];
@@ -120,6 +121,28 @@ export function ShoppingWidget({
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(true);
 
+  const applyShoppingDomainAction = (action: ShoppingDomainAction) => {
+    const currentWidgetState = {
+      id: widgetId,
+      type: 'shopping' as const,
+      position: 0,
+      items,
+      budget,
+      receipts,
+      trips,
+      reminders,
+    };
+
+    const nextState = reduceShoppingWidget(currentWidgetState, action);
+    onUpdate({
+      items: nextState.items,
+      budget: nextState.budget,
+      receipts: nextState.receipts,
+      trips: nextState.trips,
+      reminders: nextState.reminders,
+    });
+  };
+
   const addItem = () => {
     if (newItemName.trim()) {
       const item: PersonalShoppingItem = {
@@ -133,7 +156,7 @@ export function ShoppingWidget({
         priority: selectedPriority,
         createdAt: Date.now(),
       };
-      onUpdate({ items: [...items, item] });
+      applyShoppingDomainAction({ type: 'set-items', payload: [...items, item] });
       setNewItemName('');
       setNewItemQuantity('');
       setNewItemPrice('');
@@ -159,7 +182,7 @@ export function ShoppingWidget({
         createdAt: Date.now(),
       };
 
-      onUpdate({ items: [...items, item] });
+      applyShoppingDomainAction({ type: 'set-items', payload: [...items, item] });
       toast.success(`Added Barcode ${barcodeValue}`);
       setBarcodeInput('');
       setShowBarcodeDialog(false);
@@ -322,21 +345,22 @@ export function ShoppingWidget({
   };
 
   const togglePurchased = (id: string) => {
-    onUpdate({
-      items: items.map((item) =>
-        item.id === id ? { ...item, purchased: !item.purchased, purchasedAt: !item.purchased ? Date.now() : undefined } : item
-      )
+    applyShoppingDomainAction({
+      type: 'set-items',
+      payload: items.map((item) =>
+        item.id === id ? { ...item, purchased: !item.purchased, purchasedAt: !item.purchased ? Date.now() : undefined } : item,
+      ),
     });
   };
 
   const deleteItem = (id: string) => {
-    onUpdate({ items: items.filter((item) => item.id !== id) });
+    applyShoppingDomainAction({ type: 'set-items', payload: items.filter((item) => item.id !== id) });
     toast.success('Item removed');
   };
 
   const updateBudget = () => {
     const newBudget = budgetInput ? parseFloat(budgetInput) : undefined;
-    onUpdate({ budget: newBudget });
+    applyShoppingDomainAction({ type: 'set-budget', payload: newBudget });
     toast.success(newBudget ? `Budget set to $${newBudget.toFixed(2)}` : 'Budget cleared');
   };
 
@@ -808,7 +832,7 @@ export function ShoppingWidget({
                       placeholder="Enter barcode..."
                       value={barcodeInput}
                       onChange={(e) => setBarcodeInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleBarcodeSubmit()}
+                      onKeyDown={(e) => e.key === 'Enter' && handleBarcodeSubmit()}
                     />
                     <Button size="icon" variant="outline" title="Scan with camera">
                       <Scan size={18} />
@@ -1432,7 +1456,7 @@ export function ShoppingWidget({
               placeholder="Item name..."
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               className="h-9"
             />
           </div>
@@ -1441,7 +1465,7 @@ export function ShoppingWidget({
               placeholder="Qty"
               value={newItemQuantity}
               onChange={(e) => setNewItemQuantity(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               className="h-9"
             />
           </div>
@@ -1452,7 +1476,7 @@ export function ShoppingWidget({
               step="0.01"
               value={newItemPrice}
               onChange={(e) => setNewItemPrice(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               className="h-9"
             />
           </div>
@@ -1474,7 +1498,7 @@ export function ShoppingWidget({
             placeholder="Store (optional)"
             value={selectedStore}
             onChange={(e) => setSelectedStore(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             className="w-36 h-9"
           />
 
