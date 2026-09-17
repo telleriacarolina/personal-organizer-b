@@ -1,4 +1,4 @@
-export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work' | 'shopping' | 'daily-focus';
+export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work' | 'shopping' | 'daily-focus' | 'ai-chat';
 
 export interface WidgetSize {
   width: number;
@@ -384,4 +384,20 @@ export interface ShoppingWidget extends BaseWidget {
   reminders?: ShoppingReminder[];
 }
 
-export type Widget = TasksWidget | DailyFocusWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget;
+export interface AIChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  timestamp: number;
+  /** If this message produced suggestions, they are stored here */
+  suggestions?: AIInsight[];
+  /** Which widget type these suggestions target */
+  targetWidget?: string;
+}
+
+export interface AIChatWidget extends BaseWidget {
+  type: 'ai-chat';
+  messages: AIChatMessage[];
+}
+
+export type Widget = TasksWidget | DailyFocusWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget | AIChatWidget;

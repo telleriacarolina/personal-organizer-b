@@ -6,6 +6,7 @@ import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
 import { AIConfigButton } from '@/components/ai/AIConfigButton';
+import { AIChatWidget } from '@/components/widgets/AIChatWidget';
 import { WorkOrganizationQuestionnaire, WorkOrganizationPreference } from '@/components/WorkOrganizationQuestionnaire';
 import { TasksWidget } from '@/components/widgets/TasksWidget';
 import { NotesWidget } from '@/components/widgets/NotesWidget';
@@ -47,6 +48,7 @@ function App() {
       ...(type === 'goals' && { goals: [] }),
       ...(type === 'calendar' && { events: [] }),
       ...(type === 'shopping' && { items: [], receipts: [], trips: [], reminders: [] }),
+      ...(type === 'ai-chat' && { messages: [] }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
@@ -451,6 +453,15 @@ function App() {
                         onAddTask={addTaskToSource}
                         onToggleTask={toggleTaskInSource}
                         onPriorityChange={updateTaskPriorityInSource}
+                      />
+                    );
+                  case 'ai-chat':
+                    return (
+                      <AIChatWidget
+                        {...widgetProps}
+                        messages={widget.messages}
+                        onUpdate={(messages) => updateWidget(widget.id, { messages })}
+                        availableWidgets={currentWidgets.map((w) => ({ id: w.id, type: w.type }))}
                       />
                     );
                   default:
