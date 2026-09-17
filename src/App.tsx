@@ -250,12 +250,20 @@ function App() {
   };
 
   const currentWidgets = useMemo(() => widgets ?? [], [widgets]);
-  const taskSources = currentWidgets
-    .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
-    .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
-  const calendarSources = currentWidgets
-    .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
-    .map((widget) => ({ id: widget.id }));
+  const taskSources = useMemo(
+    () =>
+      currentWidgets
+        .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
+        .map((widget) => ({ id: widget.id, tasks: widget.tasks })),
+    [currentWidgets]
+  );
+  const calendarSources = useMemo(
+    () =>
+      currentWidgets
+        .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
+        .map((widget) => ({ id: widget.id })),
+    [currentWidgets]
+  );
 
   const agentHandlers: AgentHandlers = useMemo(() => ({
     onAddTask: (widgetId, taskData) => {
