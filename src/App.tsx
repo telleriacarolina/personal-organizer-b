@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
@@ -21,7 +21,7 @@ import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
 import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 import { appendImportedCalendarEvent, type CalendarImportDraft } from '@/lib/calendar-imports';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import type { AgentContext, AgentHandlers } from '@/types/agent';
+import type { AgentContext, AgentPermission } from '@/types/agent';
 
 function App() {
   const [widgets, setWidgets] = useLocalStorageState<Widget[]>('organizer-widgets', []);
@@ -249,7 +249,7 @@ function App() {
     }
   };
 
-  const currentWidgets = widgets || [];
+  const currentWidgets = useMemo(() => widgets || [], [widgets]);
   const taskSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
     .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
@@ -257,161 +257,39 @@ function App() {
     .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
     .map((widget) => ({ id: widget.id }));
 
-  const agentHandlers: AgentHandlers = useMemo(() => ({
-    onAddTask: (widgetId, taskData) => {
-      setWidgets((current) =>
-        (current || []).map((widget) =>
-          widget.id === widgetId && widget.type === 'tasks'
-            ? ({
-                ...widget,
-                tasks: [
-                  ...widget.tasks,
-                  {
-                    id: Date.now().toString(),
-                    text: taskData.text,
-                    completed: false,
-                    priority: taskData.priority ?? 'medium',
-                    dueDate: taskData.dueDate ?? null,
-                    category: taskData.category ?? null,
-                    createdAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : widget
-        )
-      );
-      toast.success(`Added task: ${taskData.text}`);
-    },
-    onAddNote: (widgetId, noteData) => {
-      setWidgets((current) =>
-        (current || []).map((w) =>
-          w.id === widgetId && w.type === 'notes'
-            ? ({
-                ...w,
-                notes: [
-                  ...w.notes,
-                  {
-                    id: Date.now().toString(),
-                    title: noteData.title,
-                    content: noteData.content,
-                    createdAt: Date.now(),
-                    updatedAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : w
-        )
-      );
-      toast.success(`Note created: ${noteData.title}`);
-    },
-    onAddGoal: (widgetId, goalData) => {
-      setWidgets((current) =>
-        (current || []).map((w) =>
-          w.id === widgetId && w.type === 'goals'
-            ? ({
-                ...w,
-                goals: [
-                  ...w.goals,
-                  {
-                    id: Date.now().toString(),
-                    title: goalData.title,
-                    description: goalData.description,
-                    targetDate: goalData.targetDate,
-                    completed: false,
-                    createdAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : w
-        )
-      );
-      toast.success(`Goal added: ${goalData.title}`);
-    },
-    onAddHabit: (widgetId, habitData) => {
-      setWidgets((current) =>
-        (current || []).map((w) =>
-          w.id === widgetId && w.type === 'habits'
-            ? ({
-                ...w,
-                habits: [
-                  ...w.habits,
-                  {
-                    id: Date.now().toString(),
-                    name: habitData.name,
-                    completions: {},
-                    createdAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : w
-        )
-      );
-      toast.success(`Habit added: ${habitData.name}`);
-    },
-    onAddShoppingItem: (widgetId, itemData) => {
-      setWidgets((current) =>
-        (current || []).map((w) =>
-          w.id === widgetId && w.type === 'shopping'
-            ? ({
-                ...w,
-                items: [
-                  ...w.items,
-                  {
-                    id: Date.now().toString(),
-                    name: itemData.name,
-                    quantity: itemData.quantity,
-                    category: itemData.category ?? 'other',
-                    store: undefined,
-                    estimatedPrice: undefined,
-                    actualPrice: undefined,
-                    purchased: false,
-                    priority: itemData.priority ?? 'medium',
-                    notes: undefined,
-                    barcode: undefined,
-                    receiptId: undefined,
-                    createdAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : w
-        )
-      );
-      toast.success(`Added to shopping: ${itemData.name}`);
-    },
-    onAddCalendarEvent: (widgetId, eventData) => {
-      setWidgets((current) =>
-        (current || []).map((w) =>
-          w.id === widgetId && w.type === 'calendar'
-            ? ({
-                ...w,
-                events: [
-                  ...w.events,
-                  {
-                    id: Date.now().toString(),
-                    title: eventData.title,
-                    type: eventData.type,
-                    description: eventData.description,
-                    date: eventData.date,
-                    startTime: eventData.startTime,
-                    endTime: eventData.endTime,
-                    allDay: eventData.allDay ?? false,
-                    location: eventData.location,
-                    createdAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : w
-        )
-      );
-      toast.success(`Event added: ${eventData.title}`);
-    },
-  }), [setWidgets]);
+  const updateWidgetsForAgent = useCallback((updater: (widgets: Widget[]) => Widget[]) => {
+    setWidgets((current) => updater(current || []));
+  }, [setWidgets]);
+
+  const agentPermissions: AgentPermission[] = useMemo(() => [
+    'read:tasks',
+    'write:tasks',
+    'read:notes',
+    'write:notes',
+    'read:habits',
+    'write:habits',
+    'read:goals',
+    'write:goals',
+    'read:calendar',
+    'write:calendar',
+    'read:work',
+    'publish:work_to_calendar',
+    'read:shopping',
+    'write:shopping',
+    'read:record-notes',
+    'write:record-notes',
+  ], []);
 
   const agentContext: AgentContext = useMemo(() => ({
     widgets: currentWidgets,
-    handlers: agentHandlers,
+    updateWidgets: updateWidgetsForAgent,
     currentDate: new Date(),
-  }), [currentWidgets, agentHandlers]);
+    actorContext: {
+      userId: 'personal-organizer-user',
+      workspaceId: 'local-organizer-workspace',
+      permissions: agentPermissions,
+    },
+  }), [agentPermissions, currentWidgets, updateWidgetsForAgent]);
 
   useEffect(() => {
     if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !localStorage.getItem('drag-hint-shown')) {
