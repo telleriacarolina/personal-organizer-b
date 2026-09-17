@@ -32,7 +32,8 @@ import {
   CalendarBlank,
   Copy,
   Gear,
-  ArrowRight
+  ArrowRight,
+  Sparkle
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { AIInsightAction, ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference, WorkOrganizationType, WidgetAIState, WidgetSize } from '@/types';
@@ -146,6 +147,7 @@ export function WorkWidget({
 
     toast.success('Added to calendar');
   };
+  const [showAIPanel, setShowAIPanel] = useState(true);
 
   const addClientSlot = (data: Omit<ClientSlot, 'id' | 'createdAt'>) => {
     const newSlot: ClientSlot = {
@@ -450,16 +452,29 @@ export function WorkWidget({
       onSizeChange={onSizeChange}
       widgetType="work"
     >
-      <AISuggestionsPanel
-        title="AI Work Recommendations"
-        featureLabel="work"
-        state={aiState}
-        isGenerating={isGeneratingInsights}
-        isStale={isAIStale}
-        onGenerate={handleGenerateInsights}
-        onApplyAction={handleApplyAction}
-        onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
-      />
+      {showAIPanel ? (
+        <AISuggestionsPanel
+          title="AI Work Recommendations"
+          featureLabel="work"
+          state={aiState}
+          isGenerating={isGeneratingInsights}
+          isStale={isAIStale}
+          onGenerate={handleGenerateInsights}
+          onApplyAction={handleApplyAction}
+          onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
+          onClose={() => setShowAIPanel(false)}
+        />
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 text-xs text-muted-foreground w-full"
+          onClick={() => setShowAIPanel(true)}
+        >
+          <Sparkle size={13} />
+          Show AI Suggestions
+        </Button>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor={`work-calendar-destination-${widgetId}`} className="text-xs text-muted-foreground">

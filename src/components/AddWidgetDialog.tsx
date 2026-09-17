@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CheckSquareOffset, Note, Fire, Target, Calendar, Briefcase, ShoppingCart } from '@phosphor-icons/react';
+import { CheckSquareOffset, Note, Fire, Target, Calendar, Briefcase, ShoppingCart, Robot, Record } from '@phosphor-icons/react';
 import { WidgetType } from '@/types';
 
 interface AddWidgetDialogProps {
@@ -60,10 +60,22 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
       icon: <ShoppingCart size={32} />,
     },
     {
+      type: 'record-note' as WidgetType,
+      title: 'Record Note',
+      description: 'Capture voice memos, videos, and photos',
+      icon: <Record size={32} />,
+    },
+    {
       type: 'work' as WidgetType,
       title: 'Work Dashboard',
       description: 'Clients, jobs, time tracking, meals, shopping & errands',
       icon: <Briefcase size={32} />,
+    },
+    {
+      type: 'ai-chat' as WidgetType,
+      title: 'AI Assistant',
+      description: 'Chat with AI to get suggestions and apply them to your widgets',
+      icon: <Robot size={32} />,
     },
   ];
 
@@ -82,7 +94,7 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
               key={widget.type}
               variant="outline"
               className={`h-auto flex-col gap-2 sm:gap-3 p-4 sm:p-6 hover:border-primary hover:bg-primary/5 ${
-                widget.type === 'work' ? 'col-span-2' : ''
+                widget.type === 'work' || widget.type === 'ai-chat' ? 'col-span-2' : ''
               }`}
               onClick={() => {
                 onAddWidget(widget.type);

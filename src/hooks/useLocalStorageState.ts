@@ -23,7 +23,12 @@ export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispa
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(key, JSON.stringify(value));
+      try {
+        window.localStorage.setItem(key, JSON.stringify(value));
+      } catch (e) {
+        // QuotaExceededError: storage is full (common when storing large Base64 media)
+        console.warn(`[useLocalStorageState] Could not persist key "${key}":`, e);
+      }
     }
   }, [key, value]);
 

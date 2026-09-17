@@ -1,4 +1,4 @@
-import { MagicWand, ShieldCheck, Sparkle, WarningCircle } from '@phosphor-icons/react';
+import { MagicWand, ShieldCheck, Sparkle, WarningCircle, X } from '@phosphor-icons/react';
 import { AIInsightAction, WidgetAIState } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,8 @@ interface AISuggestionsPanelProps {
   onGenerate: () => void;
   onApplyAction: (insightId: string, action: AIInsightAction) => void;
   onDismissInsight: (insightId: string) => void;
+  /** Called when the user clicks the exit button to hide the AI panel from the widget */
+  onClose?: () => void;
 }
 
 export function AISuggestionsPanel({
@@ -24,13 +26,14 @@ export function AISuggestionsPanel({
   onGenerate,
   onApplyAction,
   onDismissInsight,
+  onClose,
 }: AISuggestionsPanelProps) {
   const visibleInsights = state?.insights.filter((insight) => insight.status !== 'dismissed') || [];
 
   return (
     <Card className="border-primary/20 bg-primary/5 p-4 gap-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
+        <div className="space-y-1 flex-1">
           <div className="flex items-center gap-2">
             <Sparkle size={18} className="text-primary" weight="duotone" />
             <h3 className="font-medium text-sm">{title}</h3>
@@ -56,10 +59,23 @@ export function AISuggestionsPanel({
             </div>
           )}
         </div>
-        <Button onClick={onGenerate} disabled={isGenerating} size="sm" className="gap-2">
-          <Sparkle size={14} />
-          {isGenerating ? 'Generating...' : visibleInsights.length > 0 ? 'Regenerate' : 'Generate'}
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button onClick={onGenerate} disabled={isGenerating} size="sm" className="gap-2">
+            <Sparkle size={14} />
+            {isGenerating ? 'Generating...' : visibleInsights.length > 0 ? 'Regenerate' : 'Generate'}
+          </Button>
+          {onClose && (
+            <Button
+              onClick={onClose}
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              title="Remove AI suggestions from this widget"
+            >
+              <X size={15} />
+            </Button>
+          )}
+        </div>
       </div>
 
       {state?.error && (

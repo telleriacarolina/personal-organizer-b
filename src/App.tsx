@@ -6,6 +6,7 @@ import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
 import { AIConfigButton } from '@/components/ai/AIConfigButton';
+import { AIChatWidget } from '@/components/widgets/AIChatWidget';
 import { WorkOrganizationQuestionnaire, WorkOrganizationPreference } from '@/components/WorkOrganizationQuestionnaire';
 import { TasksWidget } from '@/components/widgets/TasksWidget';
 import { NotesWidget } from '@/components/widgets/NotesWidget';
@@ -15,6 +16,7 @@ import { CalendarWidget } from '@/components/widgets/CalendarWidget';
 import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
+import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
 import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 import { appendImportedCalendarEvent, CalendarImportDraft } from '@/lib/calendar-imports';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
@@ -48,6 +50,8 @@ function App() {
       ...(type === 'goals' && { goals: [] }),
       ...(type === 'calendar' && { events: [] }),
       ...(type === 'shopping' && { items: [], receipts: [], trips: [], reminders: [] }),
+      ...(type === 'ai-chat' && { messages: [], appliedSuggestionIds: [] }),
+      ...(type === 'record-note' && { records: [] }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
@@ -481,6 +485,29 @@ function App() {
                         onAddTask={addTaskToSource}
                         onToggleTask={toggleTaskInSource}
                         onPriorityChange={updateTaskPriorityInSource}
+                      />
+                    );
+                  case 'ai-chat':
+                    return (
+                      <AIChatWidget
+                        {...widgetProps}
+                        messages={widget.messages}
+                        appliedSuggestionIds={widget.appliedSuggestionIds ?? []}
+                        onUpdate={(messages) => updateWidget(widget.id, { messages })}
+                        onApplySuggestion={(id) =>
+                          updateWidget(widget.id, {
+                            appliedSuggestionIds: [...(widget.appliedSuggestionIds ?? []), id],
+                          })
+                        }
+                        availableWidgets={currentWidgets.map((w) => ({ id: w.id, type: w.type }))}
+                      />
+                    );
+                  case 'record-note':
+                    return (
+                      <RecordNoteWidget
+                        {...widgetProps}
+                        records={widget.records}
+                        onUpdate={(records) => updateWidget(widget.id, { records })}
                       />
                     );
                   default:
