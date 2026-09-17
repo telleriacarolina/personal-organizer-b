@@ -104,13 +104,12 @@ describe('appendImportedCalendarEvent', () => {
   });
 });
 
-// ─── Regression tests for the PR #47 iCal (.ics) import path ──────────────────
+// ─── Regression tests for the iCal (.ics) import path ──────────────────────────
 //
-// PR #49 adds regression coverage for the iCal import behavior introduced in
-// PR #47. These tests protect that path: ical-sourced events must be added,
+// These tests protect the iCal import path: ical-sourced events must be added,
 // deduplicated, and stored exactly like work-sourced events.
 
-describe('appendImportedCalendarEvent – ical source regression for PR #47', () => {
+describe('appendImportedCalendarEvent – ical source regression', () => {
   const icalDraft = {
     title: 'Team Stand-up',
     type: 'appointment' as const,
@@ -227,7 +226,7 @@ describe('appendImportedCalendarEvent – ical source regression for PR #47', ()
   });
 });
 
-describe('hasImportedSourceEvent – ical source regression for PR #47', () => {
+describe('hasImportedSourceEvent – ical source regression', () => {
   it('returns true when an ical event with the same sourceId is already present', () => {
     const existing: CalendarEvent[] = [
       {
