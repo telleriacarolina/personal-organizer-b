@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { PaperPlaneRight, Robot, Trash, CheckCircle, XCircle } from '@phosphor-icons/react';
+import { PaperPlaneRight, Robot, Trash, CheckCircle, XCircle, ShieldCheck } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { v4 as uuidv4 } from 'uuid';
 import { handleAgentMessage, WELCOME_MESSAGE } from '@/lib/organizer-agent-service';
-import type { AgentMessage, AgentWriteAction, AgentContext } from '@/types/agent';
+import type { AgentActivityEntry, AgentMessage, AgentPendingAction, AgentContext } from '@/types/agent';
 
 interface OrganizerAgentPanelProps {
   context: AgentContext;
@@ -130,12 +130,16 @@ function MessageBubble({ message }: MessageBubbleProps) {
 // ---------------------------------------------------------------------------
 
 interface ConfirmBannerProps {
-  action: AgentWriteAction;
+  action: AgentPendingAction;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
 function ConfirmBanner({ action, onConfirm, onCancel }: ConfirmBannerProps) {
+  const [typedValue, setTypedValue] = useState('');
+  const needsTypedConfirmation = action.confirmationLevel === 'c3';
+  const isTypedConfirmationValid = !needsTypedConfirmation || typedValue.trim().toUpperCase() === action.confirmationPhrase;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -143,9 +147,23 @@ function ConfirmBanner({ action, onConfirm, onCancel }: ConfirmBannerProps) {
       exit={{ opacity: 0, y: 8 }}
       className="mx-4 mb-2 rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2"
     >
-      <p className="text-xs font-medium text-foreground">{action.description}</p>
+      <div className="flex items-center gap-2">
+        <ShieldCheck size={14} className="text-primary" weight="fill" />
+        <p className="text-xs font-medium text-foreground">{action.description}</p>
+      </div>
+      <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+        Confirmation level: {action.confirmationLevel.toUpperCase()}
+      </p>
+      {needsTypedConfirmation && (
+        <Input
+          value={typedValue}
+          onChange={(event) => setTypedValue(event.target.value)}
+          placeholder={`Type ${action.confirmationPhrase} to confirm`}
+          className="h-8 text-xs"
+        />
+      )}
       <div className="flex gap-2">
-        <Button size="sm" className="h-7 gap-1 text-xs" onClick={onConfirm}>
+        <Button size="sm" className="h-7 gap-1 text-xs" onClick={onConfirm} disabled={!isTypedConfirmationValid}>
           <CheckCircle size={13} weight="fill" />
           Confirm
         </Button>
@@ -155,6 +173,40 @@ function ConfirmBanner({ action, onConfirm, onCancel }: ConfirmBannerProps) {
         </Button>
       </div>
     </motion.div>
+  );
+}
+
+interface ActivityLogProps {
+  entries: AgentActivityEntry[];
+}
+
+function ActivityLog({ entries }: ActivityLogProps) {
+  if (entries.length === 0) return null;
+  const recentEntries = entries.slice(-6).reverse();
+
+  return (
+    <div className="border-t px-4 py-3 space-y-2 shrink-0">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <ShieldCheck size={13} />
+        Activity Log
+      </div>
+      <div className="space-y-2">
+        {recentEntries.map((entry) => (
+          <div key={entry.id} className="rounded-md border bg-muted/40 px-3 py-2 text-xs space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium text-foreground">{entry.toolName}</span>
+              <Badge variant="outline" className="text-[10px] uppercase">
+                {entry.status}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">{entry.summary}</p>
+            {entry.warnings.length > 0 && (
+              <p className="text-[11px] text-amber-700 dark:text-amber-300">{entry.warnings[0]}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -173,7 +225,8 @@ export function OrganizerAgentPanel({ context }: OrganizerAgentPanelProps) {
   ]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [pendingAction, setPendingAction] = useState<AgentWriteAction | undefined>(undefined);
+  const [pendingAction, setPendingAction] = useState<AgentPendingAction | undefined>(undefined);
+  const [activityLog, setActivityLog] = useState<AgentActivityEntry[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Mirror messages in a ref so sendMessage always reads the latest history
@@ -229,6 +282,9 @@ export function OrganizerAgentPanel({ context }: OrganizerAgentPanelProps) {
         };
 
         setMessages((prev) => [...prev, assistantMsg]);
+        if (response.activity) {
+          setActivityLog((prev) => [...prev, response.activity!]);
+        }
 
         if (response.pendingAction) {
           setPendingAction(response.pendingAction);
@@ -253,7 +309,7 @@ export function OrganizerAgentPanel({ context }: OrganizerAgentPanelProps) {
 
   const handleConfirmAction = useCallback(() => {
     if (!pendingAction) return;
-    sendMessage('yes');
+    sendMessage(pendingAction.confirmationPhrase ?? 'yes');
   }, [pendingAction, sendMessage]);
 
   const handleCancelAction = useCallback(() => {
@@ -271,6 +327,7 @@ export function OrganizerAgentPanel({ context }: OrganizerAgentPanelProps) {
       },
     ]);
     setPendingAction(undefined);
+    setActivityLog([]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -323,6 +380,8 @@ export function OrganizerAgentPanel({ context }: OrganizerAgentPanelProps) {
           />
         )}
       </AnimatePresence>
+
+      <ActivityLog entries={activityLog} />
 
       {/* Input row */}
       <div className="flex items-center gap-2 px-4 py-3 border-t shrink-0">
