@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useLocalStorageState } from '@/hooks/useLocalStorageState';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
 import { AIConfigButton } from '@/components/ai/AIConfigButton';
@@ -28,12 +27,10 @@ import {
   formatPersistenceIssue,
   hasLegacyWidgetMediaPayload,
   migrateWidgetsMedia,
-  readLocalStorageJson,
+  preferencesRepository,
+  stateRepositories,
   subscribeToPersistenceIssues,
-  writeLocalStorageJson,
 } from '@/lib/persistence';
-import type { AgentContext } from '@/types/agent';
-import { preferencesRepository, stateRepositories } from '@/lib/persistence';
 import {
   addCalendarImport as addCalendarImportCommand,
   addTaskToSource as addTaskToSourceCommand,
@@ -50,7 +47,7 @@ import {
   updateWidget as updateWidgetCommand,
   updateWidgetSize as updateWidgetSizeCommand,
 } from '@/lib/organizer-commands';
-import type { AgentContext, AgentPermission } from '@/types/agent';
+import type { AgentPermission } from '@/types/agent';
 
 function App() {
   const [widgets, setWidgets] = usePersistentState(stateRepositories.widgets, []);
@@ -88,14 +85,16 @@ function App() {
   };
 
   const updateWidget = (id: string, data: Partial<Widget> | ((widget: Widget) => Widget)) => {
-    setWidgets((current) =>
-      (current || []).map((w) => {
-        if (w.id !== id) return w;
-        return typeof data === 'function' ? data(w) : ({ ...w, ...data } as Widget);
-      })
-    );
-  const updateWidget = (id: string, data: Partial<Widget>) => {
-    setWidgets((current) => updateWidgetCommand(current, id, data));
+    if (typeof data === 'function') {
+      setWidgets((current) =>
+        (current || []).map((w) => {
+          if (w.id !== id) return w;
+          return data(w);
+        })
+      );
+    } else {
+      setWidgets((current) => updateWidgetCommand(current, id, data));
+    }
   };
 
   const updateWidgetSize = (id: string, size: { width: number; height: number }) => {
@@ -206,14 +205,6 @@ function App() {
     }
   };
 
-  const currentWidgets = widgets;
-  const currentWidgets = useMemo(() => widgets || [], [widgets]);
-  const taskSources = currentWidgets
-    .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
-    .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
-  const calendarSources = currentWidgets
-    .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
-    .map((widget) => ({ id: widget.id }));
   const currentWidgets = useMemo(() => widgets ?? [], [widgets]);
   const taskSources = useMemo(
     () =>
@@ -303,11 +294,6 @@ function App() {
   }, [currentWidgets, setWidgets]);
 
   useEffect(() => {
-    if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !readLocalStorageJson('drag-hint-shown', false)) {
-      setShowDragHint(true);
-      const timer = setTimeout(() => {
-        setShowDragHint(false);
-        writeLocalStorageJson('drag-hint-shown', true);
     if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !preferencesRepository.isDragHintShown()) {
       setShowDragHint(true);
       const timer = setTimeout(() => {
@@ -630,6 +616,7 @@ function App() {
         className: 'sm:mb-0 mb-16'
       }} />
       <Analytics />
+      <SpeedInsights />
     </div>
   );
 }
