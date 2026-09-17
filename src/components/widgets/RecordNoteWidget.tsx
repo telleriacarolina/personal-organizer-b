@@ -123,9 +123,13 @@ export function RecordNoteWidget({
     };
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      setPreviewDataUrl(url);
-      setRecordingState('preview');
+      // Convert to a data URL so the recording survives page reloads in localStorage
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewDataUrl(reader.result as string);
+        setRecordingState('preview');
+      };
+      reader.readAsDataURL(blob);
       releaseStream();
       stopTimerInterval();
     };
@@ -156,6 +160,12 @@ export function RecordNoteWidget({
         stream.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
       }, 300);
+    }).catch(() => {
+      stream.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      setRecordingState('idle');
+      setActiveMode(null);
+      toast.error('Could not capture photo. Please try again.');
     });
   };
 
@@ -385,20 +395,7 @@ interface RecordCardProps {
 }
 
 function RecordCard({ record, onDelete }: RecordCardProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
-
-  const toggleAudio = () => {
-    const el = audioRef.current;
-    if (!el) return;
-    if (isPlaying) {
-      el.pause();
-    } else {
-      el.play().catch(() => {});
-    }
-    setIsPlaying(!isPlaying);
-  };
 
   const mediaIcon =
     record.mediaType === 'voice' ? (
@@ -428,8 +425,14 @@ function RecordCard({ record, onDelete }: RecordCardProps) {
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
           {record.mediaType === 'voice' && (
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleAudio}>
-              {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              title={expanded ? 'Collapse' : 'Play'}
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? <Pause size={14} /> : <Play size={14} />}
             </Button>
           )}
           <Button
@@ -468,11 +471,10 @@ function RecordCard({ record, onDelete }: RecordCardProps) {
             )}
             {record.mediaType === 'voice' && (
               <audio
-                ref={audioRef}
                 src={record.dataUrl}
-                onEnded={() => setIsPlaying(false)}
                 className="w-full"
                 controls
+                autoPlay
               />
             )}
             {record.transcription && (
