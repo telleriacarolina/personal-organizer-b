@@ -47,6 +47,24 @@ const eventTypes: { value: CalendarEntryType; label: string }[] = [
   { value: 'occasion', label: 'Occasion' },
 ];
 
+const SYNC_TOKEN_SESSION_KEY = 'family-calendar-sync-token';
+
+function isTrustedSyncUrl(apiBaseUrl: string): boolean {
+  try {
+    const parsed = new URL(apiBaseUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    if (parsed.protocol === 'https:') return true;
+    const isLocal =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.localhost');
+    return parsed.protocol === 'http:' && isLocal;
+  } catch {
+    return false;
+  }
+}
+
 export function CalendarWidget({
   events,
   onUpdate,
@@ -59,7 +77,8 @@ export function CalendarWidget({
   size,
   onSizeChange,
 }: CalendarWidgetProps) {
-  const [, setPlannerEvents] = useLocalStorageState<FamilyCalendarPlannerEvent[]>('family-calendar-planner-events', []);
+  const [externalSyncEnabled, setExternalSyncEnabled] = useLocalStorageState<boolean>('family-calendar-sync-enabled', false);
+  const [externalSyncConsent, setExternalSyncConsent] = useLocalStorageState<boolean>('family-calendar-sync-consent', false);
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -80,6 +99,8 @@ export function CalendarWidget({
   const [location, setLocation] = useState('');
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(true);
+  const apiBaseUrl = import.meta.env.VITE_FAMILY_CALENDAR_API_URL as string | undefined;
+  const hasExternalSyncEndpoint = Boolean(apiBaseUrl?.trim());
 
   useEffect(() => {
     const checkReminders = () => {
@@ -176,23 +197,61 @@ export function CalendarWidget({
     };
   };
 
+  const handleExternalSyncToggle = (enabled: boolean) => {
+    if (!enabled) {
+      setExternalSyncEnabled(false);
+      return;
+    }
+
+    if (!hasExternalSyncEndpoint) {
+      toast.error('External sync endpoint is not configured');
+      return;
+    }
+    if (!apiBaseUrl || !isTrustedSyncUrl(apiBaseUrl)) {
+      toast.error('External sync requires HTTPS (HTTP allowed only on localhost)');
+      return;
+    }
+
+    if (!externalSyncConsent) {
+      const accepted = window.confirm(
+        'External sync sends event title, description, date/time, location, reminder, and attendee metadata to your configured calendar endpoint. Continue?'
+      );
+      if (!accepted) return;
+      setExternalSyncConsent(true);
+    }
+
+    setExternalSyncEnabled(true);
+    toast.success('External sync enabled');
+  };
+
   const syncFamilyCalendarPlanner = async (calendarEvents: CalendarEvent[]) => {
     const mappedEvents = calendarEvents.map(mapToFamilyCalendarPlannerEvent);
-    setPlannerEvents(mappedEvents);
-
-    const apiBaseUrl = import.meta.env.VITE_FAMILY_CALENDAR_API_URL;
-    if (!apiBaseUrl) return;
+    if (!externalSyncEnabled || !externalSyncConsent || !apiBaseUrl) return;
+    if (!isTrustedSyncUrl(apiBaseUrl)) {
+      toast.error('Unsafe sync URL blocked. Use HTTPS (or localhost in development).');
+      return;
+    }
+    const token = window.sessionStorage.getItem(SYNC_TOKEN_SESSION_KEY);
+    if (!token) {
+      toast.error(`External sync requires a short-lived access token in sessionStorage key "${SYNC_TOKEN_SESSION_KEY}".`);
+      return;
+    }
 
     try {
       const response = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/events/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Organizer-Session-Token': token,
         },
         body: JSON.stringify({ events: mappedEvents }),
       });
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          toast.error('Calendar sync authentication failed. Refresh your short-lived token and try again.');
+          return;
+        }
         throw new Error(`Sync failed with status ${response.status}`);
       }
     } catch {
@@ -439,6 +498,23 @@ export function CalendarWidget({
       )}
 
       <div className="space-y-4">
+        {hasExternalSyncEndpoint && (
+          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium text-foreground">External calendar sync</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Sends title, description, date/time, location, reminders, and attendee metadata to your configured API.
+                </p>
+              </div>
+              <Switch checked={externalSyncEnabled} onCheckedChange={handleExternalSyncToggle} />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {`Production endpoints must use HTTPS. A short-lived token is required in sessionStorage key "${SYNC_TOKEN_SESSION_KEY}".`}
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Button

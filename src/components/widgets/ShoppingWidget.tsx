@@ -17,6 +17,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { saveMediaBlob } from '@/lib/media-storage';
+import { normalizeImageForStorage, validateImageFile } from '@/lib/media-validation';
 
 interface ShoppingWidgetProps {
   items: PersonalShoppingItem[];
@@ -66,6 +68,9 @@ const priorityColors = {
   medium: 'bg-accent/20 text-accent-foreground',
   high: 'bg-destructive/20 text-destructive',
 };
+
+const MAX_RECEIPT_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_RECEIPT_IMAGE_DIMENSION = 4096;
 
 export function ShoppingWidget({
   items,
@@ -174,23 +179,36 @@ export function ShoppingWidget({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setReceiptImageInput(file);
     setIsProcessingReceipt(true);
 
     try {
-      const reader = new FileReader();
-      await new Promise<void>((resolve) => {
-        reader.onload = () => resolve();
-        reader.readAsDataURL(file);
+      await validateImageFile(file, {
+        maxBytes: MAX_RECEIPT_IMAGE_BYTES,
+        maxWidth: MAX_RECEIPT_IMAGE_DIMENSION,
+        maxHeight: MAX_RECEIPT_IMAGE_DIMENSION,
       });
+      const normalizedImage = await normalizeImageForStorage(file, {
+        maxWidth: MAX_RECEIPT_IMAGE_DIMENSION,
+        maxHeight: MAX_RECEIPT_IMAGE_DIMENSION,
+      });
+      await validateImageFile(normalizedImage, {
+        maxBytes: MAX_RECEIPT_IMAGE_BYTES,
+        maxWidth: MAX_RECEIPT_IMAGE_DIMENSION,
+        maxHeight: MAX_RECEIPT_IMAGE_DIMENSION,
+      });
+      setReceiptImageInput(normalizedImage);
 
       if (!receiptStoreName.trim()) {
         setReceiptStoreName(file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '));
       }
 
-      toast.success('Receipt image added. Review and confirm the details below.');
-    } catch {
-      toast.error('Failed to load receipt image. You can manually enter the details instead.');
+      toast.success('Receipt image validated and added.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load receipt image');
+      setReceiptImageInput(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } finally {
       setIsProcessingReceipt(false);
     }
@@ -233,13 +251,14 @@ export function ShoppingWidget({
       const receiptId = Date.now().toString();
       const receiptDateTs = new Date(receiptDate).getTime();
 
-      let imageData: string | undefined;
+      let imageRef: Receipt['imageRef'];
       if (receiptImageInput) {
-        const reader = new FileReader();
-        imageData = await new Promise((resolve) => {
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(receiptImageInput);
+        await validateImageFile(receiptImageInput, {
+          maxBytes: MAX_RECEIPT_IMAGE_BYTES,
+          maxWidth: MAX_RECEIPT_IMAGE_DIMENSION,
+          maxHeight: MAX_RECEIPT_IMAGE_DIMENSION,
         });
+        imageRef = await saveMediaBlob(receiptImageInput);
       }
 
       const calculatedTotal = parsedItems.reduce((sum, item) => sum + (item.price || 0), 0);
@@ -259,7 +278,7 @@ export function ShoppingWidget({
         subtotal: calculatedTotal,
         tax: total - calculatedTotal,
         notes: receiptNotes || undefined,
-        imageData,
+        imageRef,
         createdAt: Date.now(),
       };
 

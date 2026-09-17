@@ -17,6 +17,8 @@ import { RecordNote, RecordNoteMediaType, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { selectMimeType, label, defaultTitle, formatDuration } from './recordNoteUtils';
+import { deleteMediaBlob, getMediaBlob, saveMediaBlob } from '@/lib/media-storage';
+import { assertMaxBytes } from '@/lib/media-validation';
 
 interface RecordNoteWidgetProps {
   records: RecordNote[];
@@ -33,9 +35,9 @@ interface RecordNoteWidgetProps {
 
 type RecordingState = 'idle' | 'recording' | 'preview';
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
+const MAX_RECORDING_SECONDS = 300;
+const MAX_RECORDING_BYTES = 25 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
 export function RecordNoteWidget({
   records,
@@ -51,21 +53,28 @@ export function RecordNoteWidget({
 }: RecordNoteWidgetProps) {
   const [activeMode, setActiveMode] = useState<RecordNoteMediaType | null>(null);
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
-  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pendingTitle, setPendingTitle] = useState('');
-  // Display counter only — the authoritative duration is in durationRef
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  // Ref for the live-preview video element (rendered only during recording)
   const liveVideoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Authoritative final duration in whole seconds, written on stop
   const durationRef = useRef<number>(0);
-  // Re-entry guard: true while getUserMedia is pending
   const acquiringRef = useRef(false);
+
+  useEffect(() => {
+    if (!previewBlob) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(previewBlob);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [previewBlob]);
 
   const stopTimerInterval = () => {
     if (timerRef.current) {
@@ -81,8 +90,6 @@ export function RecordNoteWidget({
     }
   };
 
-  // Attach the live camera stream to the video element once it mounts
-  // (the <video> is only in the DOM after recordingState becomes 'recording')
   useEffect(() => {
     if (recordingState === 'recording' && activeMode === 'video' && liveVideoRef.current && streamRef.current) {
       liveVideoRef.current.srcObject = streamRef.current;
@@ -90,20 +97,19 @@ export function RecordNoteWidget({
     }
   }, [recordingState, activeMode]);
 
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       stopTimerInterval();
       releaseStream();
-    };
-  }, []);
+    },
+    []
+  );
 
   const startRecording = async (mode: RecordNoteMediaType) => {
-    // Prevent concurrent getUserMedia calls (e.g., fast double-click)
     if (acquiringRef.current || recordingState !== 'idle') return;
     acquiringRef.current = true;
 
-    setPreviewDataUrl(null);
+    setPreviewBlob(null);
     setRecordingDuration(0);
     durationRef.current = 0;
     setPendingTitle('');
@@ -129,9 +135,8 @@ export function RecordNoteWidget({
     acquiringRef.current = false;
     streamRef.current = stream;
 
-    // For photo mode, capture a single frame then return
     if (mode === 'photo') {
-      capturePhoto(stream);
+      void capturePhoto(stream);
       return;
     }
 
@@ -145,13 +150,18 @@ export function RecordNoteWidget({
     recorder.onstop = () => {
       const effectiveMime = mimeType || recorder.mimeType;
       const blob = new Blob(chunksRef.current, { type: effectiveMime });
-      // Convert to a data URL so the recording survives page reloads in localStorage
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewDataUrl(reader.result as string);
-        setRecordingState('preview');
-      };
-      reader.readAsDataURL(blob);
+      try {
+        assertMaxBytes(blob, MAX_RECORDING_BYTES, 'Recording');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Recording is too large');
+        setRecordingState('idle');
+        setActiveMode(null);
+        releaseStream();
+        stopTimerInterval();
+        return;
+      }
+      setPreviewBlob(blob);
+      setRecordingState('preview');
       releaseStream();
       stopTimerInterval();
     };
@@ -164,12 +174,16 @@ export function RecordNoteWidget({
       setRecordingDuration((d) => {
         const next = d + 1;
         durationRef.current = next;
+        if (next >= MAX_RECORDING_SECONDS) {
+          stopRecording();
+          toast.info('Recording stopped at 5 minutes for privacy and storage limits.');
+        }
         return next;
       });
     }, 1000);
   };
 
-  const capturePhoto = (stream: MediaStream) => {
+  const capturePhoto = async (stream: MediaStream) => {
     const video = document.createElement('video');
     video.muted = true;
     video.playsInline = true;
@@ -181,29 +195,46 @@ export function RecordNoteWidget({
     };
 
     video.addEventListener('loadedmetadata', () => {
-      video.play().then(() => {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 480;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
+      video
+        .play()
+        .then(async () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 640;
+          canvas.height = video.videoHeight || 480;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            cleanup();
+            setRecordingState('idle');
+            setActiveMode(null);
+            toast.error('Canvas not supported in this browser.');
+            return;
+          }
+          ctx.drawImage(video, 0, 0);
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+          cleanup();
+          if (!blob) {
+            toast.error('Could not capture photo. Please try again.');
+            setRecordingState('idle');
+            setActiveMode(null);
+            return;
+          }
+          try {
+            assertMaxBytes(blob, MAX_PHOTO_BYTES, 'Photo');
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Photo is too large');
+            setRecordingState('idle');
+            setActiveMode(null);
+            return;
+          }
+          setPreviewBlob(blob);
+          setRecordingState('preview');
+        })
+        .catch(() => {
           cleanup();
           setRecordingState('idle');
           setActiveMode(null);
-          toast.error('Canvas not supported in this browser.');
-          return;
-        }
-        ctx.drawImage(video, 0, 0);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        cleanup();
-        setPreviewDataUrl(dataUrl);
-        setRecordingState('preview');
-      }).catch(() => {
-        cleanup();
-        setRecordingState('idle');
-        setActiveMode(null);
-        toast.error('Could not capture photo. Please try again.');
-      });
+          toast.error('Could not capture photo. Please try again.');
+        });
     });
 
     video.addEventListener('error', () => {
@@ -224,7 +255,7 @@ export function RecordNoteWidget({
   };
 
   const cancelPreview = () => {
-    setPreviewDataUrl(null);
+    setPreviewBlob(null);
     setRecordingState('idle');
     setActiveMode(null);
     setPendingTitle('');
@@ -232,28 +263,39 @@ export function RecordNoteWidget({
     stopTimerInterval();
   };
 
-  const saveRecord = () => {
-    if (!previewDataUrl || !activeMode) return;
+  const saveRecord = async () => {
+    if (!previewBlob || !activeMode) return;
     const title = pendingTitle.trim() || defaultTitle(activeMode);
-    const newRecord: RecordNote = {
-      id: Date.now().toString(),
-      title,
-      mediaType: activeMode,
-      dataUrl: previewDataUrl,
-      // Use the ref value — never stale React state
-      duration: activeMode !== 'photo' ? durationRef.current : undefined,
-      createdAt: Date.now(),
-    };
-    onUpdate([...records, newRecord]);
-    toast.success(`${label(activeMode)} saved!`);
-    setPreviewDataUrl(null);
-    setRecordingState('idle');
-    setActiveMode(null);
-    setPendingTitle('');
+    try {
+      const mediaRef = await saveMediaBlob(previewBlob);
+      const newRecord: RecordNote = {
+        id: Date.now().toString(),
+        title,
+        mediaType: activeMode,
+        mediaRef,
+        duration: activeMode !== 'photo' ? durationRef.current : undefined,
+        createdAt: Date.now(),
+      };
+      onUpdate([...records, newRecord]);
+      toast.success(`${label(activeMode)} saved!`);
+      setPreviewBlob(null);
+      setRecordingState('idle');
+      setActiveMode(null);
+      setPendingTitle('');
+    } catch {
+      toast.error('Could not save media securely. Please try again.');
+    }
   };
 
-  const deleteRecord = (id: string) => {
-    onUpdate(records.filter((r) => r.id !== id));
+  const deleteRecord = async (record: RecordNote) => {
+    if (record.mediaRef?.id) {
+      try {
+        await deleteMediaBlob(record.mediaRef.id);
+      } catch {
+        toast.error('Failed to remove stored media blob');
+      }
+    }
+    onUpdate(records.filter((r) => r.id !== record.id));
     toast.success('Record deleted');
   };
 
@@ -271,7 +313,6 @@ export function RecordNoteWidget({
       globalLock={globalLock}
       widgetType="record-note"
     >
-      {/* Mode selector */}
       {recordingState === 'idle' && (
         <div className="flex gap-2">
           <Button
@@ -304,7 +345,6 @@ export function RecordNoteWidget({
         </div>
       )}
 
-      {/* Live recording view */}
       <AnimatePresence>
         {recordingState === 'recording' && activeMode && (
           <motion.div
@@ -328,7 +368,7 @@ export function RecordNoteWidget({
                 {activeMode === 'voice' ? 'Recording audio' : 'Recording video'}
               </div>
               <span className="font-mono text-sm font-medium" aria-live="polite" aria-label={`Elapsed: ${formatDuration(recordingDuration)}`}>
-                {formatDuration(recordingDuration)}
+                {formatDuration(recordingDuration)} / 05:00
               </span>
             </div>
             <Button variant="destructive" className="w-full gap-2" onClick={stopRecording}>
@@ -339,16 +379,15 @@ export function RecordNoteWidget({
         )}
       </AnimatePresence>
 
-      {/* Preview / save view */}
       <AnimatePresence>
-        {recordingState === 'preview' && previewDataUrl && activeMode && (
+        {recordingState === 'preview' && previewUrl && activeMode && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             className="space-y-3 border border-border rounded-lg p-3 bg-background"
           >
-            <MediaPreview dataUrl={previewDataUrl} mediaType={activeMode} />
+            <MediaPreview dataUrl={previewUrl} mediaType={activeMode} />
 
             <Input
               placeholder={`Title for this ${label(activeMode).toLowerCase()}…`}
@@ -358,7 +397,7 @@ export function RecordNoteWidget({
             />
 
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={saveRecord}>
+              <Button className="flex-1" onClick={() => void saveRecord()}>
                 Save
               </Button>
               <Button variant="outline" className="flex-1" onClick={cancelPreview}>
@@ -369,7 +408,6 @@ export function RecordNoteWidget({
         )}
       </AnimatePresence>
 
-      {/* Records list */}
       <ScrollArea className="h-[320px]">
         <div className="space-y-2 pr-2">
           <AnimatePresence>
@@ -388,10 +426,6 @@ export function RecordNoteWidget({
     </WidgetContainer>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
 
 function MediaPreview({ dataUrl, mediaType }: { dataUrl: string; mediaType: RecordNoteMediaType }) {
   if (mediaType === 'photo') {
@@ -416,13 +450,51 @@ function MediaPreview({ dataUrl, mediaType }: { dataUrl: string; mediaType: Reco
   return <audio src={dataUrl} controls className="w-full" />;
 }
 
+function useRecordMediaUrl(record: RecordNote): string | null {
+  const [url, setUrl] = useState<string | null>(record.dataUrl ?? null);
+  useEffect(() => {
+    let disposed = false;
+    let currentObjectUrl: string | null = null;
+    if (record.dataUrl) {
+      setUrl(record.dataUrl);
+      return;
+    }
+    if (!record.mediaRef?.id) {
+      setUrl(null);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const blob = await getMediaBlob(record.mediaRef!.id);
+        if (disposed || !blob) {
+          if (!disposed) setUrl(null);
+          return;
+        }
+        currentObjectUrl = URL.createObjectURL(blob);
+        setUrl(currentObjectUrl);
+      } catch {
+        if (!disposed) setUrl(null);
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+    };
+  }, [record.id, record.dataUrl, record.mediaRef?.id]);
+
+  return url;
+}
+
 interface RecordCardProps {
   record: RecordNote;
-  onDelete: (id: string) => void;
+  onDelete: (record: RecordNote) => void;
 }
 
 function RecordCard({ record, onDelete }: RecordCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const mediaUrl = useRecordMediaUrl(record);
 
   const mediaIcon =
     record.mediaType === 'voice' ? (
@@ -469,7 +541,7 @@ function RecordCard({ record, onDelete }: RecordCardProps) {
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-destructive"
-            onClick={() => onDelete(record.id)}
+            onClick={() => void onDelete(record)}
             aria-label={`Delete ${record.title}`}
           >
             <Trash size={14} />
@@ -485,24 +557,29 @@ function RecordCard({ record, onDelete }: RecordCardProps) {
             exit={{ opacity: 0, height: 0 }}
             className="mt-2 overflow-hidden"
           >
-            {record.mediaType === 'photo' && (
-              <img
-                src={record.dataUrl}
-                alt={record.title}
-                className="w-full rounded object-cover max-h-48"
-              />
-            )}
-            {record.mediaType === 'video' && (
-              <video
-                src={record.dataUrl}
-                controls
-                className="w-full rounded aspect-video bg-black"
-                playsInline
-              />
-            )}
-            {/* No autoPlay — blocked by browser autoplay policies and jarring UX */}
-            {record.mediaType === 'voice' && (
-              <audio src={record.dataUrl} className="w-full" controls />
+            {!mediaUrl ? (
+              <p className="text-xs text-muted-foreground">Media unavailable. The stored blob may have been deleted.</p>
+            ) : (
+              <>
+                {record.mediaType === 'photo' && (
+                  <img
+                    src={mediaUrl}
+                    alt={record.title}
+                    className="w-full rounded object-cover max-h-48"
+                  />
+                )}
+                {record.mediaType === 'video' && (
+                  <video
+                    src={mediaUrl}
+                    controls
+                    className="w-full rounded aspect-video bg-black"
+                    playsInline
+                  />
+                )}
+                {record.mediaType === 'voice' && (
+                  <audio src={mediaUrl} className="w-full" controls />
+                )}
+              </>
             )}
             {record.transcription && (
               <p className="mt-2 text-xs text-muted-foreground">{record.transcription}</p>

@@ -76,19 +76,31 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null
   }
 
+  const safeChartId = id.replace(/[^a-zA-Z0-9_-]/g, "")
+  const safeVarName = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "")
+  const safeColorValue = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed || /[;{}<>]/.test(trimmed)) return null
+    if (/^url\s*\(/i.test(trimmed)) return null
+    if (!/^[#(),.%/\-\sa-zA-Z0-9]+$/.test(trimmed)) return null
+    return trimmed
+  }
+
   return (
     <style
       dangerouslySetInnerHTML={{
         __html: Object.entries(THEMES)
           .map(
             ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
+${prefix} [data-chart="${safeChartId}"] {
 ${colorConfig
   .map(([key, itemConfig]) => {
     const color =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
+    const safeName = safeVarName(key)
+    const safeColor = color ? safeColorValue(color) : null
+    return safeName && safeColor ? `  --color-${safeName}: ${safeColor};` : null
   })
   .join("\n")}
 }

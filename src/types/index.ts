@@ -352,7 +352,15 @@ export interface Receipt {
   tax?: number;
   subtotal?: number;
   notes?: string;
+  /** Legacy Base64 image payload kept for backward compatibility. */
   imageData?: string;
+  /** IndexedDB reference for receipt media blobs. */
+  imageRef?: {
+    id: string;
+    mimeType: string;
+    byteSize: number;
+    createdAt: number;
+  };
   createdAt: number;
 }
 
@@ -410,7 +418,15 @@ export interface RecordNote {
   id: string;
   title: string;
   mediaType: RecordNoteMediaType;
-  dataUrl: string;
+  /** Legacy Base64 payload kept for backward compatibility. */
+  dataUrl?: string;
+  /** IndexedDB reference for stored media blobs. */
+  mediaRef?: {
+    id: string;
+    mimeType: string;
+    byteSize: number;
+    createdAt: number;
+  };
   duration?: number;
   transcription?: string;
   createdAt: number;

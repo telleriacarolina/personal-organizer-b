@@ -172,6 +172,10 @@ function buildProvider(mode: AIMode): AIProvider {
   }
 }
 
+function isExternalMode(mode: AIMode): boolean {
+  return mode === 'openai';
+}
+
 export class AIService {
   private provider: AIProvider;
   private config: AIConfig;
@@ -187,11 +191,16 @@ export class AIService {
   }
 
   get isEnabled(): boolean {
+    if (isExternalMode(this.config.mode) && !this.config.privacyAccepted) return false;
     return this.config.mode !== 'off' && this.provider.isAvailable() && this.provider.mode !== 'off';
   }
 
   configure(updates: Partial<AIConfig>): void {
     this.config = { ...this.config, ...updates };
+    if (isExternalMode(this.config.mode) && !this.config.privacyAccepted) {
+      this.config.mode = 'off';
+      this.config.providerLabel = 'Disabled';
+    }
     this.provider = buildProvider(this.config.mode);
     if (typeof window !== 'undefined') {
       // Never persist the API key to localStorage

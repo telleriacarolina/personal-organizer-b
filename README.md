@@ -46,6 +46,8 @@ VITE_ORGANIZER_AI_PROVIDER=OpenAI
 VITE_ORGANIZER_AI_API_URL=https://your-ai-service.example.com
 ```
 
+> `VITE_*` values are client-visible at runtime. Never place long-lived secrets in these variables.
+
 Current behavior:
 
 * `off`: AI panels stay functional for configuration review and do not send data anywhere
@@ -53,6 +55,52 @@ Current behavior:
 * `api`: marks an external provider as configured, but live provider requests are intentionally deferred beyond Phase 1
 
 The AI review flow is always explicit: generate → review → apply or dismiss. Suggestions are stored separately from widget source data.
+
+### Calendar External Sync Security
+
+Calendar sync stays local by default even when `VITE_FAMILY_CALENDAR_API_URL` is configured.
+
+External sync requires:
+
+* User opt-in in the Calendar widget
+* HTTPS endpoint (HTTP allowed only for localhost/local development)
+* Short-lived session token in `sessionStorage` key: `family-calendar-sync-token`
+
+When enabled, the app may transmit: event title, description, dates/times, location, reminders, and attendee metadata to the configured endpoint.
+Disable external sync from the Calendar widget at any time.
+
+### Data Storage, Classification, and Retention
+
+Data classes:
+
+* **General settings** (theme/layout/snap/lock): local browser storage
+* **Planner content** (tasks, notes, goals, habits, calendar/work/shopping metadata): local browser storage
+* **Large media** (recorded audio/video/photos, receipt images): IndexedDB blob storage
+
+Current retention model:
+
+* Data persists until removed by the user.
+* Deleting individual records removes their linked media when applicable.
+* **Clear Data** in the main toolbar clears organizer data, AI history/config, sync preferences, theme state, and stored media blobs for this origin.
+
+Security limitation:
+
+* Client-side storage is readable by scripts running in the same origin. Treat browser-only persistence as convenience storage, not strong secrecy.
+
+### Content Security Policy (CSP) Strategy
+
+Use CSP as a deployment header (recommended) for production, with explicit allowances for required assets (such as Google Fonts if enabled).  
+Example baseline:
+
+* `default-src 'self'`
+* `script-src 'self'`
+* `style-src 'self' https://fonts.googleapis.com`
+* `font-src 'self' https://fonts.gstatic.com`
+* `img-src 'self' data: blob:`
+* `media-src 'self' blob:`
+* `connect-src 'self' https:`
+
+Adjust per deployment environment and verify against application/runtime needs before enforcement.
 
 ### Building for Production
 
@@ -133,11 +181,10 @@ Runs weekly security audits and dependency checks.
 
 #### 6. **Copilot Setup Steps** (`copilot-setup-steps.yml`)
 
-Sets up development environment with GitHub Copilot CLI.
+Sets up development environment dependencies for Copilot runs.
 
-* Runs on pull requests and pushes to main
+* Runs by manual workflow dispatch
 * Installs dependencies
-* Sets up GitHub Copilot CLI
 
 ## 📋 Release Process
 
@@ -171,7 +218,9 @@ If a deployment causes issues:
 * Weekly automated security audits
 * Dependency vulnerability scanning
 * No secrets or API keys in code
-* All data stored locally in browser
+* Security gate fails on high/critical dependency vulnerabilities
+* Dependabot updates enabled
+* Secret scanning expected in CI/review process
 
 ## 📦 Build Artifacts
 

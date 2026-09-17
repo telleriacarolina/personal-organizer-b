@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
+import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen, Trash } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
@@ -22,6 +22,7 @@ import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 import { appendImportedCalendarEvent, type CalendarImportDraft } from '@/lib/calendar-imports';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import type { AgentContext, AgentHandlers } from '@/types/agent';
+import { clearAllMediaBlobs, removeMediaDatabase } from '@/lib/media-storage';
 
 function App() {
   const [widgets, setWidgets] = useLocalStorageState<Widget[]>('organizer-widgets', []);
@@ -32,6 +33,7 @@ function App() {
   const [snapToGrid, setSnapToGrid] = useLocalStorageState<boolean>('organizer-snap-to-grid', false);
   const [globalLock, setGlobalLock] = useLocalStorageState<boolean>('organizer-global-lock', false);
   const [widgetAIState, setWidgetAIState] = useLocalStorageState<Record<string, WidgetAIState>>('organizer-widget-ai', {});
+  const [isClearingData, setIsClearingData] = useState(false);
   const dragStartTimeRef = useRef<number>(0);
 
   const addWidget = (type: WidgetType) => {
@@ -249,6 +251,50 @@ function App() {
     }
   };
 
+  const clearAllPersonalData = async () => {
+    const confirmed = window.confirm(
+      'This will clear all organizer data, AI history, theme settings, sync preferences, and stored media from this browser. Continue?'
+    );
+    if (!confirmed || isClearingData) return;
+
+    setIsClearingData(true);
+    try {
+      const keys = [
+        'organizer-widgets',
+        'organizer-snap-to-grid',
+        'organizer-global-lock',
+        'organizer-widget-ai',
+        'organizer-ai-config',
+        'organizer-ai-suggestions',
+        'organizer-theme',
+        'organizer-custom-colors',
+        'organizer-bg-image',
+        'family-calendar-sync-enabled',
+        'family-calendar-sync-consent',
+        'family-calendar-planner-events',
+        'drag-hint-shown',
+      ];
+      keys.forEach((key) => localStorage.removeItem(key));
+      sessionStorage.removeItem('family-calendar-sync-token');
+
+      await clearAllMediaBlobs();
+      await removeMediaDatabase();
+
+      setWidgets([]);
+      setSnapToGrid(false);
+      setGlobalLock(false);
+      setWidgetAIState({});
+      setShowAddDialog(false);
+      setShowWorkQuestionnaire(false);
+      setShowDragHint(false);
+      toast.success('All personal data has been removed from this browser.');
+    } catch {
+      toast.error('Could not clear all personal data. Close other tabs and try again.');
+    } finally {
+      setIsClearingData(false);
+    }
+  };
+
   const currentWidgets = widgets || [];
   const taskSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
@@ -460,6 +506,17 @@ function App() {
                   <LockOpen size={20} />
                 )}
                 <span className="hidden lg:inline">{globalLock ? 'Locked' : 'Unlocked'}</span>
+              </Button>
+              <Button
+                onClick={() => void clearAllPersonalData()}
+                size="lg"
+                variant="outline"
+                className="gap-2 flex-shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10"
+                disabled={isClearingData}
+                title="Clear all personal organizer data"
+              >
+                <Trash size={18} />
+                <span className="hidden lg:inline">{isClearingData ? 'Clearing…' : 'Clear Data'}</span>
               </Button>
               <AIConfigButton />
               <OrganizerAgentButton context={agentContext} />

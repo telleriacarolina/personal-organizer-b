@@ -7,7 +7,8 @@
 
 import type { PersistedSuggestion } from '@/types/ai';
 
-const STORAGE_KEY = 'organizer-widget-ai';
+const STORAGE_KEY = 'organizer-ai-suggestions';
+const LEGACY_STORAGE_KEY = 'organizer-widget-ai';
 const MAX_PERSISTED = 200; // prevent unbounded growth
 
 // ---------------------------------------------------------------------------
@@ -18,9 +19,21 @@ function readAll(): PersistedSuggestion[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed as PersistedSuggestion[];
+    }
+  } catch {
+    return [];
+  }
+
+  try {
+    const legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!legacyRaw) return [];
+    const parsed = JSON.parse(legacyRaw);
     if (!Array.isArray(parsed)) return [];
+    writeAll(parsed as PersistedSuggestion[]);
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
     return parsed as PersistedSuggestion[];
   } catch {
     return [];
