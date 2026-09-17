@@ -186,7 +186,11 @@ describe('appendImportedCalendarEvent – ical source regression', () => {
   });
 
   it('does not deduplicate ical and work events sharing the same sourceId string', () => {
-    const workDraft = { ...icalDraft, sourceType: 'work' as const };
+    const workDraft = {
+      ...icalDraft,
+      sourceType: 'work' as const,
+      sourceWidgetId: 'work-widget-1',
+    };
     const afterWork = appendImportedCalendarEvent([], workDraft);
     const afterIcal = appendImportedCalendarEvent(afterWork.events, icalDraft);
 
