@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 import type { CalendarEvent, FamilyCalendarPlannerEvent } from '@/types';
-import { stateRepositories, type CalendarSyncPort } from '@/lib/persistence';
+import { stateRepositories, type CalendarSyncPort, type StateRepository } from '@/lib/persistence';
 
 function buildDateTimeIso(dateMs: number, time?: string, fallbackTime = '09:00') {
   const date = new Date(dateMs);
@@ -34,8 +34,12 @@ export function mapToFamilyCalendarPlannerEvent(event: CalendarEvent): FamilyCal
 }
 
 export class FamilyCalendarSyncService implements CalendarSyncPort {
+  constructor(
+    private readonly plannerEventsRepository: StateRepository<FamilyCalendarPlannerEvent[]> = stateRepositories.plannerEvents,
+  ) {}
+
   async syncEvents(events: FamilyCalendarPlannerEvent[]): Promise<void> {
-    stateRepositories.plannerEvents.save(events);
+    this.plannerEventsRepository.save(events);
 
     const apiBaseUrl = import.meta.env.VITE_FAMILY_CALENDAR_API_URL;
     if (!apiBaseUrl) {

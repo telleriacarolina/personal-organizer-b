@@ -105,10 +105,17 @@ function App() {
     destinationWidgetId: string,
     event: Parameters<typeof addCalendarImportCommand>[2]
   ): { added: boolean; reason?: 'invalid-destination' | 'duplicate' } => {
-    const { widgets: nextWidgets, result } = addCalendarImportCommand(widgets, destinationWidgetId, event);
-    if (result.added) {
-      setWidgets(nextWidgets);
-    }
+    let result: { added: boolean; reason?: 'invalid-destination' | 'duplicate' } = {
+      added: false,
+      reason: 'invalid-destination',
+    };
+
+    setWidgets((current) => {
+      const next = addCalendarImportCommand(current, destinationWidgetId, event);
+      result = next.result;
+      return next.result.added ? next.widgets : current;
+    });
+
     return result;
   };
 
@@ -116,7 +123,11 @@ function App() {
     setWidgets((current) => updateDailyFocusSourceWidgetCommand(current, widgetId, sourceWidgetId));
   };
 
-  const updateWidgetAIState = (_widgetId: string, state: WidgetAIState) => {
+  const updateWidgetAIState = (widgetId: string, state: WidgetAIState) => {
+    if (widgetId !== state.widgetId) {
+      console.warn(`Ignoring AI state update for "${state.widgetId}" on widget "${widgetId}"`);
+      return;
+    }
     setWidgetAIState((current) => saveWidgetAIState(current, state));
   };
 
