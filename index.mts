@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// Load .env (gitignored) before importing the gateway
+// Load .env (gitignored) before the SDK initializes so the API key is available
 const envPath = resolve(import.meta.dirname, '.env');
 try {
   const lines = readFileSync(envPath, 'utf8').split('\n');
@@ -18,10 +18,12 @@ try {
   // .env not present — rely on environment variables already set
 }
 
-import { generateText } from 'ai';
+// Dynamic import ensures the env vars above are set before the SDK is loaded
+const { generateText } = await import('ai');
+const { gateway } = await import('@ai-sdk/gateway');
 
 const { text } = await generateText({
-  model: 'openai/gpt-5.6-sol' as never,
+  model: gateway('openai/gpt-5.6-sol'),
   prompt: 'Say hello and introduce yourself in one sentence.',
 });
 
