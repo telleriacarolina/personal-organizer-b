@@ -6,6 +6,7 @@ import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
 import { AIConfigButton } from '@/components/ai/AIConfigButton';
+import { OrganizerAgentButton } from '@/components/ai/OrganizerAgentButton';
 import { WorkOrganizationQuestionnaire, WorkOrganizationPreference } from '@/components/WorkOrganizationQuestionnaire';
 import { TasksWidget } from '@/components/widgets/TasksWidget';
 import { NotesWidget } from '@/components/widgets/NotesWidget';
@@ -17,6 +18,7 @@ import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
 import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
+import type { AgentContext, AgentHandlers } from '@/types/agent';
 
 function App() {
   const [widgets, setWidgets] = useLocalStorageState<Widget[]>('organizer-widgets', []);
@@ -210,6 +212,153 @@ function App() {
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
     .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
 
+  const agentHandlers: AgentHandlers = {
+    onAddTask: (widgetId, taskData) => {
+      updateTasksWidget(widgetId, (tasks) => [
+        ...tasks,
+        {
+          id: Date.now().toString(),
+          text: taskData.text,
+          completed: false,
+          priority: taskData.priority ?? 'medium',
+          dueDate: taskData.dueDate ?? null,
+          category: taskData.category ?? null,
+          createdAt: Date.now(),
+        },
+      ]);
+      toast.success(`Added task: ${taskData.text}`);
+    },
+    onAddNote: (widgetId, noteData) => {
+      setWidgets((current) =>
+        (current || []).map((w) =>
+          w.id === widgetId && w.type === 'notes'
+            ? ({
+                ...w,
+                notes: [
+                  ...w.notes,
+                  {
+                    id: Date.now().toString(),
+                    title: noteData.title,
+                    content: noteData.content,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                  },
+                ],
+              } as Widget)
+            : w
+        )
+      );
+      toast.success(`Note created: ${noteData.title}`);
+    },
+    onAddGoal: (widgetId, goalData) => {
+      setWidgets((current) =>
+        (current || []).map((w) =>
+          w.id === widgetId && w.type === 'goals'
+            ? ({
+                ...w,
+                goals: [
+                  ...w.goals,
+                  {
+                    id: Date.now().toString(),
+                    title: goalData.title,
+                    description: goalData.description,
+                    targetDate: goalData.targetDate,
+                    completed: false,
+                    createdAt: Date.now(),
+                  },
+                ],
+              } as Widget)
+            : w
+        )
+      );
+      toast.success(`Goal added: ${goalData.title}`);
+    },
+    onAddHabit: (widgetId, habitData) => {
+      setWidgets((current) =>
+        (current || []).map((w) =>
+          w.id === widgetId && w.type === 'habits'
+            ? ({
+                ...w,
+                habits: [
+                  ...w.habits,
+                  {
+                    id: Date.now().toString(),
+                    name: habitData.name,
+                    completions: {},
+                    createdAt: Date.now(),
+                  },
+                ],
+              } as Widget)
+            : w
+        )
+      );
+      toast.success(`Habit added: ${habitData.name}`);
+    },
+    onAddShoppingItem: (widgetId, itemData) => {
+      setWidgets((current) =>
+        (current || []).map((w) =>
+          w.id === widgetId && w.type === 'shopping'
+            ? ({
+                ...w,
+                items: [
+                  ...w.items,
+                  {
+                    id: Date.now().toString(),
+                    name: itemData.name,
+                    quantity: itemData.quantity,
+                    category: itemData.category ?? 'other',
+                    store: undefined,
+                    estimatedPrice: undefined,
+                    actualPrice: undefined,
+                    purchased: false,
+                    priority: itemData.priority ?? 'medium',
+                    notes: undefined,
+                    barcode: undefined,
+                    receiptId: undefined,
+                    createdAt: Date.now(),
+                  },
+                ],
+              } as Widget)
+            : w
+        )
+      );
+      toast.success(`Added to shopping: ${itemData.name}`);
+    },
+    onAddCalendarEvent: (widgetId, eventData) => {
+      setWidgets((current) =>
+        (current || []).map((w) =>
+          w.id === widgetId && w.type === 'calendar'
+            ? ({
+                ...w,
+                events: [
+                  ...w.events,
+                  {
+                    id: Date.now().toString(),
+                    title: eventData.title,
+                    type: eventData.type,
+                    description: eventData.description,
+                    date: eventData.date,
+                    startTime: eventData.startTime,
+                    endTime: eventData.endTime,
+                    allDay: eventData.allDay ?? false,
+                    location: eventData.location,
+                    createdAt: Date.now(),
+                  },
+                ],
+              } as Widget)
+            : w
+        )
+      );
+      toast.success(`Event added: ${eventData.title}`);
+    },
+  };
+
+  const agentContext: AgentContext = {
+    widgets: currentWidgets,
+    handlers: agentHandlers,
+    currentDate: new Date(),
+  };
+
   useEffect(() => {
     if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !localStorage.getItem('drag-hint-shown')) {
       setShowDragHint(true);
@@ -259,6 +408,7 @@ function App() {
                 <span className="hidden lg:inline">{globalLock ? 'Locked' : 'Unlocked'}</span>
               </Button>
               <AIConfigButton />
+              <OrganizerAgentButton context={agentContext} />
               <ThemeCustomizationButton />
               <Button onClick={() => setShowAddDialog(true)} size="lg" className="gap-2 flex-1 sm:flex-initial">
                 <Plus size={20} />
