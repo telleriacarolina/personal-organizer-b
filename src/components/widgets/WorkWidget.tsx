@@ -1397,17 +1397,12 @@ function JobsTab({
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={() => {
-                      const deadline = job.deadline;
-                      if (deadline === undefined) {
-                        return;
-                      }
-
+                    onClick={() =>
                       onAddToCalendar({
                         title: `Job deadline: ${job.title}`,
                         type: 'event',
                         description: `${job.description ? `${job.description} — ` : ''}Client: ${job.client}`,
-                        date: deadline,
+                        date: job.deadline!,
                         startTime: undefined,
                         endTime: undefined,
                         allDay: true,
@@ -1417,8 +1412,8 @@ function JobsTab({
                         sourceType: 'work',
                         sourceId: `job-deadline:${job.id}`,
                         sourceWidgetId: undefined,
-                      });
-                    }}
+                      })
+                    }
                     className="text-xs"
                     disabled={!canPublishToCalendar}
                   >
@@ -1723,17 +1718,12 @@ function ErrandsTab({
                       <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() => {
-                          const dueDate = errand.dueDate;
-                          if (dueDate === undefined) {
-                            return;
-                          }
-
+                        onClick={() =>
                           onAddToCalendar({
                             title: `Errand: ${errand.title}`,
                             type: 'appointment',
                             description: errand.description,
-                            date: dueDate,
+                            date: errand.dueDate!,
                             startTime: undefined,
                             endTime: undefined,
                             allDay: true,
@@ -1743,8 +1733,8 @@ function ErrandsTab({
                             sourceType: 'work',
                             sourceId: `errand:${errand.id}`,
                             sourceWidgetId: undefined,
-                          });
-                        }}
+                          })
+                        }
                         className="text-xs mt-2"
                         disabled={!canPublishToCalendar}
                       >
