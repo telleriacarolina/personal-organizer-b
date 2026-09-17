@@ -12,10 +12,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
 import { toast } from 'sonner';
+import { CollectionMutation, createItem, deleteItem, updateItem } from '@/lib/atomic-state';
+import { createId } from '@/lib/id';
 
 interface NotesWidgetProps {
   notes: Note[];
-  onUpdate: (notes: Note[]) => void;
+  onUpdate: (mutation: CollectionMutation<Note>) => void;
   taskSources: { id: string; tasks: Task[] }[];
   aiState?: WidgetAIState;
   onAIStateChange: (state: WidgetAIState) => void;
@@ -50,13 +52,13 @@ export function NotesWidget({
   const addNote = () => {
     if (newTitle.trim() || newContent.trim()) {
       const note: Note = {
-        id: Date.now().toString(),
+        id: createId('note'),
         title: newTitle || 'Untitled Note',
         content: newContent,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
-      onUpdate([...notes, note]);
+      onUpdate(createItem(note));
       setNewTitle('');
       setNewContent('');
       setShowNew(false);
@@ -64,17 +66,11 @@ export function NotesWidget({
   };
 
   const deleteNote = (id: string) => {
-    onUpdate(notes.filter((note) => note.id !== id));
+    onUpdate(deleteItem(id));
   };
 
   const updateNote = (id: string, title: string, content: string) => {
-    onUpdate(
-      notes.map((note) =>
-        note.id === id
-          ? { ...note, title, content, updatedAt: Date.now() }
-          : note
-      )
-    );
+    onUpdate(updateItem(id, (note) => ({ ...note, title, content, updatedAt: Date.now() })));
   };
 
   const aiInput = { notes };

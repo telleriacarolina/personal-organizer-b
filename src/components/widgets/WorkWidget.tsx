@@ -41,6 +41,10 @@ import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
 import type { CalendarImportDraft } from '@/lib/calendar-imports';
+import { createItem, deleteItem, updateItem } from '@/lib/atomic-state';
+import { createId } from '@/lib/id';
+import { validateWidgetReference } from '@/lib/reference-validation';
+import { resolveActiveTimerEntryId } from '@/lib/work-timers';
 
 interface CalendarSource {
   id: string;
@@ -56,6 +60,8 @@ interface WorkWidgetProps {
   errands: WorkErrand[];
   routines?: WorkRoutine[];
   activeRoutineId?: string;
+  activeTimerEntryId?: string | null;
+  calendarSourceWidgetId?: string | null;
   organizationPreference?: WorkOrganizationPreference;
   calendarSources: CalendarSource[];
   aiState?: WidgetAIState;
@@ -64,17 +70,31 @@ interface WorkWidgetProps {
     destinationWidgetId: string,
     event: CalendarImportDraft
   ) => { added: boolean; reason?: 'invalid-destination' | 'duplicate' };
-  onUpdate: (data: {
-    clientSlots?: ClientSlot[];
-    meals?: WorkMeal[];
-    timeEntries?: TimeEntry[];
-    jobs?: Job[];
-    shoppingList?: ShoppingItem[];
-    errands?: WorkErrand[];
+  onUpdate: (updater: (current: {
+    clientSlots: ClientSlot[];
+    meals: WorkMeal[];
+    timeEntries: TimeEntry[];
+    jobs: Job[];
+    shoppingList: ShoppingItem[];
+    errands: WorkErrand[];
     routines?: WorkRoutine[];
     activeRoutineId?: string;
+    activeTimerEntryId?: string | null;
+    calendarSourceWidgetId?: string | null;
     organizationPreference?: WorkOrganizationPreference;
-  }) => void;
+  }) => Partial<{
+    clientSlots: ClientSlot[];
+    meals: WorkMeal[];
+    timeEntries: TimeEntry[];
+    jobs: Job[];
+    shoppingList: ShoppingItem[];
+    errands: WorkErrand[];
+    routines?: WorkRoutine[];
+    activeRoutineId?: string;
+    activeTimerEntryId?: string | null;
+    calendarSourceWidgetId?: string | null;
+    organizationPreference?: WorkOrganizationPreference;
+  }>) => void;
   onRemove: () => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
@@ -92,6 +112,8 @@ export function WorkWidget({
   errands,
   routines = [],
   activeRoutineId,
+  activeTimerEntryId,
+  calendarSourceWidgetId,
   organizationPreference,
   calendarSources,
   aiState,
@@ -104,7 +126,6 @@ export function WorkWidget({
   size,
   onSizeChange
 }: WorkWidgetProps) {
-  const [activeTimer, setActiveTimer] = useState<string | null>(null);
   const [showClientDialog, setShowClientDialog] = useState(false);
   const [showMealDialog, setShowMealDialog] = useState(false);
   const [showJobDialog, setShowJobDialog] = useState(false);
@@ -112,19 +133,15 @@ export function WorkWidget({
   const [showRoutineDialog, setShowRoutineDialog] = useState(false);
   const [showOrganizationDialog, setShowOrganizationDialog] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const [selectedCalendarSourceId, setSelectedCalendarSourceId] = useState('');
-  const canPublishToCalendar = calendarSources.length > 0 && selectedCalendarSourceId.length > 0;
+  const calendarReference = validateWidgetReference(calendarSourceWidgetId, calendarSources);
+  const canPublishToCalendar = calendarReference.state === 'valid';
+  const activeTimer = resolveActiveTimerEntryId(timeEntries, activeTimerEntryId);
 
   useEffect(() => {
-    if (calendarSources.length === 0) {
-      setSelectedCalendarSourceId('');
-      return;
+    if (activeTimer !== activeTimerEntryId) {
+      onUpdate(() => ({ activeTimerEntryId: activeTimer }));
     }
-
-    if (!selectedCalendarSourceId || !calendarSources.some((source) => source.id === selectedCalendarSourceId)) {
-      setSelectedCalendarSourceId(calendarSources[0].id);
-    }
-  }, [calendarSources, selectedCalendarSourceId]);
+  }, [activeTimer, activeTimerEntryId, onUpdate, timeEntries]);
 
   const addItemToCalendar = (event: CalendarImportDraft) => {
     if (!canPublishToCalendar) {
@@ -132,7 +149,7 @@ export function WorkWidget({
       return;
     }
 
-    const result = onAddCalendarEvent(selectedCalendarSourceId, {
+    const result = onAddCalendarEvent(calendarReference.targetId, {
       ...event,
       sourceWidgetId: event.sourceWidgetId ?? widgetId,
     });
@@ -152,53 +169,53 @@ export function WorkWidget({
   const addClientSlot = (data: Omit<ClientSlot, 'id' | 'createdAt'>) => {
     const newSlot: ClientSlot = {
       ...data,
-      id: Date.now().toString(),
+      id: createId('client-slot'),
       createdAt: Date.now()
     };
-    onUpdate({ clientSlots: [...clientSlots, newSlot] });
+    onUpdate((current) => ({ clientSlots: createItem(newSlot)(current.clientSlots) }));
     toast.success('Client slot scheduled');
     setShowClientDialog(false);
   };
 
   const updateClientStatus = (id: string, status: ClientSlot['status']) => {
-    onUpdate({
-      clientSlots: clientSlots.map(slot =>
-        slot.id === id ? { ...slot, status } : slot
-      )
-    });
+    onUpdate((current) => ({
+      clientSlots: updateItem(id, (slot) => ({ ...slot, status }))(current.clientSlots),
+    }));
   };
 
   const deleteClientSlot = (id: string) => {
-    onUpdate({ clientSlots: clientSlots.filter(s => s.id !== id) });
+    onUpdate((current) => ({ clientSlots: deleteItem(id)(current.clientSlots) }));
     toast.success('Client slot deleted');
   };
 
   const addMeal = (data: Omit<WorkMeal, 'id' | 'createdAt'>) => {
     const newMeal: WorkMeal = {
       ...data,
-      id: Date.now().toString(),
+      id: createId('work-meal'),
       createdAt: Date.now()
     };
-    onUpdate({ meals: [...meals, newMeal] });
+    onUpdate((current) => ({ meals: createItem(newMeal)(current.meals) }));
     toast.success('Meal scheduled');
     setShowMealDialog(false);
   };
 
   const deleteMeal = (id: string) => {
-    onUpdate({ meals: meals.filter(m => m.id !== id) });
+    onUpdate((current) => ({ meals: deleteItem(id)(current.meals) }));
     toast.success('Meal deleted');
   };
 
   const startTimer = (description: string, project?: string) => {
     const newEntry: TimeEntry = {
-      id: Date.now().toString(),
+      id: createId('time-entry'),
       description,
       project,
       startTime: Date.now(),
       createdAt: Date.now()
     };
-    onUpdate({ timeEntries: [...timeEntries, newEntry] });
-    setActiveTimer(newEntry.id);
+    onUpdate((current) => ({
+      timeEntries: createItem(newEntry)(current.timeEntries),
+      activeTimerEntryId: newEntry.id,
+    }));
     toast.success('Timer started');
   };
 
@@ -207,97 +224,91 @@ export function WorkWidget({
     if (entry && !entry.endTime) {
       const endTime = Date.now();
       const duration = Math.floor((endTime - entry.startTime) / 1000 / 60);
-      onUpdate({
-        timeEntries: timeEntries.map(e =>
-          e.id === id ? { ...e, endTime, duration } : e
-        )
-      });
-      setActiveTimer(null);
+      onUpdate((current) => ({
+        timeEntries: updateItem(id, (timeEntry) => ({ ...timeEntry, endTime, duration }))(current.timeEntries),
+        activeTimerEntryId: current.activeTimerEntryId === id ? null : current.activeTimerEntryId,
+      }));
       toast.success(`Timer stopped: ${duration} minutes`);
     }
   };
 
   const deleteTimeEntry = (id: string) => {
-    onUpdate({ timeEntries: timeEntries.filter(e => e.id !== id) });
-    if (activeTimer === id) setActiveTimer(null);
+    onUpdate((current) => ({
+      timeEntries: deleteItem(id)(current.timeEntries),
+      activeTimerEntryId: current.activeTimerEntryId === id ? null : current.activeTimerEntryId,
+    }));
     toast.success('Time entry deleted');
   };
 
   const addJob = (data: Omit<Job, 'id' | 'createdAt'>) => {
     const newJob: Job = {
       ...data,
-      id: Date.now().toString(),
+      id: createId('job'),
       createdAt: Date.now()
     };
-    onUpdate({ jobs: [...jobs, newJob] });
+    onUpdate((current) => ({ jobs: createItem(newJob)(current.jobs) }));
     toast.success('Job added');
     setShowJobDialog(false);
   };
 
   const updateJobStatus = (id: string, status: Job['status']) => {
-    onUpdate({
-      jobs: jobs.map(job =>
-        job.id === id ? { ...job, status } : job
-      )
-    });
+    onUpdate((current) => ({
+      jobs: updateItem(id, (job) => ({ ...job, status }))(current.jobs),
+    }));
   };
 
   const deleteJob = (id: string) => {
-    onUpdate({ jobs: jobs.filter(j => j.id !== id) });
+    onUpdate((current) => ({ jobs: deleteItem(id)(current.jobs) }));
     toast.success('Job deleted');
   };
 
   const addShoppingItem = (item: string, quantity?: string, category?: string) => {
     const newItem: ShoppingItem = {
-      id: Date.now().toString(),
+      id: createId('work-shopping-item'),
       item,
       quantity,
       category,
       purchased: false,
       createdAt: Date.now()
     };
-    onUpdate({ shoppingList: [...shoppingList, newItem] });
+    onUpdate((current) => ({ shoppingList: createItem(newItem)(current.shoppingList) }));
   };
 
   const toggleShoppingItem = (id: string) => {
-    onUpdate({
-      shoppingList: shoppingList.map(item =>
-        item.id === id ? { ...item, purchased: !item.purchased } : item
-      )
-    });
+    onUpdate((current) => ({
+      shoppingList: updateItem(id, (item) => ({ ...item, purchased: !item.purchased }))(current.shoppingList),
+    }));
   };
 
   const deleteShoppingItem = (id: string) => {
-    onUpdate({ shoppingList: shoppingList.filter(i => i.id !== id) });
+    onUpdate((current) => ({ shoppingList: deleteItem(id)(current.shoppingList) }));
   };
 
   const addErrand = (data: Omit<WorkErrand, 'id' | 'createdAt'>) => {
     const newErrand: WorkErrand = {
       ...data,
-      id: Date.now().toString(),
+      id: createId('work-errand'),
       createdAt: Date.now()
     };
-    onUpdate({ errands: [...errands, newErrand] });
+    onUpdate((current) => ({ errands: createItem(newErrand)(current.errands) }));
     toast.success('Work errand added');
     setShowErrandDialog(false);
   };
 
   const toggleErrand = (id: string) => {
-    onUpdate({
-      errands: errands.map(errand =>
-        errand.id === id ? { ...errand, completed: !errand.completed } : errand
-      )
-    });
+    onUpdate((current) => ({
+      errands: updateItem(id, (errand) => ({ ...errand, completed: !errand.completed }))(current.errands),
+    }));
   };
 
   const deleteErrand = (id: string) => {
-    onUpdate({ errands: errands.filter(e => e.id !== id) });
+    onUpdate((current) => ({ errands: deleteItem(id)(current.errands) }));
     toast.success('Work errand deleted');
   };
 
   const saveAsRoutine = (name: string, description?: string) => {
     const newRoutine: WorkRoutine = {
-      id: Date.now().toString(),
+      id: createId('work-routine'),
       name,
       description,
       clientSlots: [...clientSlots],
@@ -308,7 +319,7 @@ export function WorkWidget({
       errands: [...errands],
       createdAt: Date.now()
     };
-    onUpdate({ routines: [...routines, newRoutine] });
+    onUpdate((current) => ({ routines: createItem(newRoutine)(current.routines || []) }));
     toast.success(`Routine "${name}" saved!`);
     setShowRoutineDialog(false);
   };
@@ -317,15 +328,16 @@ export function WorkWidget({
     const routine = routines.find(r => r.id === routineId);
     if (!routine) return;
     
-    onUpdate({
+    onUpdate(() => ({
       clientSlots: [...routine.clientSlots],
       meals: [...routine.meals],
       timeEntries: [...routine.timeEntries],
       jobs: [...routine.jobs],
       shoppingList: [...routine.shoppingList],
       errands: [...routine.errands],
-      activeRoutineId: routineId
-    });
+      activeRoutineId: routineId,
+      activeTimerEntryId: null,
+    }));
     toast.success(`Loaded routine "${routine.name}"`);
   };
 
@@ -335,37 +347,38 @@ export function WorkWidget({
 
     const duplicatedRoutine: WorkRoutine = {
       ...routine,
-      id: Date.now().toString(),
+      id: createId('work-routine'),
       name: `${routine.name} (Copy)`,
       createdAt: Date.now()
     };
-    onUpdate({ routines: [...routines, duplicatedRoutine] });
+    onUpdate((current) => ({ routines: createItem(duplicatedRoutine)(current.routines || []) }));
     toast.success(`Routine duplicated!`);
   };
 
   const deleteRoutine = (routineId: string) => {
-    onUpdate({ 
-      routines: routines.filter(r => r.id !== routineId),
-      ...(activeRoutineId === routineId && { activeRoutineId: undefined })
-    });
+    onUpdate((current) => ({
+      routines: deleteItem(routineId)(current.routines || []),
+      ...(current.activeRoutineId === routineId && { activeRoutineId: undefined }),
+    }));
     toast.success('Routine deleted');
   };
 
   const clearCurrentWorkspace = () => {
-    onUpdate({
+    onUpdate(() => ({
       clientSlots: [],
       meals: [],
       timeEntries: [],
       jobs: [],
       shoppingList: [],
       errands: [],
-      activeRoutineId: undefined
-    });
+      activeRoutineId: undefined,
+      activeTimerEntryId: null,
+    }));
     toast.success('Workspace cleared');
   };
 
   const updateOrganizationPreference = (newPreference: WorkOrganizationPreference) => {
-    onUpdate({ organizationPreference: newPreference });
+    onUpdate(() => ({ organizationPreference: newPreference }));
     toast.success(`Organization changed to ${getOrganizationLabel(newPreference.type)}`);
     setShowOrganizationDialog(false);
   };
@@ -481,8 +494,8 @@ export function WorkWidget({
           Calendar destination
         </Label>
         <Select
-          value={selectedCalendarSourceId}
-          onValueChange={setSelectedCalendarSourceId}
+          value={calendarReference.state === 'valid' ? calendarReference.targetId : ''}
+          onValueChange={(value) => onUpdate(() => ({ calendarSourceWidgetId: value || null }))}
           disabled={calendarSources.length === 0}
         >
           <SelectTrigger id={`work-calendar-destination-${widgetId}`}>
@@ -498,6 +511,11 @@ export function WorkWidget({
         </Select>
         {calendarSources.length === 0 && (
           <p className="text-xs text-muted-foreground">Add a Calendar widget to publish scheduled work items.</p>
+        )}
+        {calendarReference.state === 'missing-widget' && (
+          <p className="text-xs text-destructive">
+            The selected Calendar widget is no longer available. Choose a replacement before publishing new items.
+          </p>
         )}
       </div>
 

@@ -17,10 +17,12 @@ import { RecordNote, RecordNoteMediaType, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { selectMimeType, label, defaultTitle, formatDuration } from './recordNoteUtils';
+import { CollectionMutation, createItem, deleteItem } from '@/lib/atomic-state';
+import { createId } from '@/lib/id';
 
 interface RecordNoteWidgetProps {
   records: RecordNote[];
-  onUpdate: (records: RecordNote[]) => void;
+  onUpdate: (mutation: CollectionMutation<RecordNote>) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -236,7 +238,7 @@ export function RecordNoteWidget({
     if (!previewDataUrl || !activeMode) return;
     const title = pendingTitle.trim() || defaultTitle(activeMode);
     const newRecord: RecordNote = {
-      id: Date.now().toString(),
+      id: createId('record-note'),
       title,
       mediaType: activeMode,
       dataUrl: previewDataUrl,
@@ -244,7 +246,7 @@ export function RecordNoteWidget({
       duration: activeMode !== 'photo' ? durationRef.current : undefined,
       createdAt: Date.now(),
     };
-    onUpdate([...records, newRecord]);
+    onUpdate(createItem(newRecord));
     toast.success(`${label(activeMode)} saved!`);
     setPreviewDataUrl(null);
     setRecordingState('idle');
@@ -253,7 +255,7 @@ export function RecordNoteWidget({
   };
 
   const deleteRecord = (id: string) => {
-    onUpdate(records.filter((r) => r.id !== id));
+    onUpdate(deleteItem(id));
     toast.success('Record deleted');
   };
 

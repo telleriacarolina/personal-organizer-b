@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
@@ -20,8 +20,12 @@ import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
 import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
 import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 import { appendImportedCalendarEvent, type CalendarImportDraft } from '@/lib/calendar-imports';
+import { createId } from '@/lib/id';
+import { applyGlobalLockState, toggleGlobalLockValue } from '@/lib/dashboard-state';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import type { AgentContext, AgentHandlers } from '@/types/agent';
+
+type WidgetOfType<TType extends Widget['type']> = Extract<Widget, { type: TType }>;
 
 function App() {
   const [widgets, setWidgets] = useLocalStorageState<Widget[]>('organizer-widgets', []);
@@ -33,6 +37,8 @@ function App() {
   const [globalLock, setGlobalLock] = useLocalStorageState<boolean>('organizer-global-lock', false);
   const [widgetAIState, setWidgetAIState] = useLocalStorageState<Record<string, WidgetAIState>>('organizer-widget-ai', {});
   const dragStartTimeRef = useRef<number>(0);
+  const pendingSnapToGridToastRef = useRef<string | null>(null);
+  const pendingGlobalLockToastRef = useRef<string | null>(null);
 
   const addWidget = (type: WidgetType) => {
     if (type === 'work') {
@@ -41,47 +47,78 @@ function App() {
       return;
     }
 
-    const newWidget: Widget = {
-      id: Date.now().toString(),
-      type,
-      position: (widgets || []).length,
-      ...(type === 'tasks' && { tasks: [] }),
-      ...(type === 'daily-focus' && { sourceWidgetId: (widgets || []).find((widget) => widget.type === 'tasks')?.id ?? null }),
-      ...(type === 'notes' && { notes: [] }),
-      ...(type === 'habits' && { habits: [] }),
-      ...(type === 'goals' && { goals: [] }),
-      ...(type === 'calendar' && { events: [] }),
-      ...(type === 'shopping' && { items: [], receipts: [], trips: [], reminders: [] }),
-      ...(type === 'ai-chat' && { messages: [], appliedSuggestionIds: [] }),
-      ...(type === 'record-note' && { records: [] }),
-    } as Widget;
+    setWidgets((current) => {
+      const currentWidgets = current || [];
+      const newWidget: Widget = {
+        id: createId(`${type}-widget`),
+        type,
+        position: currentWidgets.length,
+        ...(type === 'tasks' && { tasks: [] }),
+        ...(type === 'daily-focus' && {
+          sourceWidgetId: currentWidgets.find((widget) => widget.type === 'tasks')?.id ?? null,
+        }),
+        ...(type === 'notes' && { notes: [] }),
+        ...(type === 'habits' && { habits: [] }),
+        ...(type === 'goals' && { goals: [] }),
+        ...(type === 'calendar' && { events: [] }),
+        ...(type === 'shopping' && { items: [], receipts: [], trips: [], reminders: [] }),
+        ...(type === 'ai-chat' && { messages: [], appliedSuggestionIds: [] }),
+        ...(type === 'record-note' && { records: [] }),
+      } as Widget;
 
-    setWidgets((current) => [...(current || []), newWidget]);
+      return [...currentWidgets, newWidget];
+    });
     toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} widget added!`);
   };
 
   const handleWorkOrganizationComplete = (preference: WorkOrganizationPreference) => {
-    const newWidget: Widget = {
-      id: Date.now().toString(),
-      type: 'work',
-      position: (widgets || []).length,
-      clientSlots: [],
-      meals: [],
-      timeEntries: [],
-      jobs: [],
-      shoppingList: [],
-      errands: [],
-      routines: [],
-      activeRoutineId: undefined,
-      organizationPreference: preference,
-    } as Widget;
+    setWidgets((current) => {
+      const currentWidgets = current || [];
+      const newWidget: Widget = {
+        id: createId('work-widget'),
+        type: 'work',
+        position: currentWidgets.length,
+        clientSlots: [],
+        meals: [],
+        timeEntries: [],
+        jobs: [],
+        shoppingList: [],
+        errands: [],
+        routines: [],
+        activeRoutineId: undefined,
+        activeTimerEntryId: null,
+        calendarSourceWidgetId: null,
+        organizationPreference: preference,
+      } as Widget;
 
-    setWidgets((current) => [...(current || []), newWidget]);
+      return [...currentWidgets, newWidget];
+    });
     toast.success(`Work widget added with ${preference.type} organization!`);
   };
 
+  const mutateWidgets = useCallback((mutation: (current: Widget[]) => Widget[]) => {
+    setWidgets((current) => mutation(current || []));
+  }, [setWidgets]);
+
+  const mutateTypedWidget = useCallback(
+    <TType extends Widget['type']>(
+      id: string,
+      type: TType,
+      mutation: (widget: WidgetOfType<TType>) => WidgetOfType<TType>,
+    ) => {
+      mutateWidgets((current) =>
+        current.map((widget) =>
+          widget.id === id && widget.type === type
+            ? mutation(widget as WidgetOfType<TType>)
+            : widget,
+        ),
+      );
+    },
+    [mutateWidgets],
+  );
+
   const removeWidget = (id: string) => {
-    setWidgets((current) => (current || []).filter((w) => w.id !== id));
+    mutateWidgets((current) => current.filter((widget) => widget.id !== id));
     setWidgetAIState((current) => {
       const nextState = { ...(current || {}) };
       delete nextState[id];
@@ -90,25 +127,19 @@ function App() {
     toast.success('Widget removed');
   };
 
-  const updateWidget = (id: string, data: Partial<Widget>) => {
-    setWidgets((current) =>
-      (current || []).map((w) => (w.id === id ? { ...w, ...data } as Widget : w))
-    );
-  };
-
   const updateWidgetSize = (id: string, size: { width: number; height: number }) => {
-    setWidgets((current) =>
-      (current || []).map((w) => (w.id === id ? { ...w, size } as Widget : w))
+    mutateWidgets((current) =>
+      current.map((widget) => (widget.id === id ? { ...widget, size } : widget)),
     );
   };
 
   const updateTasksWidget = (sourceWidgetId: string, updater: (tasks: Task[]) => Task[]) => {
-    setWidgets((current) =>
-      (current || []).map((widget) =>
+    mutateWidgets((current) =>
+      current.map((widget) =>
         widget.id === sourceWidgetId && widget.type === 'tasks'
           ? ({ ...widget, tasks: updater(widget.tasks) } as Widget)
           : widget
-      )
+      ),
     );
   };
 
@@ -119,7 +150,7 @@ function App() {
     updateTasksWidget(sourceWidgetId, (tasks) => [
       ...tasks,
       {
-        id: Date.now().toString(),
+        id: createId('task'),
         text: task.text,
         completed: false,
         priority: task.priority,
@@ -184,7 +215,7 @@ function App() {
   };
 
   const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {
-    updateWidget(widgetId, { sourceWidgetId });
+    mutateTypedWidget(widgetId, 'daily-focus', (widget) => ({ ...widget, sourceWidgetId }));
   };
 
   const updateWidgetAIState = (widgetId: string, state: WidgetAIState) => {
@@ -195,45 +226,23 @@ function App() {
   };
 
   const toggleSnapToGrid = () => {
-    setSnapToGrid((current) => !current);
-    toast.success(snapToGrid ? 'Grid snapping disabled' : 'Grid snapping enabled');
+    setSnapToGrid((current) => {
+      const next = !current;
+      pendingSnapToGridToastRef.current = next ? 'Grid snapping enabled' : 'Grid snapping disabled';
+      return next;
+    });
   };
 
   const toggleGlobalLock = () => {
-    const newLockState = !globalLock;
-    setGlobalLock(newLockState);
-    
-    if (newLockState) {
-      setWidgets((current) =>
-        (current || []).map((w) => ({
-          ...w,
-          size: {
-            ...w.size,
-            width: w.size?.width || 350,
-            height: w.size?.height || 400,
-            locked: true
-          }
-        }))
-      );
-      toast.success('All widgets locked');
-    } else {
-      setWidgets((current) =>
-        (current || []).map((w) => ({
-          ...w,
-          size: {
-            ...w.size,
-            width: w.size?.width || 350,
-            height: w.size?.height || 400,
-            locked: false
-          }
-        }))
-      );
-      toast.success('All widgets unlocked');
-    }
+    setGlobalLock((current) => {
+      const next = toggleGlobalLockValue(current);
+      pendingGlobalLockToastRef.current = next ? 'All widgets locked' : 'All widgets unlocked';
+      return next;
+    });
   };
 
   const handleReorder = (newOrder: Widget[]) => {
-    setWidgets(newOrder.map((w, index) => ({ ...w, position: index })));
+    mutateWidgets(() => newOrder.map((widget, index) => ({ ...widget, position: index })));
   };
 
   const handleDragStart = () => {
@@ -249,7 +258,7 @@ function App() {
     }
   };
 
-  const currentWidgets = widgets || [];
+  const currentWidgets = useMemo(() => widgets || [], [widgets]);
   const taskSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
     .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
@@ -267,7 +276,7 @@ function App() {
                 tasks: [
                   ...widget.tasks,
                   {
-                    id: Date.now().toString(),
+                    id: createId('task'),
                     text: taskData.text,
                     completed: false,
                     priority: taskData.priority ?? 'medium',
@@ -291,7 +300,7 @@ function App() {
                 notes: [
                   ...w.notes,
                   {
-                    id: Date.now().toString(),
+                    id: createId('note'),
                     title: noteData.title,
                     content: noteData.content,
                     createdAt: Date.now(),
@@ -313,7 +322,7 @@ function App() {
                 goals: [
                   ...w.goals,
                   {
-                    id: Date.now().toString(),
+                    id: createId('goal'),
                     title: goalData.title,
                     description: goalData.description,
                     targetDate: goalData.targetDate,
@@ -336,7 +345,7 @@ function App() {
                 habits: [
                   ...w.habits,
                   {
-                    id: Date.now().toString(),
+                    id: createId('habit'),
                     name: habitData.name,
                     completions: {},
                     createdAt: Date.now(),
@@ -357,7 +366,7 @@ function App() {
                 items: [
                   ...w.items,
                   {
-                    id: Date.now().toString(),
+                    id: createId('shopping-item'),
                     name: itemData.name,
                     quantity: itemData.quantity,
                     category: itemData.category ?? 'other',
@@ -387,7 +396,7 @@ function App() {
                 events: [
                   ...w.events,
                   {
-                    id: Date.now().toString(),
+                    id: createId('calendar-event'),
                     title: eventData.title,
                     type: eventData.type,
                     description: eventData.description,
@@ -412,6 +421,21 @@ function App() {
     handlers: agentHandlers,
     currentDate: new Date(),
   }), [currentWidgets, agentHandlers]);
+
+  useEffect(() => {
+    mutateWidgets((current) => applyGlobalLockState(current, globalLock));
+    if (pendingGlobalLockToastRef.current) {
+      toast.success(pendingGlobalLockToastRef.current);
+      pendingGlobalLockToastRef.current = null;
+    }
+  }, [globalLock, mutateWidgets]);
+
+  useEffect(() => {
+    if (pendingSnapToGridToastRef.current) {
+      toast.success(pendingSnapToGridToastRef.current);
+      pendingSnapToGridToastRef.current = null;
+    }
+  }, [snapToGrid]);
 
   useEffect(() => {
     if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !localStorage.getItem('drag-hint-shown')) {
@@ -569,7 +593,12 @@ function App() {
                       <TasksWidget
                         {...widgetProps}
                         tasks={widget.tasks}
-                        onUpdate={(tasks) => updateWidget(widget.id, { tasks })}
+                        onUpdate={(mutation) =>
+                          mutateTypedWidget(widget.id, 'tasks', (current) => ({
+                            ...current,
+                            tasks: mutation(current.tasks),
+                          }))
+                        }
                       />
                     );
                   case 'notes':
@@ -580,7 +609,12 @@ function App() {
                         taskSources={taskSources}
                         aiState={widgetAIState?.[widget.id]}
                         onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
-                        onUpdate={(notes) => updateWidget(widget.id, { notes })}
+                        onUpdate={(mutation) =>
+                          mutateTypedWidget(widget.id, 'notes', (current) => ({
+                            ...current,
+                            notes: mutation(current.notes),
+                          }))
+                        }
                       />
                     );
                   case 'habits':
@@ -588,7 +622,12 @@ function App() {
                       <HabitsWidget
                         {...widgetProps}
                         habits={widget.habits}
-                        onUpdate={(habits) => updateWidget(widget.id, { habits })}
+                        onUpdate={(mutation) =>
+                          mutateTypedWidget(widget.id, 'habits', (current) => ({
+                            ...current,
+                            habits: mutation(current.habits),
+                          }))
+                        }
                       />
                     );
                   case 'goals':
@@ -596,7 +635,12 @@ function App() {
                       <GoalsWidget
                         {...widgetProps}
                         goals={widget.goals}
-                        onUpdate={(goals) => updateWidget(widget.id, { goals })}
+                        onUpdate={(mutation) =>
+                          mutateTypedWidget(widget.id, 'goals', (current) => ({
+                            ...current,
+                            goals: mutation(current.goals),
+                          }))
+                        }
                       />
                     );
                   case 'calendar':
@@ -606,7 +650,12 @@ function App() {
                         events={widget.events}
                         aiState={widgetAIState?.[widget.id]}
                         onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
-                        onUpdate={(events) => updateWidget(widget.id, { events })}
+                        onUpdate={(mutation) =>
+                          mutateTypedWidget(widget.id, 'calendar', (current) => ({
+                            ...current,
+                            events: mutation(current.events),
+                          }))
+                        }
                       />
                     );
                   case 'shopping':
@@ -620,7 +669,18 @@ function App() {
                         reminders={widget.reminders}
                         aiState={widgetAIState?.[widget.id]}
                         onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
-                        onUpdate={(data) => updateWidget(widget.id, data)}
+                        onUpdate={(updater) =>
+                          mutateTypedWidget(widget.id, 'shopping', (current) => ({
+                            ...current,
+                            ...updater({
+                              items: current.items,
+                              budget: current.budget,
+                              receipts: current.receipts,
+                              trips: current.trips,
+                              reminders: current.reminders,
+                            }),
+                          }))
+                        }
                       />
                     );
                   case 'work':
@@ -635,12 +695,31 @@ function App() {
                         errands={widget.errands}
                         routines={widget.routines}
                         activeRoutineId={widget.activeRoutineId}
+                        activeTimerEntryId={widget.activeTimerEntryId}
+                        calendarSourceWidgetId={widget.calendarSourceWidgetId}
                         organizationPreference={widget.organizationPreference}
                         calendarSources={calendarSources}
                         aiState={widgetAIState?.[widget.id]}
                         onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
                         onAddCalendarEvent={addCalendarEventToSource}
-                        onUpdate={(data) => updateWidget(widget.id, data)}
+                        onUpdate={(updater) =>
+                          mutateTypedWidget(widget.id, 'work', (current) => ({
+                            ...current,
+                            ...updater({
+                              clientSlots: current.clientSlots,
+                              meals: current.meals,
+                              timeEntries: current.timeEntries,
+                              jobs: current.jobs,
+                              shoppingList: current.shoppingList,
+                              errands: current.errands,
+                              routines: current.routines,
+                              activeRoutineId: current.activeRoutineId,
+                              activeTimerEntryId: current.activeTimerEntryId,
+                              calendarSourceWidgetId: current.calendarSourceWidgetId,
+                              organizationPreference: current.organizationPreference,
+                            }),
+                          }))
+                        }
                       />
                     );
                   case 'daily-focus':
@@ -665,11 +744,19 @@ function App() {
                         {...widgetProps}
                         messages={widget.messages}
                         appliedSuggestionIds={widget.appliedSuggestionIds ?? []}
-                        onUpdate={(messages) => updateWidget(widget.id, { messages })}
+                        onUpdate={(mutation) =>
+                          mutateTypedWidget(widget.id, 'ai-chat', (current) => ({
+                            ...current,
+                            messages: mutation(current.messages),
+                          }))
+                        }
                         onApplySuggestion={(id) =>
-                          updateWidget(widget.id, {
-                            appliedSuggestionIds: [...(widget.appliedSuggestionIds ?? []), id],
-                          })
+                          mutateTypedWidget(widget.id, 'ai-chat', (current) => ({
+                            ...current,
+                            appliedSuggestionIds: current.appliedSuggestionIds?.includes(id)
+                              ? current.appliedSuggestionIds
+                              : [...(current.appliedSuggestionIds ?? []), id],
+                          }))
                         }
                         availableWidgets={currentWidgets.map((w) => ({ id: w.id, type: w.type }))}
                       />
@@ -679,7 +766,12 @@ function App() {
                       <RecordNoteWidget
                         {...widgetProps}
                         records={widget.records}
-                        onUpdate={(records) => updateWidget(widget.id, { records })}
+                        onUpdate={(mutation) =>
+                          mutateTypedWidget(widget.id, 'record-note', (current) => ({
+                            ...current,
+                            records: mutation(current.records),
+                          }))
+                        }
                       />
                     );
                   default:

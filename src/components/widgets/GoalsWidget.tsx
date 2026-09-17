@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Target, Plus, Trash } from '@phosphor-icons/react';
 import { Goal, WidgetSize } from '@/types';
+import { CollectionMutation, createItem, deleteItem, toggleItem } from '@/lib/atomic-state';
+import { createId } from '@/lib/id';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface GoalsWidgetProps {
   goals: Goal[];
-  onUpdate: (goals: Goal[]) => void;
+  onUpdate: (mutation: CollectionMutation<Goal>) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -27,13 +29,13 @@ export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, 
   const addGoal = () => {
     if (newTitle.trim()) {
       const goal: Goal = {
-        id: Date.now().toString(),
+        id: createId('goal'),
         title: newTitle,
         description: newDescription,
         completed: false,
         createdAt: Date.now(),
       };
-      onUpdate([...goals, goal]);
+      onUpdate(createItem(goal));
       setNewTitle('');
       setNewDescription('');
       setShowNew(false);
@@ -41,15 +43,11 @@ export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, 
   };
 
   const toggleGoal = (id: string) => {
-    onUpdate(
-      goals.map((goal) =>
-        goal.id === id ? { ...goal, completed: !goal.completed } : goal
-      )
-    );
+    onUpdate(toggleItem(id, (goal) => ({ ...goal, completed: !goal.completed })));
   };
 
   const deleteGoal = (id: string) => {
-    onUpdate(goals.filter((goal) => goal.id !== id));
+    onUpdate(deleteItem(id));
   };
 
   return (

@@ -18,10 +18,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { CollectionMutation, createItem, deleteItem, updateItem } from '@/lib/atomic-state';
+import { processCalendarReminders } from '@/lib/calendar-reminders';
+import { createId } from '@/lib/id';
 
 interface CalendarWidgetProps {
   events: CalendarEvent[];
-  onUpdate: (events: CalendarEvent[]) => void;
+  onUpdate: (mutation: CollectionMutation<CalendarEvent>) => void;
   aiState?: WidgetAIState;
   onAIStateChange: (state: WidgetAIState) => void;
   onRemove: () => void;
@@ -84,21 +87,30 @@ export function CalendarWidget({
   useEffect(() => {
     const checkReminders = () => {
       const now = Date.now();
-      events.forEach((event) => {
-        if (event.reminder && !event.reminderSent) {
-          const reminderTime = event.date - event.reminder * 60 * 1000;
-          if (now >= reminderTime && now < event.date) {
-            toast.info(`Reminder: ${event.title}`, {
-              description: event.startTime ? `Starting at ${event.startTime}` : 'Event coming up',
-              duration: 10000,
-            });
-            onUpdate(
-              events.map((e) =>
-                e.id === event.id ? { ...e, reminderSent: true } : e
-              )
-            );
+      if (
+        !events.some((event) => {
+          if (!event.reminder || event.reminderSent) {
+            return false;
           }
-        }
+
+          const reminderTime = event.date - event.reminder * 60 * 1000;
+          return now >= reminderTime && now < event.date;
+        })
+      ) {
+        return;
+      }
+
+      let triggered: CalendarEvent[] = [];
+      onUpdate((currentEvents) => {
+        const result = processCalendarReminders(currentEvents, now);
+        triggered = result.triggered;
+        return result.events;
+      });
+      triggered.forEach((event) => {
+        toast.info(`Reminder: ${event.title}`, {
+          description: event.startTime ? `Starting at ${event.startTime}` : 'Event coming up',
+          duration: 10000,
+        });
       });
     };
 
@@ -208,7 +220,7 @@ export function CalendarWidget({
 
     const eventDateTime = new Date(eventDate).setHours(0, 0, 0, 0);
     const newEvent: CalendarEvent = {
-      id: editingEvent?.id || Date.now().toString(),
+      id: editingEvent?.id || createId('calendar-event'),
       title: title.trim(),
       type: eventType,
       description: description.trim(),
@@ -223,11 +235,13 @@ export function CalendarWidget({
       createdAt: editingEvent?.createdAt || Date.now(),
     };
 
-    const updatedEvents = editingEvent
-      ? events.map((e) => (e.id === editingEvent.id ? newEvent : e))
-      : [...events, newEvent];
-
-    onUpdate(updatedEvents);
+    let updatedEvents: CalendarEvent[] = [];
+    onUpdate((currentEvents) => {
+      updatedEvents = editingEvent
+        ? updateItem(editingEvent.id, () => newEvent)(currentEvents)
+        : createItem(newEvent)(currentEvents);
+      return updatedEvents;
+    });
     void syncFamilyCalendarPlanner(updatedEvents);
 
     if (editingEvent) {
@@ -241,8 +255,11 @@ export function CalendarWidget({
   };
 
   const deleteEvent = (id: string) => {
-    const updatedEvents = events.filter((e) => e.id !== id);
-    onUpdate(updatedEvents);
+    let updatedEvents: CalendarEvent[] = [];
+    onUpdate((currentEvents) => {
+      updatedEvents = deleteItem(id)(currentEvents);
+      return updatedEvents;
+    });
     void syncFamilyCalendarPlanner(updatedEvents);
     toast.success('Event deleted');
     setShowDialog(false);

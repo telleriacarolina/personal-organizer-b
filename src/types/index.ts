@@ -305,6 +305,8 @@ export interface WorkWidget extends BaseWidget {
   errands: WorkErrand[];
   routines?: WorkRoutine[];
   activeRoutineId?: string;
+  activeTimerEntryId?: string | null;
+  calendarSourceWidgetId?: string | null;
   organizationPreference?: WorkOrganizationPreference;
 }
 

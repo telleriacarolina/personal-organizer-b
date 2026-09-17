@@ -6,11 +6,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ListChecks, Plus, Trash } from '@phosphor-icons/react';
 import { Task, WidgetSize } from '@/types';
+import { CollectionMutation, createItem, deleteItem, toggleItem } from '@/lib/atomic-state';
+import { createId } from '@/lib/id';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface TasksWidgetProps {
   tasks: Task[];
-  onUpdate: (tasks: Task[]) => void;
+  onUpdate: (mutation: CollectionMutation<Task>) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -26,28 +28,24 @@ export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, 
   const addTask = () => {
     if (newTask.trim()) {
       const task: Task = {
-        id: Date.now().toString(),
+        id: createId('task'),
         text: newTask,
         completed: false,
         priority,
         createdAt: Date.now(),
       };
-      onUpdate([...tasks, task]);
+      onUpdate(createItem(task));
       setNewTask('');
       setPriority('medium');
     }
   };
 
   const toggleTask = (id: string) => {
-    onUpdate(
-      tasks.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
-    );
+    onUpdate(toggleItem(id, (task) => ({ ...task, completed: !task.completed })));
   };
 
   const deleteTask = (id: string) => {
-    onUpdate(tasks.filter((task) => task.id !== id));
+    onUpdate(deleteItem(id));
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
