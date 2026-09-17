@@ -268,11 +268,11 @@ export function readLegacyCompatibleArrayJson<T>(key: string, fallbackKey: strin
   return Array.isArray(legacy) ? legacy as T[] : [];
 }
 
-function ensureIndexedDbAvailable() {
+function ensureIndexedDbAvailable(operation: PersistenceOperation) {
   if (typeof indexedDB === 'undefined') {
     const issue: PersistenceIssue = {
       storage: 'indexedDB',
-      operation: 'read',
+      operation,
       code: 'storage-unavailable',
       message: 'IndexedDB is unavailable in this browser.',
     };
@@ -281,8 +281,8 @@ function ensureIndexedDbAvailable() {
   }
 }
 
-async function openMediaDatabase(): Promise<IDBDatabase> {
-  ensureIndexedDbAvailable();
+async function openMediaDatabase(operation: PersistenceOperation): Promise<IDBDatabase> {
+  ensureIndexedDbAvailable(operation);
 
   return await new Promise((resolve, reject) => {
     const request = indexedDB.open(MEDIA_DB_NAME, MEDIA_DB_VERSION);
@@ -313,7 +313,7 @@ async function runMediaRequest<T>(
   operation: PersistenceOperation,
   executor: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T> {
-  const database = await openMediaDatabase();
+  const database = await openMediaDatabase(operation);
 
   return await new Promise<T>((resolve, reject) => {
     const transaction = database.transaction(MEDIA_STORE_NAME, operation === 'read' ? 'readonly' : 'readwrite');
