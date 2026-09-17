@@ -288,6 +288,8 @@ export function CalendarWidget({
         toast.success(`Imported ${added} event${added !== 1 ? 's' : ''} from ${file.name}`);
       }
     };
+    // iCal files are UTF-8 in modern clients; legacy Latin-1 files from older
+    // Outlook exports are not supported and will render non-ASCII chars incorrectly.
     reader.readAsText(file);
   };
 

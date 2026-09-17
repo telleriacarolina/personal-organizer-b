@@ -113,7 +113,8 @@ export function parseICalText(icsContent: string): CalendarImportDraft[] {
     color = '';
   };
 
-  for (const line of lines) {
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
     const upper = line.toUpperCase();
 
     if (upper === 'BEGIN:VEVENT') {
