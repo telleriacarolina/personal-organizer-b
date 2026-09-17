@@ -6,32 +6,14 @@
 // ---------------------------------------------------------------------------
 
 import type { PersistedSuggestion } from '@/types/ai';
-
-const STORAGE_KEY = 'organizer-widget-ai';
-const MAX_PERSISTED = 200; // prevent unbounded growth
+import { aiSuggestionRepository } from '@/lib/persistence';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
 function readAll(): PersistedSuggestion[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as PersistedSuggestion[];
-  } catch {
-    return [];
-  }
-}
-
-function writeAll(suggestions: PersistedSuggestion[]): void {
-  if (typeof window === 'undefined') return;
-  // Keep only the most recent MAX_PERSISTED entries to limit storage growth
-  const trimmed = suggestions.slice(-MAX_PERSISTED);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+  return aiSuggestionRepository.list();
 }
 
 // ---------------------------------------------------------------------------
@@ -45,7 +27,7 @@ export function getAllSuggestions(): PersistedSuggestion[] {
 
 /** Return only suggestions with status === 'pending'. */
 export function getPendingSuggestions(): PersistedSuggestion[] {
-  return readAll().filter((s) => s.status === 'pending');
+  return aiSuggestionRepository.listPending();
 }
 
 /**
@@ -53,10 +35,7 @@ export function getPendingSuggestions(): PersistedSuggestion[] {
  * Avoids adding duplicates by id.
  */
 export function saveSuggestions(incoming: PersistedSuggestion[]): void {
-  const existing = readAll();
-  const existingIds = new Set(existing.map((s) => s.id));
-  const deduped = incoming.filter((s) => !existingIds.has(s.id));
-  writeAll([...existing, ...deduped]);
+  aiSuggestionRepository.saveAll(incoming);
 }
 
 /**
@@ -67,17 +46,7 @@ export function updateSuggestionStatus(
   id: string,
   status: PersistedSuggestion['status']
 ): boolean {
-  const all = readAll();
-  let found = false;
-  const updated = all.map((s) => {
-    if (s.id === id) {
-      found = true;
-      return { ...s, status, statusUpdatedAt: new Date().toISOString() };
-    }
-    return s;
-  });
-  if (found) writeAll(updated);
-  return found;
+  return aiSuggestionRepository.updateStatus(id, status);
 }
 
 /** Apply a suggestion – convenience wrapper around updateSuggestionStatus. */
@@ -92,5 +61,5 @@ export function dismissSuggestion(id: string): boolean {
 
 /** Remove all persisted suggestions (e.g. on user request). */
 export function clearAllSuggestions(): void {
-  writeAll([]);
+  aiSuggestionRepository.clearAll();
 }

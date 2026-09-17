@@ -706,8 +706,9 @@ export function ShoppingWidget({
             : r
         )
       });
+      setActiveReminders([]);
     }
-  }, [activeReminders]);
+  }, [activeReminders, onUpdate, reminders]);
 
   const aiInput = { items, budget, receipts, trips, reminders };
   const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
