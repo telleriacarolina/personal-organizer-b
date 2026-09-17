@@ -3,6 +3,7 @@ import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
+import { Analytics } from '@vercel/analytics/react';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
 import { AIConfigButton } from '@/components/ai/AIConfigButton';
@@ -256,6 +257,21 @@ function App() {
   const calendarSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
     .map((widget) => ({ id: widget.id }));
+  const currentWidgets = useMemo(() => widgets ?? [], [widgets]);
+  const taskSources = useMemo(
+    () =>
+      currentWidgets
+        .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
+        .map((widget) => ({ id: widget.id, tasks: widget.tasks })),
+    [currentWidgets]
+  );
+  const calendarSources = useMemo(
+    () =>
+      currentWidgets
+        .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
+        .map((widget) => ({ id: widget.id })),
+    [currentWidgets]
+  );
 
   const updateWidgetsForAgent = useCallback((updater: (widgets: Widget[]) => Widget[]) => {
     setWidgets((current) => updater(current || []));
@@ -584,6 +600,7 @@ function App() {
       <Toaster position="bottom-right" toastOptions={{
         className: 'sm:mb-0 mb-16'
       }} />
+      <Analytics />
     </div>
   );
 }

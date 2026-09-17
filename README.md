@@ -4,16 +4,29 @@ A comprehensive personal productivity dashboard with customizable widgets for ta
 
 ## 🚀 Features
 
-* **Customizable Widgets**: Tasks, Notes, Habits, Goals, Calendar, Work Management, Shopping
+### Widgets
+
+* **Tasks**: Create, prioritize, and track tasks with due dates and categories
+* **Notes**: Capture and organize free-form notes
+* **Habits**: Track recurring habits with streaks and completion history
+* **Goals**: Set and monitor long-term goals with progress tracking
+* **Calendar**: View and manage events; import items from Work and other widgets
+* **Work Management**: Multiple work routines for different jobs and schedules, with client slots, meals, job deadlines, and errands
+* **Shopping**: Build shopping lists with barcode scanning, receipt scanning, and expense comparison
+* **Daily Focus**: Surface today's top tasks from a linked Tasks widget with AI-powered prioritization suggestions
+* **Record Note**: Capture audio, video, and photo notes using your device microphone and camera
+* **AI Chat**: Ask productivity questions and get context-aware suggestions scoped to your existing widgets
+
+### App-wide
+
 * **Drag & Drop**: Rearrange widgets with intuitive drag-and-drop
 * **Responsive Design**: Mobile-friendly interface with touch support
 * **Theme Customization**: Custom color picker and theme settings
 * **Widget Resizing**: Pinch corners to resize widgets
 * **Grid Snapping**: Snap widgets to grid for precise alignment
 * **Lock/Unlock**: Lock all widgets to prevent accidental changes
-* **Barcode Scanning**: Add shopping items via barcode
-* **Receipt Scanning**: Track expenses and compare shopping trips
-* **Work Organization**: Multiple work routines for different jobs and schedules
+* **Work → Calendar Scheduling**: Push client slots, meals, job deadlines, and errands from the Work widget directly into a Calendar widget; duplicate events are automatically deduplicated by source reference
+* **Organizer Agent**: Conversational AI assistant (accessible from the toolbar) that reads live widget data, understands natural-language intents, and can create tasks, shopping items, and more with your confirmation
 
 ## 🛠️ Development
 
@@ -52,7 +65,17 @@ Current behavior:
 * `mock`: demo provider for UI testing without credentials; data stays in the browser
 * `api`: marks an external provider as configured, but live provider requests are intentionally deferred beyond Phase 1
 
-The AI review flow is always explicit: generate → review → apply or dismiss. Suggestions are stored separately from widget source data.
+The AI review flow is always explicit: generate → review → apply or dismiss. Suggestions are stored separately from widget source data in `organizer-widget-ai` local storage and never modify widget data until you explicitly apply them.
+
+#### Organizer Agent
+
+The Organizer Agent is a conversational assistant accessible from the toolbar (robot icon). It reads real data from all your widgets, understands natural-language requests, and can:
+
+* Answer questions about your tasks, habits, goals, calendar events, and more
+* Create tasks and shopping items on your behalf (with confirmation for write actions)
+* Surface scheduling conflicts and overdue items
+
+Write actions (create, delete, bulk operations) always show a confirmation step before any data is changed. The agent is structured to support real AI providers in a future phase; it currently uses a built-in mock implementation.
 
 ### Building for Production
 
