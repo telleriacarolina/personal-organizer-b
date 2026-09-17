@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,12 +15,16 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
 import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown, Sparkle } from '@phosphor-icons/react';
 import { AIInsightAction, CalendarEntryType, CalendarEvent, WidgetAIState, WidgetSize } from '@/types';
+import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown, Sparkle, UploadSimple } from '@phosphor-icons/react';
+import { AIInsightAction, CalendarEntryType, CalendarEvent, FamilyCalendarPlannerEvent, WidgetAIState, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
 import { syncCalendarEventsToFamilyPlanner } from '@/lib/calendar-sync';
 import { deleteCalendarEvent as deleteCalendarEventCommand, saveCalendarEvent } from '@/lib/organizer-commands';
+import { parseICalText } from '@/lib/ical-parser';
+import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
 
 interface CalendarWidgetProps {
   events: CalendarEvent[];
@@ -80,6 +86,7 @@ export function CalendarWidget({
   const [location, setLocation] = useState('');
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(true);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const checkReminders = () => {
@@ -190,6 +197,47 @@ export function CalendarWidget({
     toast.success('Event deleted');
     setShowDialog(false);
     resetForm();
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!importInputRef.current) return;
+    importInputRef.current.value = '';
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (loadEvent) => {
+      const text = loadEvent.target?.result;
+      if (typeof text !== 'string') return;
+
+      const drafts = parseICalText(text);
+      if (drafts.length === 0) {
+        toast.info('No events found in the selected file');
+        return;
+      }
+
+      let added = 0;
+      let updatedEvents = [...events];
+      for (const draft of drafts) {
+        const result = appendImportedCalendarEvent(updatedEvents, draft);
+        if (result.added) {
+          updatedEvents = result.events;
+          added++;
+        }
+      }
+
+      onUpdate(updatedEvents);
+      void syncFamilyCalendarPlanner(updatedEvents);
+
+      if (added === 0) {
+        toast.info('All events in the file are already imported');
+      } else {
+        toast.success(`Imported ${added} event${added !== 1 ? 's' : ''} from ${file.name}`);
+      }
+    };
+    // iCal files are UTF-8 in modern clients; legacy Latin-1 files from older
+    // Outlook exports are not supported and will render non-ASCII chars incorrectly.
+    reader.readAsText(file);
   };
 
   const monthStart = startOfMonth(currentMonth);
@@ -432,6 +480,23 @@ export function CalendarWidget({
               <Plus size={14} />
               <span className="hidden sm:inline">Add</span>
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-7 text-xs flex-shrink-0"
+              onClick={() => importInputRef.current?.click()}
+              title="Import events from an iCal (.ics) file"
+            >
+              <UploadSimple size={14} />
+              <span className="hidden sm:inline">Import</span>
+            </Button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".ics,text/calendar"
+              className="hidden"
+              onChange={handleImportFile}
+            />
           </div>
         </div>
 

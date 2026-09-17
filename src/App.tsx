@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
+import { Analytics } from '@vercel/analytics/react';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
 import { AIConfigButton } from '@/components/ai/AIConfigButton';
@@ -38,6 +41,7 @@ import {
   updateWidget as updateWidgetCommand,
   updateWidgetSize as updateWidgetSizeCommand,
 } from '@/lib/organizer-commands';
+import type { AgentContext, AgentPermission } from '@/types/agent';
 
 function App() {
   const [widgets, setWidgets] = usePersistentState(stateRepositories.widgets, []);
@@ -187,20 +191,63 @@ function App() {
   };
 
   const currentWidgets = widgets;
+  const currentWidgets = useMemo(() => widgets || [], [widgets]);
   const taskSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
     .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
   const calendarSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
     .map((widget) => ({ id: widget.id }));
+  const currentWidgets = useMemo(() => widgets ?? [], [widgets]);
+  const taskSources = useMemo(
+    () =>
+      currentWidgets
+        .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
+        .map((widget) => ({ id: widget.id, tasks: widget.tasks })),
+    [currentWidgets]
+  );
+  const calendarSources = useMemo(
+    () =>
+      currentWidgets
+        .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
+        .map((widget) => ({ id: widget.id })),
+    [currentWidgets]
+  );
 
   const agentHandlers = useMemo(() => createAgentHandlers(setWidgets), [setWidgets]);
+  const updateWidgetsForAgent = useCallback((updater: (widgets: Widget[]) => Widget[]) => {
+    setWidgets((current) => updater(current || []));
+  }, [setWidgets]);
+
+  const agentPermissions: AgentPermission[] = useMemo(() => [
+    'read:tasks',
+    'write:tasks',
+    'read:notes',
+    'write:notes',
+    'read:habits',
+    'write:habits',
+    'read:goals',
+    'write:goals',
+    'read:calendar',
+    'write:calendar',
+    'read:work',
+    'publish:work_to_calendar',
+    'read:shopping',
+    'write:shopping',
+    'read:record-notes',
+    'write:record-notes',
+  ], []);
 
   const agentContext: AgentContext = useMemo(() => ({
     widgets: currentWidgets,
-    handlers: agentHandlers,
+    updateWidgets: updateWidgetsForAgent,
     currentDate: new Date(),
-  }), [currentWidgets, agentHandlers]);
+    actorContext: {
+      userId: 'personal-organizer-user',
+      workspaceId: 'local-organizer-workspace',
+      permissions: agentPermissions,
+    },
+  }), [agentPermissions, currentWidgets, updateWidgetsForAgent]);
 
   useEffect(() => {
     if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !preferencesRepository.isDragHintShown()) {
@@ -495,6 +542,7 @@ function App() {
       <Toaster position="bottom-right" toastOptions={{
         className: 'sm:mb-0 mb-16'
       }} />
+      <Analytics />
     </div>
   );
 }
