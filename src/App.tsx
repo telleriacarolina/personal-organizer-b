@@ -18,6 +18,7 @@ import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
 import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
 import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
+import { appendImportedCalendarEvent, type CalendarImportDraft } from '@/lib/calendar-imports';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
 function App() {
@@ -143,6 +144,43 @@ function App() {
     );
   };
 
+  const addCalendarEventToSource = (
+    destinationWidgetId: string,
+    event: CalendarImportDraft
+  ): { added: boolean; reason?: 'invalid-destination' | 'duplicate' } => {
+    let result: { added: boolean; reason?: 'invalid-destination' | 'duplicate' } = {
+      added: false,
+      reason: 'invalid-destination',
+    };
+
+    setWidgets((current) => {
+      const currentWidgets = current || [];
+      const destinationWidget = currentWidgets.find(
+        (widget): widget is Extract<Widget, { type: 'calendar' }> =>
+          widget.id === destinationWidgetId && widget.type === 'calendar'
+      );
+      if (!destinationWidget) {
+        result = { added: false, reason: 'invalid-destination' };
+        return currentWidgets;
+      }
+
+      const importResult = appendImportedCalendarEvent(destinationWidget.events, event);
+      if (!importResult.added) {
+        result = { added: false, reason: 'duplicate' };
+        return currentWidgets;
+      }
+
+      result = { added: true };
+      return currentWidgets.map((widget) =>
+        widget.id === destinationWidgetId && widget.type === 'calendar'
+          ? ({ ...widget, events: importResult.events } as Widget)
+          : widget
+      );
+    });
+
+    return result;
+  };
+
   const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {
     updateWidget(widgetId, { sourceWidgetId });
   };
@@ -213,6 +251,9 @@ function App() {
   const taskSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
     .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
+  const calendarSources = currentWidgets
+    .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
+    .map((widget) => ({ id: widget.id }));
 
   useEffect(() => {
     if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !localStorage.getItem('drag-hint-shown')) {
@@ -436,8 +477,10 @@ function App() {
                         routines={widget.routines}
                         activeRoutineId={widget.activeRoutineId}
                         organizationPreference={widget.organizationPreference}
+                        calendarSources={calendarSources}
                         aiState={widgetAIState?.[widget.id]}
                         onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
+                        onAddCalendarEvent={addCalendarEventToSource}
                         onUpdate={(data) => updateWidget(widget.id, data)}
                       />
                     );
