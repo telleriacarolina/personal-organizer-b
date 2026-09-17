@@ -64,6 +64,8 @@ export function WidgetContainer({
         return { minWidth: 380, minHeight: 480 };
       case 'ai-chat':
         return { minWidth: 360, minHeight: 500 };
+      case 'record-note':
+        return { minWidth: 320, minHeight: 480 };
       default:
         return { minWidth: 280, minHeight: 350 };
     }

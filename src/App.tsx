@@ -16,6 +16,7 @@ import { CalendarWidget } from '@/components/widgets/CalendarWidget';
 import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
+import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
 import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
@@ -49,6 +50,7 @@ function App() {
       ...(type === 'calendar' && { events: [] }),
       ...(type === 'shopping' && { items: [], receipts: [], trips: [], reminders: [] }),
       ...(type === 'ai-chat' && { messages: [], appliedSuggestionIds: [] }),
+      ...(type === 'record-note' && { records: [] }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
@@ -468,6 +470,14 @@ function App() {
                           })
                         }
                         availableWidgets={currentWidgets.map((w) => ({ id: w.id, type: w.type }))}
+                      />
+                    );
+                  case 'record-note':
+                    return (
+                      <RecordNoteWidget
+                        {...widgetProps}
+                        records={widget.records}
+                        onUpdate={(records) => updateWidget(widget.id, { records })}
                       />
                     );
                   default:
