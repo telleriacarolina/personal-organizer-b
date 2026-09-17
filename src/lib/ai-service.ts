@@ -15,6 +15,7 @@ import type {
   AISuggestion,
 } from '@/types/ai';
 import { DEFAULT_AI_CONFIG } from '@/types/ai';
+import { readLocalStorageJson, writeLocalStorageJson } from '@/lib/persistence';
 import { preferencesRepository } from '@/lib/persistence';
 
 // ---------------------------------------------------------------------------
@@ -138,6 +139,8 @@ export function normalizeSuggestion(raw: Partial<AISuggestion>): AISuggestion | 
 // ---------------------------------------------------------------------------
 
 function readConfigFromStorage(): AIConfig {
+  if (typeof window === 'undefined') return { ...DEFAULT_AI_CONFIG };
+  return { ...DEFAULT_AI_CONFIG, ...readLocalStorageJson<Partial<AIConfig>>(CONFIG_STORAGE_KEY, {}) };
   try {
     return { ...DEFAULT_AI_CONFIG, ...preferencesRepository.getAIConfig() };
   } catch {
@@ -189,6 +192,11 @@ export class AIService {
   configure(updates: Partial<AIConfig>): void {
     this.config = { ...this.config, ...updates };
     this.provider = buildProvider(this.config.mode);
+    if (typeof window !== 'undefined') {
+      // Never persist the API key to localStorage
+      const { apiKey: _ignored, ...safe } = this.config;
+      writeLocalStorageJson(CONFIG_STORAGE_KEY, safe);
+    }
     const { apiKey: _ignored, ...safe } = this.config;
     preferencesRepository.setAIConfig(safe);
   }

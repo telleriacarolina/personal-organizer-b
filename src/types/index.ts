@@ -352,6 +352,7 @@ export interface Receipt {
   tax?: number;
   subtotal?: number;
   notes?: string;
+  imageMediaId?: string;
   imageData?: string;
   createdAt: number;
 }
@@ -410,10 +411,17 @@ export interface RecordNote {
   id: string;
   title: string;
   mediaType: RecordNoteMediaType;
-  dataUrl: string;
+  mediaId?: string;
+  dataUrl?: string;
   duration?: number;
   transcription?: string;
   createdAt: number;
+}
+
+export interface BackgroundImage {
+  mediaId?: string;
+  url?: string;
+  opacity: number;
 }
 
 export interface RecordNoteWidget extends BaseWidget {

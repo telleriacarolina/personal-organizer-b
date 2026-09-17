@@ -13,6 +13,44 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Palette, Check, Trash, Upload } from '@phosphor-icons/react';
 import { toast } from 'sonner';
+import { BackgroundImage } from '@/types';
+import { useStoredMediaUrl } from '@/hooks/useStoredMediaUrl';
+import {
+  createMediaId,
+  deleteMedia,
+  formatPersistenceIssue,
+  hasLegacyBackgroundImagePayload,
+  migrateLegacyBackgroundImage,
+  saveMedia,
+} from '@/lib/persistence';
+
+interface ThemePreset {
+  name: string;
+  description: string;
+  colors: {
+    background: string;
+    foreground: string;
+    card: string;
+    cardForeground: string;
+    primary: string;
+    primaryForeground: string;
+    secondary: string;
+    secondaryForeground: string;
+    accent: string;
+    accentForeground: string;
+    muted: string;
+    mutedForeground: string;
+    border: string;
+    success: string;
+    successForeground: string;
+  };
+}
+
+interface CustomColors {
+  primary: string;
+  accent: string;
+  background: string;
+}
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { stateRepositories } from '@/lib/persistence';
 import { applyBackgroundImage, applyCustomColors, applyTheme } from '@/lib/theme-service';
@@ -153,6 +191,13 @@ interface ThemeCustomizationProps {
 }
 
 export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationProps) {
+  const [selectedTheme, setSelectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
+  const [customColors, setCustomColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
+  const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
+  const { url: resolvedBackgroundUrl, isMissing: isBackgroundMissing } = useStoredMediaUrl({
+    mediaId: backgroundImage?.mediaId,
+    fallbackUrl: backgroundImage?.url ?? null,
+  });
   const [selectedTheme, setSelectedTheme] = usePersistentState(stateRepositories.theme, 'Warm Terracotta');
   const [customColors, setCustomColors] = usePersistentState(stateRepositories.customColors, null);
   const [backgroundImage, setBackgroundImage] = usePersistentState(stateRepositories.backgroundImage, null);
@@ -170,6 +215,64 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
       setLocalBg(customColors.background);
     }
   }, [customColors]);
+
+  const applyTheme = (theme: ThemePreset) => {
+    const root = document.documentElement;
+    Object.entries(theme.colors).forEach(([key, value]) => {
+      const cssVar = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+      root.style.setProperty(`--${cssVar}`, value);
+    });
+  };
+
+  const applyCustomColors = (colors: CustomColors) => {
+    const root = document.documentElement;
+    const primaryOklch = hexToOklch(colors.primary);
+    const accentOklch = hexToOklch(colors.accent);
+    const bgOklch = hexToOklch(colors.background);
+
+    root.style.setProperty('--primary', primaryOklch);
+    root.style.setProperty('--accent', accentOklch);
+    root.style.setProperty('--background', bgOklch);
+  };
+
+  const applyBackgroundImage = (image: BackgroundImage | null, resolvedUrl: string | null) => {
+    const appContainer = document.querySelector('.min-h-screen');
+    if (appContainer instanceof HTMLElement) {
+      if (image && resolvedUrl) {
+        appContainer.style.backgroundImage = `url(${resolvedUrl})`;
+        appContainer.style.backgroundSize = 'cover';
+        appContainer.style.backgroundPosition = 'center';
+        appContainer.style.backgroundAttachment = 'fixed';
+        appContainer.style.position = 'relative';
+        
+        let overlay = appContainer.querySelector('.bg-overlay') as HTMLElement;
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.className = 'bg-overlay';
+          overlay.style.position = 'fixed';
+          overlay.style.top = '0';
+          overlay.style.left = '0';
+          overlay.style.width = '100%';
+          overlay.style.height = '100%';
+          overlay.style.backgroundColor = 'var(--background)';
+          overlay.style.zIndex = '-1';
+          overlay.style.pointerEvents = 'none';
+          appContainer.appendChild(overlay);
+        }
+        overlay.style.opacity = (image.opacity / 100).toString();
+      } else {
+        appContainer.style.backgroundImage = '';
+        const overlay = appContainer.querySelector('.bg-overlay');
+        if (overlay) {
+          overlay.remove();
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    applyBackgroundImage(backgroundImage, resolvedBackgroundUrl);
+  }, [backgroundImage, resolvedBackgroundUrl]);
 
   const handleThemeSelect = (themeName: string) => {
     const theme = themePresets.find((t) => t.name === themeName);
@@ -213,7 +316,7 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     toast.success('Custom colors applied!');
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -221,18 +324,26 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const imageUrl = event.target?.result as string;
-        const newBgImage: BackgroundImage = {
-          url: imageUrl,
-          opacity: opacity,
-        };
-        setBackgroundImage(newBgImage);
-        applyBackgroundImage(newBgImage);
+      const nextMediaId = createMediaId('theme-background');
+      const previousMediaId = backgroundImage?.mediaId;
+
+      try {
+        await saveMedia({ id: nextMediaId, kind: 'theme-background', blob: file });
+        setBackgroundImage({
+          mediaId: nextMediaId,
+          opacity,
+        });
         toast.success('Background image uploaded!');
-      };
-      reader.readAsDataURL(file);
+        if (previousMediaId) {
+          void deleteMedia(previousMediaId).catch(() => {
+            toast.error('Background image changed, but the previous stored image could not be cleaned up.');
+          });
+        }
+      } catch {
+        toast.error('Could not save background image. Please try again.');
+      } finally {
+        e.target.value = '';
+      }
     }
   };
 
@@ -240,16 +351,20 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     const newOpacity = value[0];
     setOpacity(newOpacity);
     if (backgroundImage) {
-      const updated = { ...backgroundImage, opacity: newOpacity };
-      setBackgroundImage(updated);
-      applyBackgroundImage(updated);
+      setBackgroundImage((current) => current ? { ...current, opacity: newOpacity } : current);
     }
   };
 
-  const handleRemoveImage = () => {
-    setBackgroundImage(null);
-    applyBackgroundImage(null);
-    toast.success('Background image removed');
+  const handleRemoveImage = async () => {
+    try {
+      if (backgroundImage?.mediaId) {
+        await deleteMedia(backgroundImage.mediaId);
+      }
+      setBackgroundImage(null);
+      toast.success('Background image removed');
+    } catch {
+      toast.error('Could not remove background image. Please try again.');
+    }
   };
 
   return (
@@ -444,7 +559,7 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
                 <div className="space-y-4">
                   <div className="relative rounded-lg overflow-hidden border-2 border-border">
                     <img 
-                      src={backgroundImage.url} 
+                      src={resolvedBackgroundUrl ?? ''} 
                       alt="Background preview" 
                       className="w-full h-48 object-cover"
                     />
@@ -453,6 +568,9 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
                       style={{ opacity: backgroundImage.opacity / 100 }}
                     />
                   </div>
+                  {isBackgroundMissing && (
+                    <p className="text-sm text-destructive">The saved background image is unavailable.</p>
+                  )}
 
                   <div className="space-y-3">
                     <Label htmlFor="opacity-slider" className="text-base font-medium">
@@ -527,6 +645,14 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
 
 export function ThemeCustomizationButton() {
   const [open, setOpen] = useState(false);
+  const [selectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
+  const [customColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
+  const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
+  const { url: resolvedBackgroundUrl } = useStoredMediaUrl({
+    mediaId: backgroundImage?.mediaId,
+    fallbackUrl: backgroundImage?.url ?? null,
+  });
+  const migrationErrorShownRef = useRef(false);
   const [selectedTheme] = usePersistentState(stateRepositories.theme, 'Warm Terracotta');
   const [customColors] = usePersistentState(stateRepositories.customColors, null);
   const [backgroundImage] = usePersistentState(stateRepositories.backgroundImage, null);
@@ -543,6 +669,69 @@ export function ThemeCustomizationButton() {
   }, [selectedTheme, customColors]);
 
   useEffect(() => {
+    if (backgroundImage && resolvedBackgroundUrl) {
+      const appContainer = document.querySelector('.min-h-screen');
+      if (appContainer instanceof HTMLElement) {
+        appContainer.style.backgroundImage = `url(${resolvedBackgroundUrl})`;
+        appContainer.style.backgroundSize = 'cover';
+        appContainer.style.backgroundPosition = 'center';
+        appContainer.style.backgroundAttachment = 'fixed';
+        appContainer.style.position = 'relative';
+        
+        let overlay = appContainer.querySelector('.bg-overlay') as HTMLElement;
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.className = 'bg-overlay';
+          overlay.style.position = 'fixed';
+          overlay.style.top = '0';
+          overlay.style.left = '0';
+          overlay.style.width = '100%';
+          overlay.style.height = '100%';
+          overlay.style.backgroundColor = 'var(--background)';
+          overlay.style.zIndex = '-1';
+          overlay.style.pointerEvents = 'none';
+          appContainer.appendChild(overlay);
+        }
+        overlay.style.opacity = (backgroundImage.opacity / 100).toString();
+      }
+    } else {
+      const appContainer = document.querySelector('.min-h-screen');
+      if (appContainer instanceof HTMLElement) {
+        appContainer.style.backgroundImage = '';
+        const overlay = appContainer.querySelector('.bg-overlay');
+        if (overlay) {
+          overlay.remove();
+        }
+      }
+    }
+  }, [backgroundImage, resolvedBackgroundUrl]);
+
+  useEffect(() => {
+    if (!hasLegacyBackgroundImagePayload(backgroundImage)) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      if (!backgroundImage) return;
+      const migration = await migrateLegacyBackgroundImage(backgroundImage);
+      if (cancelled) return;
+
+      if (migration.migrated) {
+        setBackgroundImage(migration.value);
+      }
+
+      if (migration.issue && !migrationErrorShownRef.current) {
+        migrationErrorShownRef.current = true;
+        toast.error(`${formatPersistenceIssue(migration.issue)} Original image was kept.`);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [backgroundImage, setBackgroundImage]);
     applyBackgroundImage(backgroundImage);
   }, [backgroundImage]);
 
