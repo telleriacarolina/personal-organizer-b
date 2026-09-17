@@ -1,4 +1,4 @@
-export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work' | 'shopping' | 'daily-focus';
+export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work' | 'shopping' | 'daily-focus' | 'record-note';
 
 export interface WidgetSize {
   width: number;
@@ -384,4 +384,21 @@ export interface ShoppingWidget extends BaseWidget {
   reminders?: ShoppingReminder[];
 }
 
-export type Widget = TasksWidget | DailyFocusWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget;
+export type RecordNoteMediaType = 'voice' | 'video' | 'photo';
+
+export interface RecordNote {
+  id: string;
+  title: string;
+  mediaType: RecordNoteMediaType;
+  dataUrl: string;
+  duration?: number;
+  transcription?: string;
+  createdAt: number;
+}
+
+export interface RecordNoteWidget extends BaseWidget {
+  type: 'record-note';
+  records: RecordNote[];
+}
+
+export type Widget = TasksWidget | DailyFocusWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget | RecordNoteWidget;

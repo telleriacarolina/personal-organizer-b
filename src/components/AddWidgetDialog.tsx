@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CheckSquareOffset, Note, Fire, Target, Calendar, Briefcase, ShoppingCart } from '@phosphor-icons/react';
+import { CheckSquareOffset, Note, Fire, Target, Calendar, Briefcase, ShoppingCart, Record } from '@phosphor-icons/react';
 import { WidgetType } from '@/types';
 
 interface AddWidgetDialogProps {
@@ -58,6 +58,12 @@ export function AddWidgetDialog({ open, onOpenChange, onAddWidget }: AddWidgetDi
       title: 'Shopping List',
       description: 'Personal shopping with budgets & categories',
       icon: <ShoppingCart size={32} />,
+    },
+    {
+      type: 'record-note' as WidgetType,
+      title: 'Record Note',
+      description: 'Capture voice memos, videos, and photos',
+      icon: <Record size={32} />,
     },
     {
       type: 'work' as WidgetType,

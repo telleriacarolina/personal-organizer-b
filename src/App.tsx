@@ -15,6 +15,7 @@ import { CalendarWidget } from '@/components/widgets/CalendarWidget';
 import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
+import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
 import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
@@ -47,6 +48,7 @@ function App() {
       ...(type === 'goals' && { goals: [] }),
       ...(type === 'calendar' && { events: [] }),
       ...(type === 'shopping' && { items: [], receipts: [], trips: [], reminders: [] }),
+      ...(type === 'record-note' && { records: [] }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
@@ -451,6 +453,14 @@ function App() {
                         onAddTask={addTaskToSource}
                         onToggleTask={toggleTaskInSource}
                         onPriorityChange={updateTaskPriorityInSource}
+                      />
+                    );
+                  case 'record-note':
+                    return (
+                      <RecordNoteWidget
+                        {...widgetProps}
+                        records={widget.records}
+                        onUpdate={(records) => updateWidget(widget.id, { records })}
                       />
                     );
                   default:
