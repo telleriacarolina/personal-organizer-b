@@ -15,6 +15,7 @@ import type {
   AISuggestion,
 } from '@/types/ai';
 import { DEFAULT_AI_CONFIG } from '@/types/ai';
+import { readLocalStorageJson, writeLocalStorageJson } from '@/lib/persistence';
 
 // ---------------------------------------------------------------------------
 // Disabled provider – returns nothing, is always "available"
@@ -140,13 +141,7 @@ const CONFIG_STORAGE_KEY = 'organizer-ai-config';
 
 function readConfigFromStorage(): AIConfig {
   if (typeof window === 'undefined') return { ...DEFAULT_AI_CONFIG };
-  try {
-    const raw = window.localStorage.getItem(CONFIG_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_AI_CONFIG };
-    return { ...DEFAULT_AI_CONFIG, ...(JSON.parse(raw) as Partial<AIConfig>) };
-  } catch {
-    return { ...DEFAULT_AI_CONFIG };
-  }
+  return { ...DEFAULT_AI_CONFIG, ...readLocalStorageJson<Partial<AIConfig>>(CONFIG_STORAGE_KEY, {}) };
 }
 
 function resolveInitialMode(): AIMode {
@@ -196,7 +191,7 @@ export class AIService {
     if (typeof window !== 'undefined') {
       // Never persist the API key to localStorage
       const { apiKey: _ignored, ...safe } = this.config;
-      window.localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(safe));
+      writeLocalStorageJson(CONFIG_STORAGE_KEY, safe);
     }
   }
 

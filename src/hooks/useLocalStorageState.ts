@@ -1,4 +1,5 @@
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
+import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
+import { readLocalStorageJson, writeLocalStorageJson } from '@/lib/persistence';
 
 export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispatch<SetStateAction<T>>] {
   const initialValueRef = useRef(initialValue);
@@ -8,29 +9,29 @@ export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispa
     if (typeof window === 'undefined') {
       return initialValue;
     }
-
-    const serializedValue = window.localStorage.getItem(key);
-    if (serializedValue === null) {
-      return initialValue;
-    }
-
-    try {
-      return JSON.parse(serializedValue) as T;
-    } catch {
-      return initialValue;
-    }
+    return readLocalStorageJson(key, initialValue);
   });
+  const valueRef = useRef(value);
 
   useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  const setPersistedValue = useCallback<Dispatch<SetStateAction<T>>>((nextValue) => {
+    const resolvedValue = typeof nextValue === 'function'
+      ? (nextValue as (value: T) => T)(valueRef.current)
+      : nextValue;
+
     if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.setItem(key, JSON.stringify(value));
-      } catch (e) {
-        // QuotaExceededError: storage is full (common when storing large Base64 media)
-        console.warn(`[useLocalStorageState] Could not persist key "${key}":`, e);
+      const result = writeLocalStorageJson(key, resolvedValue);
+      if (!result.ok) {
+        return;
       }
     }
-  }, [key, value]);
+
+    valueRef.current = resolvedValue;
+    setValue(resolvedValue);
+  }, [key]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -41,18 +42,10 @@ export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispa
       return;
     }
 
-    const serializedValue = window.localStorage.getItem(key);
-    if (serializedValue === null) {
-      setValue(initialValueRef.current);
-      return;
-    }
-
-    try {
-      setValue(JSON.parse(serializedValue) as T);
-    } catch {
-      setValue(initialValueRef.current);
-    }
+    const nextValue = readLocalStorageJson(key, initialValueRef.current);
+    valueRef.current = nextValue;
+    setValue(nextValue);
   }, [key]);
 
-  return [value, setValue];
+  return [value, setPersistedValue];
 }

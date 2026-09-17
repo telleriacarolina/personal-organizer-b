@@ -6,8 +6,9 @@
 // ---------------------------------------------------------------------------
 
 import type { PersistedSuggestion } from '@/types/ai';
+import { AI_SUGGESTIONS_STORAGE_KEY, readLegacyCompatibleArrayJson, writeLocalStorageJson } from '@/lib/persistence';
 
-const STORAGE_KEY = 'organizer-widget-ai';
+const STORAGE_KEY = AI_SUGGESTIONS_STORAGE_KEY;
 const MAX_PERSISTED = 200; // prevent unbounded growth
 
 // ---------------------------------------------------------------------------
@@ -16,22 +17,14 @@ const MAX_PERSISTED = 200; // prevent unbounded growth
 
 function readAll(): PersistedSuggestion[] {
   if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as PersistedSuggestion[];
-  } catch {
-    return [];
-  }
+  return readLegacyCompatibleArrayJson<PersistedSuggestion>(STORAGE_KEY, 'organizer-widget-ai');
 }
 
 function writeAll(suggestions: PersistedSuggestion[]): void {
   if (typeof window === 'undefined') return;
   // Keep only the most recent MAX_PERSISTED entries to limit storage growth
   const trimmed = suggestions.slice(-MAX_PERSISTED);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+  writeLocalStorageJson(STORAGE_KEY, trimmed);
 }
 
 // ---------------------------------------------------------------------------

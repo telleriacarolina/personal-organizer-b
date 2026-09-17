@@ -22,6 +22,14 @@ import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 import { appendImportedCalendarEvent, type CalendarImportDraft } from '@/lib/calendar-imports';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import type { AgentContext, AgentHandlers } from '@/types/agent';
+import {
+  formatPersistenceIssue,
+  hasLegacyWidgetMediaPayload,
+  migrateWidgetsMedia,
+  readLocalStorageJson,
+  subscribeToPersistenceIssues,
+  writeLocalStorageJson,
+} from '@/lib/persistence';
 
 function App() {
   const [widgets, setWidgets] = useLocalStorageState<Widget[]>('organizer-widgets', []);
@@ -90,9 +98,12 @@ function App() {
     toast.success('Widget removed');
   };
 
-  const updateWidget = (id: string, data: Partial<Widget>) => {
+  const updateWidget = (id: string, data: Partial<Widget> | ((widget: Widget) => Widget)) => {
     setWidgets((current) =>
-      (current || []).map((w) => (w.id === id ? { ...w, ...data } as Widget : w))
+      (current || []).map((w) => {
+        if (w.id !== id) return w;
+        return typeof data === 'function' ? data(w) : ({ ...w, ...data } as Widget);
+      })
     );
   };
 
@@ -249,7 +260,7 @@ function App() {
     }
   };
 
-  const currentWidgets = widgets || [];
+  const currentWidgets = useMemo(() => widgets || [], [widgets]);
   const taskSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
     .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
@@ -414,11 +425,48 @@ function App() {
   }), [currentWidgets, agentHandlers]);
 
   useEffect(() => {
-    if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !localStorage.getItem('drag-hint-shown')) {
+    return subscribeToPersistenceIssues((issue) => {
+      toast.error(formatPersistenceIssue(issue));
+    });
+  }, []);
+
+  const migrationFailureKeysRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!hasLegacyWidgetMediaPayload(currentWidgets)) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const migration = await migrateWidgetsMedia(currentWidgets);
+      if (cancelled) return;
+
+      if (migration.migrated) {
+        setWidgets(migration.value);
+      }
+
+      if (migration.issue) {
+        const failureKey = `${migration.issue.key ?? 'widgets'}:${migration.issue.code}`;
+        if (!migrationFailureKeysRef.current.has(failureKey)) {
+          migrationFailureKeysRef.current.add(failureKey);
+          toast.error(`${formatPersistenceIssue(migration.issue)} Original data was kept.`);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentWidgets, setWidgets]);
+
+  useEffect(() => {
+    if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !readLocalStorageJson('drag-hint-shown', false)) {
       setShowDragHint(true);
       const timer = setTimeout(() => {
         setShowDragHint(false);
-        localStorage.setItem('drag-hint-shown', 'true');
+        writeLocalStorageJson('drag-hint-shown', true);
       }, 5000);
       return () => clearTimeout(timer);
     }
@@ -620,7 +668,24 @@ function App() {
                         reminders={widget.reminders}
                         aiState={widgetAIState?.[widget.id]}
                         onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
-                        onUpdate={(data) => updateWidget(widget.id, data)}
+                        onUpdate={(update) =>
+                          updateWidget(widget.id, (currentWidget) => {
+                            if (currentWidget.type !== 'shopping') {
+                              return currentWidget;
+                            }
+
+                            const currentData = {
+                              items: currentWidget.items,
+                              budget: currentWidget.budget,
+                              receipts: currentWidget.receipts,
+                              trips: currentWidget.trips,
+                              reminders: currentWidget.reminders,
+                            };
+
+                            const nextData = typeof update === 'function' ? update(currentData) : update;
+                            return { ...currentWidget, ...nextData } as Widget;
+                          })
+                        }
                       />
                     );
                   case 'work':
@@ -679,7 +744,19 @@ function App() {
                       <RecordNoteWidget
                         {...widgetProps}
                         records={widget.records}
-                        onUpdate={(records) => updateWidget(widget.id, { records })}
+                        onUpdate={(update) =>
+                          updateWidget(widget.id, (currentWidget) => {
+                            if (currentWidget.type !== 'record-note') {
+                              return currentWidget;
+                            }
+
+                            const records = typeof update === 'function'
+                              ? (update as (value: typeof currentWidget.records) => typeof currentWidget.records)(currentWidget.records)
+                              : update;
+
+                            return { ...currentWidget, records } as Widget;
+                          })
+                        }
                       />
                     );
                   default:
