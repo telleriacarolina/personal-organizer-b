@@ -175,7 +175,7 @@ function App() {
     }
   };
 
-  const currentWidgets = useMemo(() => widgets, [widgets]);
+  const currentWidgets = widgets;
   const taskSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
     .map((widget) => ({ id: widget.id, tasks: widget.tasks }));

@@ -9,7 +9,13 @@ export function usePersistentState<T>(
   const isInitialMountRef = useRef(true);
   initialValueRef.current = initialValue;
 
-  const [value, setValue] = useState<T>(() => repository.load());
+  const [value, setValue] = useState<T>(() => {
+    try {
+      return repository.load();
+    } catch {
+      return initialValueRef.current;
+    }
+  });
 
   useEffect(() => {
     try {
