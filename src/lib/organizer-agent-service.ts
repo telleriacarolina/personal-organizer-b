@@ -498,13 +498,14 @@ async function mockHandleMessage(
     if (!title) title = 'New Event';
     const dateStr = parseRelativeDate(trimmed, context.currentDate);
     if (!dateStr) return { message: `What date should I schedule "${title}"?` };
+    const startTime = extractTime(trimmed);
     return createPendingWrite(context, 'calendar.create_event', {
       widgetId,
       title,
       type: 'appointment',
       date: parseISO(dateStr).getTime(),
-      startTime: extractTime(trimmed),
-      allDay: !extractTime(trimmed),
+      startTime,
+      allDay: !startTime,
     }, 'I prepared a calendar event proposal for review.');
   }
 

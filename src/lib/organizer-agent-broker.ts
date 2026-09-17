@@ -1255,9 +1255,10 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     if (category) items = items.filter((item) => item.category === category);
     if (from) items = items.filter((item) => item.dueDate && item.dueDate >= from);
     if (to) items = items.filter((item) => item.dueDate && item.dueDate <= to);
-    return createResponse(auditId, `Loaded ${Math.min(items.length, limit)} task summary${items.length === 1 ? '' : 'ies'}.`, {
-      data: { items: items.slice(0, limit), nextCursor: null },
-      affectedResourceIds: items.slice(0, limit).map((item) => item.id),
+    const limitedItems = items.slice(0, limit);
+    return createResponse(auditId, `Loaded ${limitedItems.length} task summar${limitedItems.length === 1 ? 'y' : 'ies'}.`, {
+      data: { items: limitedItems, nextCursor: null },
+      affectedResourceIds: limitedItems.map((item) => item.id),
     });
   },
   'tasks.get': (input, context) => {
@@ -1394,9 +1395,10 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
         untrustedContent: true,
       })),
     );
-    return createResponse(auditId, `Loaded ${Math.min(items.length, limit)} note summary${items.length === 1 ? '' : 'ies'}.`, {
-      data: { items: items.slice(0, limit), nextCursor: null },
-      affectedResourceIds: items.slice(0, limit).map((item) => item.id),
+    const limitedItems = items.slice(0, limit);
+    return createResponse(auditId, `Loaded ${limitedItems.length} note summar${limitedItems.length === 1 ? 'y' : 'ies'}.`, {
+      data: { items: limitedItems, nextCursor: null },
+      affectedResourceIds: limitedItems.map((item) => item.id),
     });
   },
   'notes.get': (input, context) => {
@@ -2258,14 +2260,14 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     assertString(input.recordId, 'recordId', { required: true, max: 120 });
     const match = findRecordNote(context.widgets, input.recordId);
     if (!match) return createResponse(auditId, 'Record note not found.', { ok: false });
-    const record: Omit<RecordNote, 'dataUrl'> & { hasMedia: true } = {
+    const record: Omit<RecordNote, 'dataUrl'> & { hasMedia: boolean } = {
       id: match.record.id,
       title: match.record.title,
       mediaType: match.record.mediaType,
       duration: match.record.duration,
       transcription: match.record.transcription,
       createdAt: match.record.createdAt,
-      hasMedia: true,
+      hasMedia: Boolean(match.record.dataUrl),
     };
     return createResponse(auditId, `Loaded metadata for "${match.record.title}".`, {
       data: { record },
