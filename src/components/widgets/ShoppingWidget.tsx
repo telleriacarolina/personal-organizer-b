@@ -717,6 +717,16 @@ export function ShoppingWidget({
       }));
     }
   }, [activeReminders, onUpdate]);
+      onUpdate({
+        reminders: reminders.map(r => 
+          activeReminders.find(ar => ar.id === r.id)
+            ? { ...r, lastTriggered: Date.now() }
+            : r
+        )
+      });
+      setActiveReminders([]);
+    }
+  }, [activeReminders, onUpdate, reminders]);
 
   const aiInput = { items, budget, receipts, trips, reminders };
   const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;

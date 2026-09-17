@@ -1,9 +1,11 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
 import { readLocalStorageJson, writeLocalStorageJson } from '@/lib/persistence';
+import { createLocalStorageStateRepository } from '@/lib/persistence';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { useMemo, useRef } from 'react';
 
-export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispatch<SetStateAction<T>>] {
+export function useLocalStorageState<T>(key: string, initialValue: T) {
   const initialValueRef = useRef(initialValue);
-  const isInitialMountRef = useRef(true);
   initialValueRef.current = initialValue;
   const [value, setValue] = useState<T>(() => {
     if (typeof window === 'undefined') {
@@ -48,4 +50,6 @@ export function useLocalStorageState<T>(key: string, initialValue: T): [T, Dispa
   }, [key]);
 
   return [value, setPersistedValue];
+  const repository = useMemo(() => createLocalStorageStateRepository(key, initialValueRef.current), [key]);
+  return usePersistentState(repository, initialValue);
 }

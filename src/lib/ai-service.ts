@@ -16,6 +16,7 @@ import type {
 } from '@/types/ai';
 import { DEFAULT_AI_CONFIG } from '@/types/ai';
 import { readLocalStorageJson, writeLocalStorageJson } from '@/lib/persistence';
+import { preferencesRepository } from '@/lib/persistence';
 
 // ---------------------------------------------------------------------------
 // Disabled provider – returns nothing, is always "available"
@@ -137,11 +138,14 @@ export function normalizeSuggestion(raw: Partial<AISuggestion>): AISuggestion | 
 // AIService – singleton boundary
 // ---------------------------------------------------------------------------
 
-const CONFIG_STORAGE_KEY = 'organizer-ai-config';
-
 function readConfigFromStorage(): AIConfig {
   if (typeof window === 'undefined') return { ...DEFAULT_AI_CONFIG };
   return { ...DEFAULT_AI_CONFIG, ...readLocalStorageJson<Partial<AIConfig>>(CONFIG_STORAGE_KEY, {}) };
+  try {
+    return { ...DEFAULT_AI_CONFIG, ...preferencesRepository.getAIConfig() };
+  } catch {
+    return { ...DEFAULT_AI_CONFIG };
+  }
 }
 
 function resolveInitialMode(): AIMode {
@@ -193,6 +197,8 @@ export class AIService {
       const { apiKey: _ignored, ...safe } = this.config;
       writeLocalStorageJson(CONFIG_STORAGE_KEY, safe);
     }
+    const { apiKey: _ignored, ...safe } = this.config;
+    preferencesRepository.setAIConfig(safe);
   }
 
   async generateSuggestions(request: AIRequestContext): Promise<AISuggestion[]> {

@@ -10,6 +10,7 @@ import { AI_SUGGESTIONS_STORAGE_KEY, readLegacyCompatibleArrayJson, writeLocalSt
 
 const STORAGE_KEY = AI_SUGGESTIONS_STORAGE_KEY;
 const MAX_PERSISTED = 200; // prevent unbounded growth
+import { aiSuggestionRepository } from '@/lib/persistence';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -25,6 +26,7 @@ function writeAll(suggestions: PersistedSuggestion[]): void {
   // Keep only the most recent MAX_PERSISTED entries to limit storage growth
   const trimmed = suggestions.slice(-MAX_PERSISTED);
   writeLocalStorageJson(STORAGE_KEY, trimmed);
+  return aiSuggestionRepository.list();
 }
 
 // ---------------------------------------------------------------------------
@@ -38,7 +40,7 @@ export function getAllSuggestions(): PersistedSuggestion[] {
 
 /** Return only suggestions with status === 'pending'. */
 export function getPendingSuggestions(): PersistedSuggestion[] {
-  return readAll().filter((s) => s.status === 'pending');
+  return aiSuggestionRepository.listPending();
 }
 
 /**
@@ -46,10 +48,7 @@ export function getPendingSuggestions(): PersistedSuggestion[] {
  * Avoids adding duplicates by id.
  */
 export function saveSuggestions(incoming: PersistedSuggestion[]): void {
-  const existing = readAll();
-  const existingIds = new Set(existing.map((s) => s.id));
-  const deduped = incoming.filter((s) => !existingIds.has(s.id));
-  writeAll([...existing, ...deduped]);
+  aiSuggestionRepository.saveAll(incoming);
 }
 
 /**
@@ -60,17 +59,7 @@ export function updateSuggestionStatus(
   id: string,
   status: PersistedSuggestion['status']
 ): boolean {
-  const all = readAll();
-  let found = false;
-  const updated = all.map((s) => {
-    if (s.id === id) {
-      found = true;
-      return { ...s, status, statusUpdatedAt: new Date().toISOString() };
-    }
-    return s;
-  });
-  if (found) writeAll(updated);
-  return found;
+  return aiSuggestionRepository.updateStatus(id, status);
 }
 
 /** Apply a suggestion – convenience wrapper around updateSuggestionStatus. */
@@ -85,5 +74,5 @@ export function dismissSuggestion(id: string): boolean {
 
 /** Remove all persisted suggestions (e.g. on user request). */
 export function clearAllSuggestions(): void {
-  writeAll([]);
+  aiSuggestionRepository.clearAll();
 }

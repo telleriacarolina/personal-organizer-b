@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
+import { Analytics } from '@vercel/analytics/react';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
 import { AIConfigButton } from '@/components/ai/AIConfigButton';
@@ -18,8 +21,7 @@ import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
 import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
-import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
-import { appendImportedCalendarEvent, type CalendarImportDraft } from '@/lib/calendar-imports';
+import { Widget, WidgetAIState, WidgetType } from '@/types';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import type { AgentContext, AgentHandlers } from '@/types/agent';
 import {
@@ -30,16 +32,35 @@ import {
   subscribeToPersistenceIssues,
   writeLocalStorageJson,
 } from '@/lib/persistence';
+import type { AgentContext } from '@/types/agent';
+import { preferencesRepository, stateRepositories } from '@/lib/persistence';
+import {
+  addCalendarImport as addCalendarImportCommand,
+  addTaskToSource as addTaskToSourceCommand,
+  clearWidgetAIState,
+  createAgentHandlers,
+  createWidget,
+  createWorkWidget,
+  removeWidget as removeWidgetCommand,
+  reorderWidgets,
+  saveWidgetAIState,
+  toggleTaskInSource as toggleTaskInSourceCommand,
+  updateDailyFocusSourceWidget as updateDailyFocusSourceWidgetCommand,
+  updateTaskPriorityInSource as updateTaskPriorityInSourceCommand,
+  updateWidget as updateWidgetCommand,
+  updateWidgetSize as updateWidgetSizeCommand,
+} from '@/lib/organizer-commands';
+import type { AgentContext, AgentPermission } from '@/types/agent';
 
 function App() {
-  const [widgets, setWidgets] = useLocalStorageState<Widget[]>('organizer-widgets', []);
+  const [widgets, setWidgets] = usePersistentState(stateRepositories.widgets, []);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showWorkQuestionnaire, setShowWorkQuestionnaire] = useState(false);
-  const [snapToGrid, setSnapToGrid] = useLocalStorageState<boolean>('organizer-snap-to-grid', false);
-  const [globalLock, setGlobalLock] = useLocalStorageState<boolean>('organizer-global-lock', false);
-  const [widgetAIState, setWidgetAIState] = useLocalStorageState<Record<string, WidgetAIState>>('organizer-widget-ai', {});
+  const [snapToGrid, setSnapToGrid] = usePersistentState(stateRepositories.snapToGrid, false);
+  const [globalLock, setGlobalLock] = usePersistentState(stateRepositories.globalLock, false);
+  const [widgetAIState, setWidgetAIState] = usePersistentState(stateRepositories.widgetAIState, {});
   const dragStartTimeRef = useRef<number>(0);
 
   const addWidget = (type: WidgetType) => {
@@ -49,52 +70,20 @@ function App() {
       return;
     }
 
-    const newWidget: Widget = {
-      id: Date.now().toString(),
-      type,
-      position: (widgets || []).length,
-      ...(type === 'tasks' && { tasks: [] }),
-      ...(type === 'daily-focus' && { sourceWidgetId: (widgets || []).find((widget) => widget.type === 'tasks')?.id ?? null }),
-      ...(type === 'notes' && { notes: [] }),
-      ...(type === 'habits' && { habits: [] }),
-      ...(type === 'goals' && { goals: [] }),
-      ...(type === 'calendar' && { events: [] }),
-      ...(type === 'shopping' && { items: [], receipts: [], trips: [], reminders: [] }),
-      ...(type === 'ai-chat' && { messages: [], appliedSuggestionIds: [] }),
-      ...(type === 'record-note' && { records: [] }),
-    } as Widget;
-
-    setWidgets((current) => [...(current || []), newWidget]);
+    const newWidget = createWidget(type, widgets.length, widgets);
+    setWidgets((current) => [...current, newWidget]);
     toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} widget added!`);
   };
 
   const handleWorkOrganizationComplete = (preference: WorkOrganizationPreference) => {
-    const newWidget: Widget = {
-      id: Date.now().toString(),
-      type: 'work',
-      position: (widgets || []).length,
-      clientSlots: [],
-      meals: [],
-      timeEntries: [],
-      jobs: [],
-      shoppingList: [],
-      errands: [],
-      routines: [],
-      activeRoutineId: undefined,
-      organizationPreference: preference,
-    } as Widget;
-
-    setWidgets((current) => [...(current || []), newWidget]);
+    const newWidget = createWorkWidget(preference, widgets.length);
+    setWidgets((current) => [...current, newWidget]);
     toast.success(`Work widget added with ${preference.type} organization!`);
   };
 
   const removeWidget = (id: string) => {
-    setWidgets((current) => (current || []).filter((w) => w.id !== id));
-    setWidgetAIState((current) => {
-      const nextState = { ...(current || {}) };
-      delete nextState[id];
-      return nextState;
-    });
+    setWidgets((current) => removeWidgetCommand(current, id));
+    setWidgetAIState((current) => clearWidgetAIState(current, id));
     toast.success('Widget removed');
   };
 
@@ -105,46 +94,23 @@ function App() {
         return typeof data === 'function' ? data(w) : ({ ...w, ...data } as Widget);
       })
     );
+  const updateWidget = (id: string, data: Partial<Widget>) => {
+    setWidgets((current) => updateWidgetCommand(current, id, data));
   };
 
   const updateWidgetSize = (id: string, size: { width: number; height: number }) => {
-    setWidgets((current) =>
-      (current || []).map((w) => (w.id === id ? { ...w, size } as Widget : w))
-    );
-  };
-
-  const updateTasksWidget = (sourceWidgetId: string, updater: (tasks: Task[]) => Task[]) => {
-    setWidgets((current) =>
-      (current || []).map((widget) =>
-        widget.id === sourceWidgetId && widget.type === 'tasks'
-          ? ({ ...widget, tasks: updater(widget.tasks) } as Widget)
-          : widget
-      )
-    );
+    setWidgets((current) => updateWidgetSizeCommand(current, id, size));
   };
 
   const addTaskToSource = (
     sourceWidgetId: string,
-    task: Pick<Task, 'text' | 'priority' | 'dueDate' | 'category'>
+    task: Parameters<typeof addTaskToSourceCommand>[2]
   ) => {
-    updateTasksWidget(sourceWidgetId, (tasks) => [
-      ...tasks,
-      {
-        id: Date.now().toString(),
-        text: task.text,
-        completed: false,
-        priority: task.priority,
-        dueDate: task.dueDate ?? null,
-        category: task.category ?? null,
-        createdAt: Date.now(),
-      },
-    ]);
+    setWidgets((current) => addTaskToSourceCommand(current, sourceWidgetId, task));
   };
 
   const toggleTaskInSource = (sourceWidgetId: string, taskId: string) => {
-    updateTasksWidget(sourceWidgetId, (tasks) =>
-      tasks.map((task) => (task.id === taskId ? { ...task, completed: !task.completed } : task))
-    );
+    setWidgets((current) => toggleTaskInSourceCommand(current, sourceWidgetId, taskId));
   };
 
   const updateTaskPriorityInSource = (
@@ -152,14 +118,12 @@ function App() {
     taskId: string,
     priority: 'low' | 'medium' | 'high'
   ) => {
-    updateTasksWidget(sourceWidgetId, (tasks) =>
-      tasks.map((task) => (task.id === taskId ? { ...task, priority } : task))
-    );
+    setWidgets((current) => updateTaskPriorityInSourceCommand(current, sourceWidgetId, taskId, priority));
   };
 
   const addCalendarEventToSource = (
     destinationWidgetId: string,
-    event: CalendarImportDraft
+    event: Parameters<typeof addCalendarImportCommand>[2]
   ): { added: boolean; reason?: 'invalid-destination' | 'duplicate' } => {
     let result: { added: boolean; reason?: 'invalid-destination' | 'duplicate' } = {
       added: false,
@@ -167,42 +131,24 @@ function App() {
     };
 
     setWidgets((current) => {
-      const currentWidgets = current || [];
-      const destinationWidget = currentWidgets.find(
-        (widget): widget is Extract<Widget, { type: 'calendar' }> =>
-          widget.id === destinationWidgetId && widget.type === 'calendar'
-      );
-      if (!destinationWidget) {
-        result = { added: false, reason: 'invalid-destination' };
-        return currentWidgets;
-      }
-
-      const importResult = appendImportedCalendarEvent(destinationWidget.events, event);
-      if (!importResult.added) {
-        result = { added: false, reason: 'duplicate' };
-        return currentWidgets;
-      }
-
-      result = { added: true };
-      return currentWidgets.map((widget) =>
-        widget.id === destinationWidgetId && widget.type === 'calendar'
-          ? ({ ...widget, events: importResult.events } as Widget)
-          : widget
-      );
+      const next = addCalendarImportCommand(current, destinationWidgetId, event);
+      result = next.result;
+      return next.result.added ? next.widgets : current;
     });
 
     return result;
   };
 
   const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {
-    updateWidget(widgetId, { sourceWidgetId });
+    setWidgets((current) => updateDailyFocusSourceWidgetCommand(current, widgetId, sourceWidgetId));
   };
 
   const updateWidgetAIState = (widgetId: string, state: WidgetAIState) => {
-    setWidgetAIState((current) => ({
-      ...(current || {}),
-      [widgetId]: state,
-    }));
+    if (widgetId !== state.widgetId) {
+      console.warn(`Ignoring AI state update for "${state.widgetId}" on widget "${widgetId}"`);
+      return;
+    }
+    setWidgetAIState((current) => saveWidgetAIState(current, state));
   };
 
   const toggleSnapToGrid = () => {
@@ -216,7 +162,7 @@ function App() {
     
     if (newLockState) {
       setWidgets((current) =>
-        (current || []).map((w) => ({
+        current.map((w) => ({
           ...w,
           size: {
             ...w.size,
@@ -229,7 +175,7 @@ function App() {
       toast.success('All widgets locked');
     } else {
       setWidgets((current) =>
-        (current || []).map((w) => ({
+        current.map((w) => ({
           ...w,
           size: {
             ...w.size,
@@ -244,7 +190,7 @@ function App() {
   };
 
   const handleReorder = (newOrder: Widget[]) => {
-    setWidgets(newOrder.map((w, index) => ({ ...w, position: index })));
+    setWidgets(reorderWidgets(newOrder));
   };
 
   const handleDragStart = () => {
@@ -260,6 +206,7 @@ function App() {
     }
   };
 
+  const currentWidgets = widgets;
   const currentWidgets = useMemo(() => widgets || [], [widgets]);
   const taskSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
@@ -267,162 +214,56 @@ function App() {
   const calendarSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
     .map((widget) => ({ id: widget.id }));
+  const currentWidgets = useMemo(() => widgets ?? [], [widgets]);
+  const taskSources = useMemo(
+    () =>
+      currentWidgets
+        .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
+        .map((widget) => ({ id: widget.id, tasks: widget.tasks })),
+    [currentWidgets]
+  );
+  const calendarSources = useMemo(
+    () =>
+      currentWidgets
+        .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
+        .map((widget) => ({ id: widget.id })),
+    [currentWidgets]
+  );
 
-  const agentHandlers: AgentHandlers = useMemo(() => ({
-    onAddTask: (widgetId, taskData) => {
-      setWidgets((current) =>
-        (current || []).map((widget) =>
-          widget.id === widgetId && widget.type === 'tasks'
-            ? ({
-                ...widget,
-                tasks: [
-                  ...widget.tasks,
-                  {
-                    id: Date.now().toString(),
-                    text: taskData.text,
-                    completed: false,
-                    priority: taskData.priority ?? 'medium',
-                    dueDate: taskData.dueDate ?? null,
-                    category: taskData.category ?? null,
-                    createdAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : widget
-        )
-      );
-      toast.success(`Added task: ${taskData.text}`);
-    },
-    onAddNote: (widgetId, noteData) => {
-      setWidgets((current) =>
-        (current || []).map((w) =>
-          w.id === widgetId && w.type === 'notes'
-            ? ({
-                ...w,
-                notes: [
-                  ...w.notes,
-                  {
-                    id: Date.now().toString(),
-                    title: noteData.title,
-                    content: noteData.content,
-                    createdAt: Date.now(),
-                    updatedAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : w
-        )
-      );
-      toast.success(`Note created: ${noteData.title}`);
-    },
-    onAddGoal: (widgetId, goalData) => {
-      setWidgets((current) =>
-        (current || []).map((w) =>
-          w.id === widgetId && w.type === 'goals'
-            ? ({
-                ...w,
-                goals: [
-                  ...w.goals,
-                  {
-                    id: Date.now().toString(),
-                    title: goalData.title,
-                    description: goalData.description,
-                    targetDate: goalData.targetDate,
-                    completed: false,
-                    createdAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : w
-        )
-      );
-      toast.success(`Goal added: ${goalData.title}`);
-    },
-    onAddHabit: (widgetId, habitData) => {
-      setWidgets((current) =>
-        (current || []).map((w) =>
-          w.id === widgetId && w.type === 'habits'
-            ? ({
-                ...w,
-                habits: [
-                  ...w.habits,
-                  {
-                    id: Date.now().toString(),
-                    name: habitData.name,
-                    completions: {},
-                    createdAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : w
-        )
-      );
-      toast.success(`Habit added: ${habitData.name}`);
-    },
-    onAddShoppingItem: (widgetId, itemData) => {
-      setWidgets((current) =>
-        (current || []).map((w) =>
-          w.id === widgetId && w.type === 'shopping'
-            ? ({
-                ...w,
-                items: [
-                  ...w.items,
-                  {
-                    id: Date.now().toString(),
-                    name: itemData.name,
-                    quantity: itemData.quantity,
-                    category: itemData.category ?? 'other',
-                    store: undefined,
-                    estimatedPrice: undefined,
-                    actualPrice: undefined,
-                    purchased: false,
-                    priority: itemData.priority ?? 'medium',
-                    notes: undefined,
-                    barcode: undefined,
-                    receiptId: undefined,
-                    createdAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : w
-        )
-      );
-      toast.success(`Added to shopping: ${itemData.name}`);
-    },
-    onAddCalendarEvent: (widgetId, eventData) => {
-      setWidgets((current) =>
-        (current || []).map((w) =>
-          w.id === widgetId && w.type === 'calendar'
-            ? ({
-                ...w,
-                events: [
-                  ...w.events,
-                  {
-                    id: Date.now().toString(),
-                    title: eventData.title,
-                    type: eventData.type,
-                    description: eventData.description,
-                    date: eventData.date,
-                    startTime: eventData.startTime,
-                    endTime: eventData.endTime,
-                    allDay: eventData.allDay ?? false,
-                    location: eventData.location,
-                    createdAt: Date.now(),
-                  },
-                ],
-              } as Widget)
-            : w
-        )
-      );
-      toast.success(`Event added: ${eventData.title}`);
-    },
-  }), [setWidgets]);
+  const agentHandlers = useMemo(() => createAgentHandlers(setWidgets), [setWidgets]);
+  const updateWidgetsForAgent = useCallback((updater: (widgets: Widget[]) => Widget[]) => {
+    setWidgets((current) => updater(current || []));
+  }, [setWidgets]);
+
+  const agentPermissions: AgentPermission[] = useMemo(() => [
+    'read:tasks',
+    'write:tasks',
+    'read:notes',
+    'write:notes',
+    'read:habits',
+    'write:habits',
+    'read:goals',
+    'write:goals',
+    'read:calendar',
+    'write:calendar',
+    'read:work',
+    'publish:work_to_calendar',
+    'read:shopping',
+    'write:shopping',
+    'read:record-notes',
+    'write:record-notes',
+  ], []);
 
   const agentContext: AgentContext = useMemo(() => ({
     widgets: currentWidgets,
-    handlers: agentHandlers,
+    updateWidgets: updateWidgetsForAgent,
     currentDate: new Date(),
-  }), [currentWidgets, agentHandlers]);
+    actorContext: {
+      userId: 'personal-organizer-user',
+      workspaceId: 'local-organizer-workspace',
+      permissions: agentPermissions,
+    },
+  }), [agentPermissions, currentWidgets, updateWidgetsForAgent]);
 
   useEffect(() => {
     return subscribeToPersistenceIssues((issue) => {
@@ -467,6 +308,11 @@ function App() {
       const timer = setTimeout(() => {
         setShowDragHint(false);
         writeLocalStorageJson('drag-hint-shown', true);
+    if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !preferencesRepository.isDragHintShown()) {
+      setShowDragHint(true);
+      const timer = setTimeout(() => {
+        setShowDragHint(false);
+        preferencesRepository.setDragHintShown(true);
       }, 5000);
       return () => clearTimeout(timer);
     }
@@ -783,6 +629,7 @@ function App() {
       <Toaster position="bottom-right" toastOptions={{
         className: 'sm:mb-0 mb-16'
       }} />
+      <Analytics />
     </div>
   );
 }
