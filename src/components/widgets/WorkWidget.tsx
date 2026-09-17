@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,10 +35,15 @@ import {
   ArrowRight
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { AIInsightAction, ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference, WorkOrganizationType, WidgetAIState, WidgetSize } from '@/types';
+import { AIInsightAction, CalendarEvent, ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference, WorkOrganizationType, WidgetAIState, WidgetSize } from '@/types';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+
+interface CalendarSource {
+  id: string;
+  events: CalendarEvent[];
+}
 
 interface WorkWidgetProps {
   widgetId: string;
@@ -51,8 +56,13 @@ interface WorkWidgetProps {
   routines?: WorkRoutine[];
   activeRoutineId?: string;
   organizationPreference?: WorkOrganizationPreference;
+  calendarSources: CalendarSource[];
   aiState?: WidgetAIState;
   onAIStateChange: (state: WidgetAIState) => void;
+  onAddCalendarEvent: (
+    sourceWidgetId: string,
+    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location' | 'reminder' | 'color'>
+  ) => void;
   onUpdate: (data: {
     clientSlots?: ClientSlot[];
     meals?: WorkMeal[];
@@ -82,8 +92,10 @@ export function WorkWidget({
   routines = [],
   activeRoutineId,
   organizationPreference,
+  calendarSources,
   aiState,
   onAIStateChange,
+  onAddCalendarEvent,
   onUpdate,
   onRemove,
   onDragStart,
@@ -99,6 +111,34 @@ export function WorkWidget({
   const [showRoutineDialog, setShowRoutineDialog] = useState(false);
   const [showOrganizationDialog, setShowOrganizationDialog] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [selectedCalendarSourceId, setSelectedCalendarSourceId] = useState('');
+
+  useEffect(() => {
+    if (calendarSources.length === 0) {
+      setSelectedCalendarSourceId('');
+      return;
+    }
+
+    if (!selectedCalendarSourceId || !calendarSources.some((source) => source.id === selectedCalendarSourceId)) {
+      setSelectedCalendarSourceId(calendarSources[0].id);
+    }
+  }, [calendarSources, selectedCalendarSourceId]);
+
+  const addItemToCalendar = (
+    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'>
+  ) => {
+    if (!selectedCalendarSourceId) {
+      toast.error('Add a Calendar widget first');
+      return;
+    }
+
+    onAddCalendarEvent(selectedCalendarSourceId, {
+      ...event,
+      reminder: undefined,
+      color: 'blue',
+    });
+    toast.success('Added to calendar');
+  };
 
   const addClientSlot = (data: Omit<ClientSlot, 'id' | 'createdAt'>) => {
     const newSlot: ClientSlot = {
@@ -414,6 +454,28 @@ export function WorkWidget({
         onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
       />
 
+      <div className="space-y-2">
+        <Label htmlFor={`work-calendar-destination-${widgetId}`} className="text-xs text-muted-foreground">
+          Calendar destination
+        </Label>
+        <Select
+          value={selectedCalendarSourceId}
+          onValueChange={setSelectedCalendarSourceId}
+          disabled={calendarSources.length === 0}
+        >
+          <SelectTrigger id={`work-calendar-destination-${widgetId}`}>
+            <SelectValue placeholder="Select Calendar widget" />
+          </SelectTrigger>
+          <SelectContent>
+            {calendarSources.map((source, index) => (
+              <SelectItem key={source.id} value={source.id}>
+                Calendar Widget {index + 1}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <Card className="col-span-1 md:col-span-2 lg:col-span-3 border-0 shadow-none">
       <CardHeader className="flex flex-row items-center justify-between pb-3 px-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -458,6 +520,7 @@ export function WorkWidget({
             <ClientSlotsTab
               clientSlots={clientSlots}
               onAdd={addClientSlot}
+              onAddToCalendar={addItemToCalendar}
               onUpdateStatus={updateClientStatus}
               onDelete={deleteClientSlot}
               showDialog={showClientDialog}
@@ -469,6 +532,7 @@ export function WorkWidget({
             <MealsTab
               meals={meals}
               onAdd={addMeal}
+              onAddToCalendar={addItemToCalendar}
               onDelete={deleteMeal}
               showDialog={showMealDialog}
               setShowDialog={setShowMealDialog}
@@ -489,6 +553,7 @@ export function WorkWidget({
             <JobsTab
               jobs={jobs}
               onAdd={addJob}
+              onAddToCalendar={addItemToCalendar}
               onUpdateStatus={updateJobStatus}
               onDelete={deleteJob}
               showDialog={showJobDialog}
@@ -510,6 +575,7 @@ export function WorkWidget({
             <ErrandsTab
               errands={errands}
               onAdd={addErrand}
+              onAddToCalendar={addItemToCalendar}
               onToggle={toggleErrand}
               onDelete={deleteErrand}
               showDialog={showErrandDialog}
@@ -548,6 +614,7 @@ export function WorkWidget({
 function ClientSlotsTab({
   clientSlots,
   onAdd,
+  onAddToCalendar,
   onUpdateStatus,
   onDelete,
   showDialog,
@@ -555,6 +622,9 @@ function ClientSlotsTab({
 }: {
   clientSlots: ClientSlot[];
   onAdd: (data: Omit<ClientSlot, 'id' | 'createdAt'>) => void;
+  onAddToCalendar: (
+    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'>
+  ) => void;
   onUpdateStatus: (id: string, status: ClientSlot['status']) => void;
   onDelete: (id: string) => void;
   showDialog: boolean;
@@ -737,6 +807,25 @@ function ClientSlotsTab({
                   >
                     Cancelled
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      onAddToCalendar({
+                        title: slot.service ? `${slot.clientName} - ${slot.service}` : slot.clientName,
+                        type: 'appointment',
+                        description: slot.notes || undefined,
+                        date: slot.date,
+                        startTime: slot.startTime,
+                        endTime: slot.endTime || undefined,
+                        allDay: false,
+                        location: undefined,
+                      })
+                    }
+                    className="text-xs ml-auto"
+                  >
+                    Add to Calendar
+                  </Button>
                 </div>
               </div>
             ))
@@ -750,12 +839,16 @@ function ClientSlotsTab({
 function MealsTab({
   meals,
   onAdd,
+  onAddToCalendar,
   onDelete,
   showDialog,
   setShowDialog
 }: {
   meals: WorkMeal[];
   onAdd: (data: Omit<WorkMeal, 'id' | 'createdAt'>) => void;
+  onAddToCalendar: (
+    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'>
+  ) => void;
   onDelete: (id: string) => void;
   showDialog: boolean;
   setShowDialog: (show: boolean) => void;
@@ -898,6 +991,25 @@ function MealsTab({
                 {meal.notes && (
                   <p className="text-xs text-muted-foreground">{meal.notes}</p>
                 )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    onAddToCalendar({
+                      title: meal.name,
+                      type: 'event',
+                      description: meal.notes || meal.items?.join(', ') || undefined,
+                      date: meal.date,
+                      startTime: meal.time,
+                      endTime: undefined,
+                      allDay: false,
+                      location: undefined,
+                    })
+                  }
+                  className="text-xs"
+                >
+                  Add to Calendar
+                </Button>
               </div>
             ))
           )}
@@ -1023,6 +1135,7 @@ function TimeTrackingTab({
 function JobsTab({
   jobs,
   onAdd,
+  onAddToCalendar,
   onUpdateStatus,
   onDelete,
   showDialog,
@@ -1031,6 +1144,9 @@ function JobsTab({
 }: {
   jobs: Job[];
   onAdd: (data: Omit<Job, 'id' | 'createdAt'>) => void;
+  onAddToCalendar: (
+    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'>
+  ) => void;
   onUpdateStatus: (id: string, status: Job['status']) => void;
   onDelete: (id: string) => void;
   showDialog: boolean;
@@ -1236,6 +1352,27 @@ function JobsTab({
                     <SelectItem value="on-hold">On Hold</SelectItem>
                   </SelectContent>
                 </Select>
+                {job.deadline && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      onAddToCalendar({
+                        title: `Job deadline: ${job.title}`,
+                        type: 'occasion',
+                        description: job.description || `Client: ${job.client}`,
+                        date: job.deadline,
+                        startTime: undefined,
+                        endTime: undefined,
+                        allDay: true,
+                        location: undefined,
+                      })
+                    }
+                    className="text-xs"
+                  >
+                    Add Deadline to Calendar
+                  </Button>
+                )}
               </div>
             ))
           )}
@@ -1368,6 +1505,7 @@ function ShoppingListTab({
 function ErrandsTab({
   errands,
   onAdd,
+  onAddToCalendar,
   onToggle,
   onDelete,
   showDialog,
@@ -1376,6 +1514,9 @@ function ErrandsTab({
 }: {
   errands: WorkErrand[];
   onAdd: (data: Omit<WorkErrand, 'id' | 'createdAt'>) => void;
+  onAddToCalendar: (
+    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'>
+  ) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   showDialog: boolean;
@@ -1526,6 +1667,27 @@ function ErrandsTab({
                         <span>📅 {format(errand.dueDate, 'MMM d, yyyy')}</span>
                       )}
                     </div>
+                    {errand.dueDate && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                          onAddToCalendar({
+                            title: `Errand: ${errand.title}`,
+                            type: 'appointment',
+                            description: errand.description || undefined,
+                            date: errand.dueDate,
+                            startTime: undefined,
+                            endTime: undefined,
+                            allDay: true,
+                            location: errand.location || undefined,
+                          })
+                        }
+                        className="text-xs mt-2"
+                      >
+                        Add to Calendar
+                      </Button>
+                    )}
                   </div>
                   <Button
                     variant="ghost"

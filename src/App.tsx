@@ -15,7 +15,7 @@ import { CalendarWidget } from '@/components/widgets/CalendarWidget';
 import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
-import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
+import { CalendarEvent, Task, Widget, WidgetAIState, WidgetType } from '@/types';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
 function App() {
@@ -105,6 +105,19 @@ function App() {
     );
   };
 
+  const updateCalendarWidget = (
+    sourceWidgetId: string,
+    updater: (events: CalendarEvent[]) => CalendarEvent[]
+  ) => {
+    setWidgets((current) =>
+      (current || []).map((widget) =>
+        widget.id === sourceWidgetId && widget.type === 'calendar'
+          ? ({ ...widget, events: updater(widget.events) } as Widget)
+          : widget
+      )
+    );
+  };
+
   const addTaskToSource = (
     sourceWidgetId: string,
     task: Pick<Task, 'text' | 'priority' | 'dueDate' | 'category'>
@@ -137,6 +150,30 @@ function App() {
     updateTasksWidget(sourceWidgetId, (tasks) =>
       tasks.map((task) => (task.id === taskId ? { ...task, priority } : task))
     );
+  };
+
+  const addCalendarEventToSource = (
+    sourceWidgetId: string,
+    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location' | 'reminder' | 'color'>
+  ) => {
+    updateCalendarWidget(sourceWidgetId, (events) => [
+      ...events,
+      {
+        id: Date.now().toString(),
+        title: event.title,
+        type: event.type,
+        description: event.description ?? undefined,
+        date: event.date,
+        startTime: event.startTime ?? undefined,
+        endTime: event.endTime ?? undefined,
+        allDay: event.allDay ?? false,
+        location: event.location ?? undefined,
+        reminder: event.reminder ?? undefined,
+        reminderSent: false,
+        color: event.color ?? 'blue',
+        createdAt: Date.now(),
+      },
+    ]);
   };
 
   const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {
@@ -209,6 +246,9 @@ function App() {
   const taskSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
     .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
+  const calendarSources = currentWidgets
+    .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
+    .map((widget) => ({ id: widget.id, events: widget.events }));
 
   useEffect(() => {
     if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !localStorage.getItem('drag-hint-shown')) {
@@ -432,8 +472,10 @@ function App() {
                         routines={widget.routines}
                         activeRoutineId={widget.activeRoutineId}
                         organizationPreference={widget.organizationPreference}
+                        calendarSources={calendarSources}
                         aiState={widgetAIState?.[widget.id]}
                         onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
+                        onAddCalendarEvent={addCalendarEventToSource}
                         onUpdate={(data) => updateWidget(widget.id, data)}
                       />
                     );
