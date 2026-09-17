@@ -18,7 +18,8 @@ import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
 import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
 import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
-import { appendImportedCalendarEvent, CalendarImportDraft } from '@/lib/calendar-imports';
+import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
+import type { CalendarImportDraft } from '@/lib/calendar-imports';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
 function App() {
@@ -148,24 +149,37 @@ function App() {
     destinationWidgetId: string,
     event: CalendarImportDraft
   ): { added: boolean; reason?: 'invalid-destination' | 'duplicate' } => {
-    const destinationWidget = (widgets || []).find(
-      (widget): widget is Extract<Widget, { type: 'calendar' }> =>
-        widget.id === destinationWidgetId && widget.type === 'calendar'
-    );
-    if (!destinationWidget) return { added: false, reason: 'invalid-destination' };
+    let result: { added: boolean; reason?: 'invalid-destination' | 'duplicate' } = {
+      added: false,
+      reason: 'invalid-destination',
+    };
 
-    const importResult = appendImportedCalendarEvent(destinationWidget.events, event);
-    if (!importResult.added) return { added: false, reason: 'duplicate' };
+    setWidgets((current) => {
+      const currentWidgets = current || [];
+      const destinationWidget = currentWidgets.find(
+        (widget): widget is Extract<Widget, { type: 'calendar' }> =>
+          widget.id === destinationWidgetId && widget.type === 'calendar'
+      );
+      if (!destinationWidget) {
+        result = { added: false, reason: 'invalid-destination' };
+        return currentWidgets;
+      }
 
-    setWidgets((current) =>
-      (current || []).map((widget) =>
+      const importResult = appendImportedCalendarEvent(destinationWidget.events, event);
+      if (!importResult.added) {
+        result = { added: false, reason: 'duplicate' };
+        return currentWidgets;
+      }
+
+      result = { added: true };
+      return currentWidgets.map((widget) =>
         widget.id === destinationWidgetId && widget.type === 'calendar'
           ? ({ ...widget, events: importResult.events } as Widget)
           : widget
-      )
-    );
+      );
+    });
 
-    return { added: true };
+    return result;
   };
 
   const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {

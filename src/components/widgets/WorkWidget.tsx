@@ -40,7 +40,7 @@ import { AIInsightAction, ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, Wo
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
-import { CalendarImportDraft } from '@/lib/calendar-imports';
+import type { CalendarImportDraft } from '@/lib/calendar-imports';
 
 interface CalendarSource {
   id: string;
