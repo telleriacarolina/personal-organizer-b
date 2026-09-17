@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,20 @@ interface HabitsWidgetProps {
 
 export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: HabitsWidgetProps) {
   const [newHabit, setNewHabit] = useState('');
+  const [todayKey, setTodayKey] = useState(() => new Date().toISOString().split('T')[0]);
+
+  useEffect(() => {
+    const now = new Date();
+    const nextMidnight = new Date(now);
+    nextMidnight.setHours(24, 0, 0, 0);
+    const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+
+    const timer = setTimeout(() => {
+      setTodayKey(new Date().toISOString().split('T')[0]);
+    }, msUntilMidnight + 50);
+
+    return () => clearTimeout(timer);
+  }, [todayKey]);
 
   const addHabit = () => {
     if (newHabit.trim()) {
@@ -53,15 +67,14 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
     onUpdate(habits.filter((habit) => habit.id !== id));
   };
 
-  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
   const dateWindow = useMemo(() => {
-    const base = new Date();
+    const base = new Date(todayKey);
     return Array.from({ length: 365 }, (_, i) => {
       const date = new Date(base);
       date.setDate(base.getDate() - i);
       return date.toISOString().split('T')[0];
     });
-  }, []);
+  }, [todayKey]);
   const streakMap = useMemo(() => {
     const map: Record<string, number> = {};
     habits.forEach((habit) => {
@@ -82,10 +95,10 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
   const completedTodayMap = useMemo(() => {
     const map: Record<string, boolean> = {};
     habits.forEach((habit) => {
-      map[habit.id] = Boolean(habit.completions[today]);
+      map[habit.id] = Boolean(habit.completions[todayKey]);
     });
     return map;
-  }, [habits, today]);
+  }, [habits, todayKey]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

@@ -125,15 +125,15 @@ export function useLocalStorageState<T>(
     }
 
     const flushOnUnload = () => {
-      if (timeoutRef.current || idleHandleRef.current !== null) {
-        clearPendingPersistence();
       try {
         const serialized = JSON.stringify(value);
-        window.localStorage.setItem(key, serialized);
-        latestSerializedRef.current = serialized;
+        if (latestSerializedRef.current !== serialized) {
+          clearPendingPersistence();
+          window.localStorage.setItem(key, serialized);
+          latestSerializedRef.current = serialized;
+        }
       } catch (e) {
         console.warn(`[useLocalStorageState] Could not persist key "${key}":`, e);
-      }
       }
     };
 

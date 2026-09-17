@@ -206,10 +206,13 @@ export function WidgetContainer({
   }, [draftSize, isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGridValue, minWidth, minHeight]);
 
   useEffect(() => {
-    if (!isResizing && !isPinching) {
+    if (isResizing || isPinching) {
+      return;
+    }
+    if (draftSize && (draftSize.width !== persistedWidth || draftSize.height !== persistedHeight)) {
       setDraftSize(null);
     }
-  }, [isPinching, isResizing, persistedHeight, persistedWidth]);
+  }, [draftSize, isPinching, isResizing, persistedHeight, persistedWidth]);
 
   return (
     <Reorder.Item
