@@ -141,12 +141,12 @@ function App() {
   };
 
   const addCalendarEventToSource = (
-    sourceWidgetId: string,
+    destinationWidgetId: string,
     event: CalendarImportDraft
   ): { added: boolean; reason?: 'invalid-destination' | 'duplicate' } => {
     const destinationWidget = (widgets || []).find(
       (widget): widget is Extract<Widget, { type: 'calendar' }> =>
-        widget.id === sourceWidgetId && widget.type === 'calendar'
+        widget.id === destinationWidgetId && widget.type === 'calendar'
     );
     if (!destinationWidget) return { added: false, reason: 'invalid-destination' };
 
@@ -155,7 +155,7 @@ function App() {
 
     setWidgets((current) =>
       (current || []).map((widget) =>
-        widget.id === sourceWidgetId && widget.type === 'calendar'
+        widget.id === destinationWidgetId && widget.type === 'calendar'
           ? ({ ...widget, events: importResult.events } as Widget)
           : widget
       )
@@ -236,7 +236,7 @@ function App() {
     .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
   const calendarSources = currentWidgets
     .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
-    .map((widget) => ({ id: widget.id, events: widget.events }));
+    .map((widget) => ({ id: widget.id }));
 
   useEffect(() => {
     if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !localStorage.getItem('drag-hint-shown')) {

@@ -35,7 +35,7 @@ import {
   ArrowRight
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { AIInsightAction, CalendarEvent, ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference, WorkOrganizationType, WidgetAIState, WidgetSize } from '@/types';
+import { AIInsightAction, ClientSlot, WorkMeal, TimeEntry, Job, ShoppingItem, WorkErrand, WorkRoutine, WorkOrganizationPreference, WorkOrganizationType, WidgetAIState, WidgetSize } from '@/types';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
@@ -43,7 +43,6 @@ import { CalendarImportDraft } from '@/lib/calendar-imports';
 
 interface CalendarSource {
   id: string;
-  events: CalendarEvent[];
 }
 
 interface WorkWidgetProps {
@@ -61,7 +60,7 @@ interface WorkWidgetProps {
   aiState?: WidgetAIState;
   onAIStateChange: (state: WidgetAIState) => void;
   onAddCalendarEvent: (
-    sourceWidgetId: string,
+    destinationWidgetId: string,
     event: CalendarImportDraft
   ) => { added: boolean; reason?: 'invalid-destination' | 'duplicate' };
   onUpdate: (data: {
