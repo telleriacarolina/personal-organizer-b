@@ -1,8 +1,10 @@
 import { createLocalStorageStateRepository } from '@/lib/persistence';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 export function useLocalStorageState<T>(key: string, initialValue: T) {
-  const repository = useMemo(() => createLocalStorageStateRepository(key, initialValue), [key]);
+  const initialValueRef = useRef(initialValue);
+  initialValueRef.current = initialValue;
+  const repository = useMemo(() => createLocalStorageStateRepository(key, initialValueRef.current), [key]);
   return usePersistentState(repository, initialValue);
 }
