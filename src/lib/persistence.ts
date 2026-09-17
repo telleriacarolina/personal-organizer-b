@@ -298,7 +298,7 @@ async function openMediaDatabase(operation: PersistenceOperation): Promise<IDBDa
     request.onerror = () => {
       const issue = {
         storage: 'indexedDB',
-        operation: 'read',
+        operation,
         code: 'unknown',
         message: 'Could not open the media database.',
         cause: request.error,
