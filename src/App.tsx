@@ -156,10 +156,16 @@ function App() {
     sourceWidgetId: string,
     event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location' | 'reminder' | 'color'>
   ) => {
+    const eventId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const createdAt = Date.now();
+
     updateCalendarWidget(sourceWidgetId, (events) => [
       ...events,
       {
-        id: Date.now().toString(),
+        id: eventId,
         title: event.title,
         type: event.type,
         description: event.description ?? undefined,
@@ -171,7 +177,7 @@ function App() {
         reminder: event.reminder ?? undefined,
         reminderSent: false,
         color: event.color ?? 'blue',
-        createdAt: Date.now(),
+        createdAt,
       },
     ]);
   };

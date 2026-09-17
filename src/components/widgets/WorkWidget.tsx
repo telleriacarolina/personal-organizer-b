@@ -1359,7 +1359,7 @@ function JobsTab({
                     onClick={() =>
                       onAddToCalendar({
                         title: `Job deadline: ${job.title}`,
-                        type: 'occasion',
+                        type: 'event',
                         description: job.description || `Client: ${job.client}`,
                         date: job.deadline,
                         startTime: undefined,
