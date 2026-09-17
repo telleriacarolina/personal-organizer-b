@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
-import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise, Bell, Lightning } from '@phosphor-icons/react';
+import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise, Bell, Lightning, Sparkle } from '@phosphor-icons/react';
 import { AIInsightAction, PersonalShoppingItem, Receipt, ShoppingTrip, ShoppingReminder, WidgetAIState, WidgetSize, ShoppingCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -118,6 +118,7 @@ export function ShoppingWidget({
   const [showRemindersDialog, setShowRemindersDialog] = useState(false);
   const [activeReminders, setActiveReminders] = useState<ShoppingReminder[]>([]);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(true);
 
   const addItem = () => {
     if (newItemName.trim()) {
@@ -756,16 +757,29 @@ export function ShoppingWidget({
       snapToGrid={snapToGrid}
       globalLock={globalLock}
     >
-      <AISuggestionsPanel
-        title="AI Shopping Review"
-        featureLabel="shopping"
-        state={aiState}
-        isGenerating={isGeneratingInsights}
-        isStale={isAIStale}
-        onGenerate={handleGenerateInsights}
-        onApplyAction={handleApplyAction}
-        onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
-      />
+      {showAIPanel ? (
+        <AISuggestionsPanel
+          title="AI Shopping Review"
+          featureLabel="shopping"
+          state={aiState}
+          isGenerating={isGeneratingInsights}
+          isStale={isAIStale}
+          onGenerate={handleGenerateInsights}
+          onApplyAction={handleApplyAction}
+          onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
+          onClose={() => setShowAIPanel(false)}
+        />
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 text-xs text-muted-foreground w-full"
+          onClick={() => setShowAIPanel(true)}
+        >
+          <Sparkle size={13} />
+          Show AI Suggestions
+        </Button>
+      )}
 
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">

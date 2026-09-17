@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alarm, Plus } from '@phosphor-icons/react';
+import { Alarm, Plus, Sparkle } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { AIInsightAction, DailyFocusItem, Task, WidgetAIState, WidgetSize } from '@/types';
 import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
@@ -67,6 +67,7 @@ export function DailyFocusWidget({
   const [quickTaskPriority, setQuickTaskPriority] = useState<'low' | 'medium' | 'high'>('high');
   const [quickTaskDueDate, setQuickTaskDueDate] = useState(today);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(true);
 
   const selectedSourceId =
     sourceWidgetId && taskSources.some((source) => source.id === sourceWidgetId)
@@ -177,16 +178,29 @@ export function DailyFocusWidget({
       widgetType="daily-focus"
     >
       <div className="space-y-3">
-        <AISuggestionsPanel
-          title="AI Focus Suggestions"
-          featureLabel="task"
-          state={aiState}
-          isGenerating={isGeneratingInsights}
-          isStale={isAIStale}
-          onGenerate={handleGenerateInsights}
-          onApplyAction={handleApplyAction}
-          onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
-        />
+        {showAIPanel ? (
+          <AISuggestionsPanel
+            title="AI Focus Suggestions"
+            featureLabel="task"
+            state={aiState}
+            isGenerating={isGeneratingInsights}
+            isStale={isAIStale}
+            onGenerate={handleGenerateInsights}
+            onApplyAction={handleApplyAction}
+            onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
+            onClose={() => setShowAIPanel(false)}
+          />
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-xs text-muted-foreground w-full"
+            onClick={() => setShowAIPanel(true)}
+          >
+            <Sparkle size={13} />
+            Show AI Suggestions
+          </Button>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor={`daily-focus-source-${widgetId}`} className="text-xs text-muted-foreground">

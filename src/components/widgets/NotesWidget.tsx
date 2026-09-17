@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
-import { Note as NoteIcon, Plus, Trash } from '@phosphor-icons/react';
+import { Note as NoteIcon, Plus, Trash, Sparkle } from '@phosphor-icons/react';
 import { AIInsightAction, Note, Task, WidgetAIState, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -45,6 +45,7 @@ export function NotesWidget({
   const [newContent, setNewContent] = useState('');
   const [selectedTaskSourceId, setSelectedTaskSourceId] = useState<string>(taskSources[0]?.id || '');
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(true);
 
   const addNote = () => {
     if (newTitle.trim() || newContent.trim()) {
@@ -126,16 +127,29 @@ export function NotesWidget({
       widgetType="notes"
     >
       <div className="space-y-3">
-        <AISuggestionsPanel
-          title="AI Note Assistant"
-          featureLabel="notes"
-          state={aiState}
-          isGenerating={isGeneratingInsights}
-          isStale={isAIStale}
-          onGenerate={handleGenerateInsights}
-          onApplyAction={handleApplyAction}
-          onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
-        />
+        {showAIPanel ? (
+          <AISuggestionsPanel
+            title="AI Note Assistant"
+            featureLabel="notes"
+            state={aiState}
+            isGenerating={isGeneratingInsights}
+            isStale={isAIStale}
+            onGenerate={handleGenerateInsights}
+            onApplyAction={handleApplyAction}
+            onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
+            onClose={() => setShowAIPanel(false)}
+          />
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-xs text-muted-foreground w-full"
+            onClick={() => setShowAIPanel(true)}
+          >
+            <Sparkle size={13} />
+            Show AI Suggestions
+          </Button>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor={`notes-task-source-${widgetId}`} className="text-xs text-muted-foreground">
