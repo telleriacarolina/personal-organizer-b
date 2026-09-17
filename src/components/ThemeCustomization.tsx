@@ -645,17 +645,14 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
 
 export function ThemeCustomizationButton() {
   const [open, setOpen] = useState(false);
-  const [selectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
-  const [customColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
-  const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
+  const [selectedTheme] = usePersistentState(stateRepositories.theme, 'Warm Terracotta');
+  const [customColors] = usePersistentState(stateRepositories.customColors, null);
+  const [backgroundImage, setBackgroundImage] = usePersistentState(stateRepositories.backgroundImage, null);
   const { url: resolvedBackgroundUrl } = useStoredMediaUrl({
     mediaId: backgroundImage?.mediaId,
     fallbackUrl: backgroundImage?.url ?? null,
   });
   const migrationErrorShownRef = useRef(false);
-  const [selectedTheme] = usePersistentState(stateRepositories.theme, 'Warm Terracotta');
-  const [customColors] = usePersistentState(stateRepositories.customColors, null);
-  const [backgroundImage] = usePersistentState(stateRepositories.backgroundImage, null);
 
   useEffect(() => {
     if (customColors) {
@@ -732,8 +729,6 @@ export function ThemeCustomizationButton() {
       cancelled = true;
     };
   }, [backgroundImage, setBackgroundImage]);
-    applyBackgroundImage(backgroundImage);
-  }, [backgroundImage]);
 
   return (
     <>
