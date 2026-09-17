@@ -7,7 +7,7 @@ Vercel Workflow SDK (`workflow`) adds durable workflow execution primitives to J
 Personal Organizer needs durable infrastructure for future Organizer AI Agent flows that may run for long periods, retry safely, and remain observable.
 
 ## Where workflows live
-Workflow definitions live in `/home/runner/work/personal-organizer-b/personal-organizer-b/src/workflows`.
+Workflow definitions live in `src/workflows`.
 
 ## How `"use workflow"` works
 `"use workflow"` marks the orchestration function. It should coordinate steps and deterministic control flow only.
