@@ -45,6 +45,11 @@ interface CalendarSource {
   events: CalendarEvent[];
 }
 
+type AddToCalendarEvent = Pick<
+  CalendarEvent,
+  'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'
+>;
+
 interface WorkWidgetProps {
   widgetId: string;
   clientSlots: ClientSlot[];
@@ -61,7 +66,7 @@ interface WorkWidgetProps {
   onAIStateChange: (state: WidgetAIState) => void;
   onAddCalendarEvent: (
     sourceWidgetId: string,
-    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location' | 'reminder' | 'color'>
+    event: AddToCalendarEvent & Pick<CalendarEvent, 'reminder' | 'color'>
   ) => void;
   onUpdate: (data: {
     clientSlots?: ClientSlot[];
@@ -124,9 +129,7 @@ export function WorkWidget({
     }
   }, [calendarSources, selectedCalendarSourceId]);
 
-  const addItemToCalendar = (
-    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'>
-  ) => {
+  const addItemToCalendar = (event: AddToCalendarEvent) => {
     if (!selectedCalendarSourceId) {
       toast.error('Add a Calendar widget first');
       return;
@@ -622,9 +625,7 @@ function ClientSlotsTab({
 }: {
   clientSlots: ClientSlot[];
   onAdd: (data: Omit<ClientSlot, 'id' | 'createdAt'>) => void;
-  onAddToCalendar: (
-    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'>
-  ) => void;
+  onAddToCalendar: (event: AddToCalendarEvent) => void;
   onUpdateStatus: (id: string, status: ClientSlot['status']) => void;
   onDelete: (id: string) => void;
   showDialog: boolean;
@@ -846,9 +847,7 @@ function MealsTab({
 }: {
   meals: WorkMeal[];
   onAdd: (data: Omit<WorkMeal, 'id' | 'createdAt'>) => void;
-  onAddToCalendar: (
-    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'>
-  ) => void;
+  onAddToCalendar: (event: AddToCalendarEvent) => void;
   onDelete: (id: string) => void;
   showDialog: boolean;
   setShowDialog: (show: boolean) => void;
@@ -1144,9 +1143,7 @@ function JobsTab({
 }: {
   jobs: Job[];
   onAdd: (data: Omit<Job, 'id' | 'createdAt'>) => void;
-  onAddToCalendar: (
-    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'>
-  ) => void;
+  onAddToCalendar: (event: AddToCalendarEvent) => void;
   onUpdateStatus: (id: string, status: Job['status']) => void;
   onDelete: (id: string) => void;
   showDialog: boolean;
@@ -1360,7 +1357,7 @@ function JobsTab({
                       onAddToCalendar({
                         title: `Job deadline: ${job.title}`,
                         type: 'event',
-                        description: job.description || `Client: ${job.client}`,
+                        description: `${job.description ? `${job.description} — ` : ''}Client: ${job.client}`,
                         date: job.deadline,
                         startTime: undefined,
                         endTime: undefined,
@@ -1514,9 +1511,7 @@ function ErrandsTab({
 }: {
   errands: WorkErrand[];
   onAdd: (data: Omit<WorkErrand, 'id' | 'createdAt'>) => void;
-  onAddToCalendar: (
-    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'>
-  ) => void;
+  onAddToCalendar: (event: AddToCalendarEvent) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   showDialog: boolean;
