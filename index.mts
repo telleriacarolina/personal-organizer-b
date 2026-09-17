@@ -12,7 +12,7 @@ try {
     if (eq === -1) continue;
     const key = trimmed.slice(0, eq).trim();
     const raw = trimmed.slice(eq + 1);
-    const val = raw.replace(/^(['"])(.*)\1$/, '$2');
+    const val = raw.replace(/^(['"])(.*)\1$/, '$2').trim();
     if (!process.env[key]) process.env[key] = val;
   }
 } catch {
