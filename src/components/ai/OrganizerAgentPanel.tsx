@@ -176,6 +176,12 @@ export function OrganizerAgentPanel({ context }: OrganizerAgentPanelProps) {
   const [pendingAction, setPendingAction] = useState<AgentWriteAction | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Mirror messages in a ref so sendMessage always reads the latest history
+  // without needing to be included as a dependency of the callback.
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -210,7 +216,10 @@ export function OrganizerAgentPanel({ context }: OrganizerAgentPanelProps) {
       setPendingAction(undefined);
 
       try {
-        const response = await handleAgentMessage(trimmed, messages, context, currentPending);
+        // Inject a fresh date so the agent always uses today, even if the
+        // memoized context was created before midnight.
+        const freshContext = { ...context, currentDate: new Date() };
+        const response = await handleAgentMessage(trimmed, messagesRef.current, freshContext, currentPending);
 
         const assistantMsg: AgentMessage = {
           id: uuidv4(),
@@ -239,7 +248,7 @@ export function OrganizerAgentPanel({ context }: OrganizerAgentPanelProps) {
         inputRef.current?.focus();
       }
     },
-    [isThinking, messages, context, pendingAction],
+    [isThinking, context, pendingAction],
   );
 
   const handleConfirmAction = useCallback(() => {
