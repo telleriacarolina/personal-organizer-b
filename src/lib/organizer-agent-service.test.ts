@@ -5,7 +5,7 @@
 // detection, date/time parsing, prefix stripping, and write-action dispatch.
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { handleAgentMessage } from './organizer-agent-service';
 import type { AgentContext, AgentMessage, AgentWriteAction } from '@/types/agent';
 import type {
