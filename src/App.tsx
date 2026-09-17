@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { memo, useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
@@ -23,15 +23,240 @@ import { appendImportedCalendarEvent, type CalendarImportDraft } from '@/lib/cal
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import type { AgentContext, AgentHandlers } from '@/types/agent';
 
+interface TaskSourceView {
+  id: string;
+  tasks: Task[];
+}
+
+interface CalendarSourceView {
+  id: string;
+}
+
+interface AvailableWidgetView {
+  id: string;
+  type: Widget['type'];
+}
+
+interface WidgetRenderProps {
+  widget: Widget;
+  snapToGrid: boolean;
+  globalLock: boolean;
+  taskSources: TaskSourceView[];
+  calendarSources: CalendarSourceView[];
+  availableWidgets: AvailableWidgetView[];
+  aiState?: WidgetAIState;
+  onRemoveWidget: (widgetId: string) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onSizeChange: (widgetId: string, size: { width: number; height: number }) => void;
+  onUpdateWidget: (widgetId: string, data: Partial<Widget>) => void;
+  onUpdateWidgetAIState: (widgetId: string, state: WidgetAIState) => void;
+  onAddCalendarEvent: (
+    destinationWidgetId: string,
+    event: CalendarImportDraft
+  ) => { added: boolean; reason?: 'invalid-destination' | 'duplicate' };
+  onDailyFocusSourceChange: (widgetId: string, sourceWidgetId: string | null) => void;
+  onAddTaskToSource: (
+    sourceWidgetId: string,
+    task: Pick<Task, 'text' | 'priority' | 'dueDate' | 'category'>
+  ) => void;
+  onToggleTaskInSource: (sourceWidgetId: string, taskId: string) => void;
+  onUpdateTaskPriorityInSource: (
+    sourceWidgetId: string,
+    taskId: string,
+    priority: 'low' | 'medium' | 'high'
+  ) => void;
+}
+
+const WidgetRenderer = memo(function WidgetRenderer({
+  widget,
+  snapToGrid,
+  globalLock,
+  taskSources,
+  calendarSources,
+  availableWidgets,
+  aiState,
+  onRemoveWidget,
+  onDragStart,
+  onDragEnd,
+  onSizeChange,
+  onUpdateWidget,
+  onUpdateWidgetAIState,
+  onAddCalendarEvent,
+  onDailyFocusSourceChange,
+  onAddTaskToSource,
+  onToggleTaskInSource,
+  onUpdateTaskPriorityInSource,
+}: WidgetRenderProps) {
+  const widgetProps = {
+    key: widget.id,
+    widgetId: widget.id,
+    onRemove: () => onRemoveWidget(widget.id),
+    onDragStart: globalLock ? undefined : onDragStart,
+    onDragEnd: globalLock ? undefined : onDragEnd,
+    size: widget.size,
+    onSizeChange: (size: { width: number; height: number }) => onSizeChange(widget.id, size),
+    snapToGrid,
+    globalLock,
+  };
+
+  switch (widget.type) {
+    case 'tasks':
+      return (
+        <TasksWidget
+          {...widgetProps}
+          tasks={widget.tasks}
+          onUpdate={(tasks) => onUpdateWidget(widget.id, { tasks })}
+        />
+      );
+    case 'notes':
+      return (
+        <NotesWidget
+          {...widgetProps}
+          notes={widget.notes}
+          taskSources={taskSources}
+          aiState={aiState}
+          onAIStateChange={(state) => onUpdateWidgetAIState(widget.id, state)}
+          onUpdate={(notes) => onUpdateWidget(widget.id, { notes })}
+        />
+      );
+    case 'habits':
+      return (
+        <HabitsWidget
+          {...widgetProps}
+          habits={widget.habits}
+          onUpdate={(habits) => onUpdateWidget(widget.id, { habits })}
+        />
+      );
+    case 'goals':
+      return (
+        <GoalsWidget
+          {...widgetProps}
+          goals={widget.goals}
+          onUpdate={(goals) => onUpdateWidget(widget.id, { goals })}
+        />
+      );
+    case 'calendar':
+      return (
+        <CalendarWidget
+          {...widgetProps}
+          events={widget.events}
+          aiState={aiState}
+          onAIStateChange={(state) => onUpdateWidgetAIState(widget.id, state)}
+          onUpdate={(events) => onUpdateWidget(widget.id, { events })}
+        />
+      );
+    case 'shopping':
+      return (
+        <ShoppingWidget
+          {...widgetProps}
+          items={widget.items}
+          budget={widget.budget}
+          receipts={widget.receipts}
+          trips={widget.trips}
+          reminders={widget.reminders}
+          aiState={aiState}
+          onAIStateChange={(state) => onUpdateWidgetAIState(widget.id, state)}
+          onUpdate={(data) => onUpdateWidget(widget.id, data)}
+        />
+      );
+    case 'work':
+      return (
+        <WorkWidget
+          {...widgetProps}
+          clientSlots={widget.clientSlots}
+          meals={widget.meals}
+          timeEntries={widget.timeEntries}
+          jobs={widget.jobs}
+          shoppingList={widget.shoppingList}
+          errands={widget.errands}
+          routines={widget.routines}
+          activeRoutineId={widget.activeRoutineId}
+          organizationPreference={widget.organizationPreference}
+          calendarSources={calendarSources}
+          aiState={aiState}
+          onAIStateChange={(state) => onUpdateWidgetAIState(widget.id, state)}
+          onAddCalendarEvent={onAddCalendarEvent}
+          onUpdate={(data) => onUpdateWidget(widget.id, data)}
+        />
+      );
+    case 'daily-focus':
+      return (
+        <DailyFocusWidget
+          {...widgetProps}
+          taskSources={taskSources}
+          sourceWidgetId={widget.sourceWidgetId}
+          onSourceWidgetChange={(sourceWidgetId) =>
+            onDailyFocusSourceChange(widget.id, sourceWidgetId)
+          }
+          aiState={aiState}
+          onAIStateChange={(state) => onUpdateWidgetAIState(widget.id, state)}
+          onAddTask={onAddTaskToSource}
+          onToggleTask={onToggleTaskInSource}
+          onPriorityChange={onUpdateTaskPriorityInSource}
+        />
+      );
+    case 'ai-chat':
+      return (
+        <AIChatWidget
+          {...widgetProps}
+          messages={widget.messages}
+          appliedSuggestionIds={widget.appliedSuggestionIds ?? []}
+          onUpdate={(messages) => onUpdateWidget(widget.id, { messages })}
+          onApplySuggestion={(id) =>
+            onUpdateWidget(widget.id, {
+              appliedSuggestionIds: [...(widget.appliedSuggestionIds ?? []), id],
+            })
+          }
+          availableWidgets={availableWidgets}
+        />
+      );
+    case 'record-note':
+      return (
+        <RecordNoteWidget
+          {...widgetProps}
+          records={widget.records}
+          onUpdate={(records) => onUpdateWidget(widget.id, { records })}
+        />
+      );
+    default:
+      return null;
+  }
+}, (prev, next) => {
+  if (prev.widget !== next.widget) return false;
+  if (prev.snapToGrid !== next.snapToGrid || prev.globalLock !== next.globalLock) return false;
+  if (prev.aiState !== next.aiState) return false;
+
+  switch (prev.widget.type) {
+    case 'notes':
+    case 'daily-focus':
+      return prev.taskSources === next.taskSources;
+    case 'work':
+      return prev.calendarSources === next.calendarSources;
+    case 'ai-chat':
+      return prev.availableWidgets === next.availableWidgets;
+    default:
+      return true;
+  }
+});
+
 function App() {
-  const [widgets, setWidgets] = useLocalStorageState<Widget[]>('organizer-widgets', []);
+  const [widgets, setWidgets] = useLocalStorageState<Widget[]>(
+    'organizer-widgets',
+    [],
+    { persistMode: 'debounced', debounceMs: 300 }
+  );
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showWorkQuestionnaire, setShowWorkQuestionnaire] = useState(false);
   const [snapToGrid, setSnapToGrid] = useLocalStorageState<boolean>('organizer-snap-to-grid', false);
   const [globalLock, setGlobalLock] = useLocalStorageState<boolean>('organizer-global-lock', false);
-  const [widgetAIState, setWidgetAIState] = useLocalStorageState<Record<string, WidgetAIState>>('organizer-widget-ai', {});
+  const [widgetAIState, setWidgetAIState] = useLocalStorageState<Record<string, WidgetAIState>>(
+    'organizer-widget-ai',
+    {},
+    { persistMode: 'debounced', debounceMs: 300 }
+  );
   const dragStartTimeRef = useRef<number>(0);
 
   const addWidget = (type: WidgetType) => {
@@ -80,7 +305,7 @@ function App() {
     toast.success(`Work widget added with ${preference.type} organization!`);
   };
 
-  const removeWidget = (id: string) => {
+  const removeWidget = useCallback((id: string) => {
     setWidgets((current) => (current || []).filter((w) => w.id !== id));
     setWidgetAIState((current) => {
       const nextState = { ...(current || {}) };
@@ -88,21 +313,21 @@ function App() {
       return nextState;
     });
     toast.success('Widget removed');
-  };
+  }, [setWidgetAIState, setWidgets]);
 
-  const updateWidget = (id: string, data: Partial<Widget>) => {
+  const updateWidget = useCallback((id: string, data: Partial<Widget>) => {
     setWidgets((current) =>
       (current || []).map((w) => (w.id === id ? { ...w, ...data } as Widget : w))
     );
-  };
+  }, [setWidgets]);
 
-  const updateWidgetSize = (id: string, size: { width: number; height: number }) => {
+  const updateWidgetSize = useCallback((id: string, size: { width: number; height: number }) => {
     setWidgets((current) =>
       (current || []).map((w) => (w.id === id ? { ...w, size } as Widget : w))
     );
-  };
+  }, [setWidgets]);
 
-  const updateTasksWidget = (sourceWidgetId: string, updater: (tasks: Task[]) => Task[]) => {
+  const updateTasksWidget = useCallback((sourceWidgetId: string, updater: (tasks: Task[]) => Task[]) => {
     setWidgets((current) =>
       (current || []).map((widget) =>
         widget.id === sourceWidgetId && widget.type === 'tasks'
@@ -110,9 +335,9 @@ function App() {
           : widget
       )
     );
-  };
+  }, [setWidgets]);
 
-  const addTaskToSource = (
+  const addTaskToSource = useCallback((
     sourceWidgetId: string,
     task: Pick<Task, 'text' | 'priority' | 'dueDate' | 'category'>
   ) => {
@@ -128,15 +353,15 @@ function App() {
         createdAt: Date.now(),
       },
     ]);
-  };
+  }, [updateTasksWidget]);
 
-  const toggleTaskInSource = (sourceWidgetId: string, taskId: string) => {
+  const toggleTaskInSource = useCallback((sourceWidgetId: string, taskId: string) => {
     updateTasksWidget(sourceWidgetId, (tasks) =>
       tasks.map((task) => (task.id === taskId ? { ...task, completed: !task.completed } : task))
     );
-  };
+  }, [updateTasksWidget]);
 
-  const updateTaskPriorityInSource = (
+  const updateTaskPriorityInSource = useCallback((
     sourceWidgetId: string,
     taskId: string,
     priority: 'low' | 'medium' | 'high'
@@ -144,9 +369,9 @@ function App() {
     updateTasksWidget(sourceWidgetId, (tasks) =>
       tasks.map((task) => (task.id === taskId ? { ...task, priority } : task))
     );
-  };
+  }, [updateTasksWidget]);
 
-  const addCalendarEventToSource = (
+  const addCalendarEventToSource = useCallback((
     destinationWidgetId: string,
     event: CalendarImportDraft
   ): { added: boolean; reason?: 'invalid-destination' | 'duplicate' } => {
@@ -181,18 +406,18 @@ function App() {
     });
 
     return result;
-  };
+  }, [setWidgets]);
 
-  const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {
+  const updateDailyFocusSourceWidget = useCallback((widgetId: string, sourceWidgetId: string | null) => {
     updateWidget(widgetId, { sourceWidgetId });
-  };
+  }, [updateWidget]);
 
-  const updateWidgetAIState = (widgetId: string, state: WidgetAIState) => {
+  const updateWidgetAIState = useCallback((widgetId: string, state: WidgetAIState) => {
     setWidgetAIState((current) => ({
       ...(current || {}),
       [widgetId]: state,
     }));
-  };
+  }, [setWidgetAIState]);
 
   const toggleSnapToGrid = () => {
     setSnapToGrid((current) => !current);
@@ -232,30 +457,71 @@ function App() {
     }
   };
 
-  const handleReorder = (newOrder: Widget[]) => {
+  const handleReorder = useCallback((newOrder: Widget[]) => {
     setWidgets(newOrder.map((w, index) => ({ ...w, position: index })));
-  };
+  }, [setWidgets]);
 
-  const handleDragStart = () => {
+  const handleDragStart = useCallback(() => {
     dragStartTimeRef.current = Date.now();
     setIsDragging(true);
-  };
+  }, []);
 
-  const handleDragEnd = () => {
+  const handleDragEnd = useCallback(() => {
     const dragDuration = Date.now() - dragStartTimeRef.current;
     setIsDragging(false);
     if (dragDuration > 200) {
       toast.success('Widget repositioned');
     }
-  };
+  }, []);
 
-  const currentWidgets = widgets || [];
-  const taskSources = currentWidgets
-    .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
-    .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
-  const calendarSources = currentWidgets
-    .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
-    .map((widget) => ({ id: widget.id }));
+  const currentWidgets = useMemo(() => widgets || [], [widgets]);
+
+  const stableTaskSourceCacheRef = useRef<{
+    widgets: Extract<Widget, { type: 'tasks' }>[];
+    sources: TaskSourceView[];
+  }>({ widgets: [], sources: [] });
+  const stableCalendarSourceCacheRef = useRef<{
+    widgets: Extract<Widget, { type: 'calendar' }>[];
+    sources: CalendarSourceView[];
+  }>({ widgets: [], sources: [] });
+  const stableAvailableWidgetsRef = useRef<AvailableWidgetView[]>([]);
+
+  const taskWidgets = currentWidgets.filter(
+    (widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks'
+  );
+  const taskSources =
+    stableTaskSourceCacheRef.current.widgets.length === taskWidgets.length &&
+    stableTaskSourceCacheRef.current.widgets.every((widget, index) => widget === taskWidgets[index])
+      ? stableTaskSourceCacheRef.current.sources
+      : taskWidgets.map((widget) => ({ id: widget.id, tasks: widget.tasks }));
+  if (taskSources !== stableTaskSourceCacheRef.current.sources) {
+    stableTaskSourceCacheRef.current = { widgets: taskWidgets, sources: taskSources };
+  }
+
+  const calendarWidgets = currentWidgets.filter(
+    (widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar'
+  );
+  const calendarSources =
+    stableCalendarSourceCacheRef.current.widgets.length === calendarWidgets.length &&
+    stableCalendarSourceCacheRef.current.widgets.every((widget, index) => widget === calendarWidgets[index])
+      ? stableCalendarSourceCacheRef.current.sources
+      : calendarWidgets.map((widget) => ({ id: widget.id }));
+  if (calendarSources !== stableCalendarSourceCacheRef.current.sources) {
+    stableCalendarSourceCacheRef.current = { widgets: calendarWidgets, sources: calendarSources };
+  }
+
+  const nextAvailableWidgets = currentWidgets.map((widget) => ({ id: widget.id, type: widget.type }));
+  const availableWidgets =
+    stableAvailableWidgetsRef.current.length === nextAvailableWidgets.length &&
+    stableAvailableWidgetsRef.current.every(
+      (widget, index) =>
+        widget.id === nextAvailableWidgets[index].id && widget.type === nextAvailableWidgets[index].type
+    )
+      ? stableAvailableWidgetsRef.current
+      : nextAvailableWidgets;
+  if (availableWidgets !== stableAvailableWidgetsRef.current) {
+    stableAvailableWidgetsRef.current = availableWidgets;
+  }
 
   const agentHandlers: AgentHandlers = useMemo(() => ({
     onAddTask: (widgetId, taskData) => {
@@ -550,142 +816,29 @@ function App() {
                   className="absolute inset-0 pointer-events-none z-0 bg-primary/5 rounded-xl backdrop-blur-[1px]"
                 />
               )}
-              {currentWidgets.map((widget) => {
-                const widgetProps = {
-                  key: widget.id,
-                  widgetId: widget.id,
-                  onRemove: () => removeWidget(widget.id),
-                  onDragStart: globalLock ? undefined : handleDragStart,
-                  onDragEnd: globalLock ? undefined : handleDragEnd,
-                  size: widget.size,
-                  onSizeChange: (size: { width: number; height: number }) => updateWidgetSize(widget.id, size),
-                  snapToGrid: snapToGrid,
-                  globalLock: globalLock,
-                };
-
-                switch (widget.type) {
-                  case 'tasks':
-                    return (
-                      <TasksWidget
-                        {...widgetProps}
-                        tasks={widget.tasks}
-                        onUpdate={(tasks) => updateWidget(widget.id, { tasks })}
-                      />
-                    );
-                  case 'notes':
-                    return (
-                      <NotesWidget
-                        {...widgetProps}
-                        notes={widget.notes}
-                        taskSources={taskSources}
-                        aiState={widgetAIState?.[widget.id]}
-                        onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
-                        onUpdate={(notes) => updateWidget(widget.id, { notes })}
-                      />
-                    );
-                  case 'habits':
-                    return (
-                      <HabitsWidget
-                        {...widgetProps}
-                        habits={widget.habits}
-                        onUpdate={(habits) => updateWidget(widget.id, { habits })}
-                      />
-                    );
-                  case 'goals':
-                    return (
-                      <GoalsWidget
-                        {...widgetProps}
-                        goals={widget.goals}
-                        onUpdate={(goals) => updateWidget(widget.id, { goals })}
-                      />
-                    );
-                  case 'calendar':
-                    return (
-                      <CalendarWidget
-                        {...widgetProps}
-                        events={widget.events}
-                        aiState={widgetAIState?.[widget.id]}
-                        onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
-                        onUpdate={(events) => updateWidget(widget.id, { events })}
-                      />
-                    );
-                  case 'shopping':
-                    return (
-                      <ShoppingWidget
-                        {...widgetProps}
-                        items={widget.items}
-                        budget={widget.budget}
-                        receipts={widget.receipts}
-                        trips={widget.trips}
-                        reminders={widget.reminders}
-                        aiState={widgetAIState?.[widget.id]}
-                        onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
-                        onUpdate={(data) => updateWidget(widget.id, data)}
-                      />
-                    );
-                  case 'work':
-                    return (
-                      <WorkWidget
-                        {...widgetProps}
-                        clientSlots={widget.clientSlots}
-                        meals={widget.meals}
-                        timeEntries={widget.timeEntries}
-                        jobs={widget.jobs}
-                        shoppingList={widget.shoppingList}
-                        errands={widget.errands}
-                        routines={widget.routines}
-                        activeRoutineId={widget.activeRoutineId}
-                        organizationPreference={widget.organizationPreference}
-                        calendarSources={calendarSources}
-                        aiState={widgetAIState?.[widget.id]}
-                        onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
-                        onAddCalendarEvent={addCalendarEventToSource}
-                        onUpdate={(data) => updateWidget(widget.id, data)}
-                      />
-                    );
-                  case 'daily-focus':
-                    return (
-                      <DailyFocusWidget
-                        {...widgetProps}
-                        taskSources={taskSources}
-                        sourceWidgetId={widget.sourceWidgetId}
-                        onSourceWidgetChange={(sourceWidgetId) =>
-                          updateDailyFocusSourceWidget(widget.id, sourceWidgetId)
-                        }
-                        aiState={widgetAIState?.[widget.id]}
-                        onAIStateChange={(state) => updateWidgetAIState(widget.id, state)}
-                        onAddTask={addTaskToSource}
-                        onToggleTask={toggleTaskInSource}
-                        onPriorityChange={updateTaskPriorityInSource}
-                      />
-                    );
-                  case 'ai-chat':
-                    return (
-                      <AIChatWidget
-                        {...widgetProps}
-                        messages={widget.messages}
-                        appliedSuggestionIds={widget.appliedSuggestionIds ?? []}
-                        onUpdate={(messages) => updateWidget(widget.id, { messages })}
-                        onApplySuggestion={(id) =>
-                          updateWidget(widget.id, {
-                            appliedSuggestionIds: [...(widget.appliedSuggestionIds ?? []), id],
-                          })
-                        }
-                        availableWidgets={currentWidgets.map((w) => ({ id: w.id, type: w.type }))}
-                      />
-                    );
-                  case 'record-note':
-                    return (
-                      <RecordNoteWidget
-                        {...widgetProps}
-                        records={widget.records}
-                        onUpdate={(records) => updateWidget(widget.id, { records })}
-                      />
-                    );
-                  default:
-                    return null;
-                }
-              })}
+              {currentWidgets.map((widget) => (
+                <WidgetRenderer
+                  key={widget.id}
+                  widget={widget}
+                  snapToGrid={snapToGrid}
+                  globalLock={globalLock}
+                  taskSources={taskSources}
+                  calendarSources={calendarSources}
+                  availableWidgets={availableWidgets}
+                  aiState={widgetAIState?.[widget.id]}
+                  onRemoveWidget={removeWidget}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onSizeChange={updateWidgetSize}
+                  onUpdateWidget={updateWidget}
+                  onUpdateWidgetAIState={updateWidgetAIState}
+                  onAddCalendarEvent={addCalendarEventToSource}
+                  onDailyFocusSourceChange={updateDailyFocusSourceWidget}
+                  onAddTaskToSource={addTaskToSource}
+                  onToggleTaskInSource={toggleTaskInSource}
+                  onUpdateTaskPriorityInSource={updateTaskPriorityInSource}
+                />
+              ))}
             </Reorder.Group>
           )}
         </div>

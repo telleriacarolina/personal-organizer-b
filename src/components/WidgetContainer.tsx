@@ -1,4 +1,4 @@
-import { ReactNode, useState, useRef, useEffect } from 'react';
+import { ReactNode, useState, useRef, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, DotsSixVertical, CornersOut, Lock, LockOpen } from '@phosphor-icons/react';
@@ -43,6 +43,7 @@ export function WidgetContainer({
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [isPinching, setIsPinching] = useState(false);
   const [pinchStart, setPinchStart] = useState({ distance: 0, width: 0, height: 0 });
+  const [draftSize, setDraftSize] = useState<{ width: number; height: number } | null>(null);
 
   const GRID_SIZE = 50;
   
@@ -74,20 +75,22 @@ export function WidgetContainer({
   const { minWidth, minHeight } = getMinimumSize();
   const defaultWidth = Math.max(350, minWidth);
   const defaultHeight = Math.max(400, minHeight);
-  const currentWidth = size?.width || defaultWidth;
-  const currentHeight = size?.height || defaultHeight;
+  const persistedWidth = size?.width || defaultWidth;
+  const persistedHeight = size?.height || defaultHeight;
+  const currentWidth = draftSize?.width || persistedWidth;
+  const currentHeight = draftSize?.height || persistedHeight;
   const isLocked = globalLock || size?.locked || false;
 
-  const snapToGridValue = (value: number) => {
+  const snapToGridValue = useCallback((value: number) => {
     if (!snapToGrid) return value;
     return Math.round(value / GRID_SIZE) * GRID_SIZE;
-  };
+  }, [snapToGrid]);
 
   const toggleLock = () => {
     if (onSizeChange) {
       onSizeChange({
-        width: currentWidth,
-        height: currentHeight,
+        width: persistedWidth,
+        height: persistedHeight,
         locked: !isLocked
       });
       toast.success(isLocked ? 'Widget size unlocked' : 'Widget size locked');
@@ -143,15 +146,17 @@ export function WidgetContainer({
         
         newWidth = snapToGridValue(newWidth);
         newHeight = snapToGridValue(newHeight);
-        
-        if (onSizeChange) {
-          onSizeChange({ width: newWidth, height: newHeight });
-        }
+
+        setDraftSize({ width: newWidth, height: newHeight });
       }
     };
 
     const handlePointerUp = () => {
+      if (isResizing && draftSize && onSizeChange) {
+        onSizeChange({ width: draftSize.width, height: draftSize.height });
+      }
       setIsResizing(false);
+      setDraftSize(null);
     };
 
     const handleTouchMove = (e: TouchEvent) => {
@@ -170,14 +175,16 @@ export function WidgetContainer({
         newWidth = snapToGridValue(newWidth);
         newHeight = snapToGridValue(newHeight);
         
-        if (onSizeChange) {
-          onSizeChange({ width: newWidth, height: newHeight });
-        }
+        setDraftSize({ width: newWidth, height: newHeight });
       }
     };
 
     const handleTouchEnd = () => {
+      if (isPinching && draftSize && onSizeChange) {
+        onSizeChange({ width: draftSize.width, height: draftSize.height });
+      }
       setIsPinching(false);
+      setDraftSize(null);
     };
 
     if (isResizing) {
@@ -196,7 +203,13 @@ export function WidgetContainer({
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGrid, minWidth, minHeight]);
+  }, [draftSize, isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGridValue, minWidth, minHeight]);
+
+  useEffect(() => {
+    if (!isResizing && !isPinching) {
+      setDraftSize(null);
+    }
+  }, [isPinching, isResizing, persistedHeight, persistedWidth]);
 
   return (
     <Reorder.Item

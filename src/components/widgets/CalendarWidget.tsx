@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Button } from '@/components/ui/button';
@@ -59,7 +59,11 @@ export function CalendarWidget({
   size,
   onSizeChange,
 }: CalendarWidgetProps) {
-  const [, setPlannerEvents] = useLocalStorageState<FamilyCalendarPlannerEvent[]>('family-calendar-planner-events', []);
+  const [, setPlannerEvents] = useLocalStorageState<FamilyCalendarPlannerEvent[]>(
+    'family-calendar-planner-events',
+    [],
+    { persistMode: 'debounced', debounceMs: 300 }
+  );
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -259,9 +263,30 @@ export function CalendarWidget({
   const weekEnd = endOfWeek(currentWeek);
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  const getEventsForDate = (date: Date) => {
-    return events.filter((event) => isSameDay(new Date(event.date), date));
-  };
+  const dateKey = (date: Date) => format(date, 'yyyy-MM-dd');
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    events.forEach((event) => {
+      const key = dateKey(new Date(event.date));
+      const existing = map.get(key);
+      if (existing) {
+        existing.push(event);
+      } else {
+        map.set(key, [event]);
+      }
+    });
+    map.forEach((list) => {
+      list.sort((a, b) => {
+        if (!a.startTime && !b.startTime) return a.date - b.date;
+        if (!a.startTime) return 1;
+        if (!b.startTime) return -1;
+        return a.startTime.localeCompare(b.startTime);
+      });
+    });
+    return map;
+  }, [events]);
+
+  const getEventsForDate = (date: Date) => eventsByDate.get(dateKey(date)) || [];
 
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
 
@@ -273,8 +298,9 @@ export function CalendarWidget({
     return eventTypes.find((eventTypeOption) => eventTypeOption.value === type)?.label || 'Event';
   };
 
-  const aiInput = { events };
-  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+  const aiInput = useMemo(() => ({ events }), [events]);
+  const aiInputHash = useMemo(() => buildAIInputHash(aiInput), [aiInput]);
+  const isAIStale = aiState ? aiState.sourceHash !== aiInputHash : false;
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;
@@ -313,34 +339,31 @@ export function CalendarWidget({
     return `${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}`;
   };
 
-  const getEventsForMonth = () => {
+  const monthEvents = useMemo(() => {
     const monthStartDate = startOfMonth(currentMonth);
     const monthEndDate = endOfMonth(currentMonth);
-    
     return events
       .filter((event) => {
         const eventDate = new Date(event.date);
         return eventDate >= monthStartDate && eventDate <= monthEndDate;
       })
       .sort((a, b) => a.date - b.date);
-  };
+  }, [currentMonth, events]);
 
-  const getEventsForWeek = () => {
+  const weekEvents = useMemo(() => {
     const weekStartDate = startOfWeek(currentWeek);
     const weekEndDate = endOfWeek(currentWeek);
-    
     return events
       .filter((event) => {
         const eventDate = new Date(event.date);
         return eventDate >= weekStartDate && eventDate <= weekEndDate;
       })
       .sort((a, b) => a.date - b.date);
-  };
+  }, [currentWeek, events]);
 
-  const getEventsForDay = () => {
+  const dayEvents = useMemo(() => {
     const dayStartDate = startOfDay(currentDay);
     const dayEndDate = endOfDay(currentDay);
-    
     return events
       .filter((event) => {
         const eventDate = new Date(event.date);
@@ -352,11 +375,9 @@ export function CalendarWidget({
         if (!b.startTime) return -1;
         return a.startTime.localeCompare(b.startTime);
       });
-  };
-
-  const monthEvents = getEventsForMonth();
-  const weekEvents = getEventsForWeek();
-  const dayEvents = getEventsForDay();
+  }, [currentDay, events]);
+  const allDayEvents = useMemo(() => dayEvents.filter((event) => !event.startTime), [dayEvents]);
+  const visibleRangeEvents = viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents;
 
   const handleNavigatePrev = () => {
     if (viewMode === 'month') {
@@ -865,12 +886,12 @@ export function CalendarWidget({
                   </div>
                 </div>
                 
-                {dayEvents.filter(e => !e.startTime).length > 0 && (
+                {allDayEvents.length > 0 && (
                   <div className="mt-4 space-y-2">
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       All-Day Events
                     </h4>
-                    {dayEvents.filter(e => !e.startTime).map((event) => (
+                    {allDayEvents.map((event) => (
                       <div
                         key={event.id}
                         onClick={() => openEditDialog(event)}
@@ -972,15 +993,15 @@ export function CalendarWidget({
             <h4 className="font-semibold text-sm text-foreground">
               Events & Plans - {viewMode === 'month' ? format(currentMonth, 'MMMM yyyy') : viewMode === 'week' ? `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}` : format(currentDay, 'MMMM d, yyyy')}
             </h4>
-            {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length > 0 && (
+            {visibleRangeEvents.length > 0 && (
               <Badge variant="outline" className="text-xs">
-                {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length} {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length === 1 ? 'event' : 'events'}
+                {visibleRangeEvents.length} {visibleRangeEvents.length === 1 ? 'event' : 'events'}
               </Badge>
             )}
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             <AnimatePresence>
-              {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length === 0 ? (
+              {visibleRangeEvents.length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -998,7 +1019,7 @@ export function CalendarWidget({
                   </p>
                 </motion.div>
               ) : (
-                (viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).map((event) => (
+                visibleRangeEvents.map((event) => (
                   <motion.div
                     key={event.id}
                     initial={{ opacity: 0, y: -10 }}

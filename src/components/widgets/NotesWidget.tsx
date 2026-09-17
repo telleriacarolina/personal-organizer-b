@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -77,8 +77,9 @@ export function NotesWidget({
     );
   };
 
-  const aiInput = { notes };
-  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+  const aiInput = useMemo(() => ({ notes }), [notes]);
+  const aiInputHash = useMemo(() => buildAIInputHash(aiInput), [aiInput]);
+  const isAIStale = aiState ? aiState.sourceHash !== aiInputHash : false;
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;
