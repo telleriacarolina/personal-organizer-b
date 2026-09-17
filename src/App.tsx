@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
@@ -212,20 +212,29 @@ function App() {
     .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
     .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
 
-  const agentHandlers: AgentHandlers = {
+  const agentHandlers: AgentHandlers = useMemo(() => ({
     onAddTask: (widgetId, taskData) => {
-      updateTasksWidget(widgetId, (tasks) => [
-        ...tasks,
-        {
-          id: Date.now().toString(),
-          text: taskData.text,
-          completed: false,
-          priority: taskData.priority ?? 'medium',
-          dueDate: taskData.dueDate ?? null,
-          category: taskData.category ?? null,
-          createdAt: Date.now(),
-        },
-      ]);
+      setWidgets((current) =>
+        (current || []).map((widget) =>
+          widget.id === widgetId && widget.type === 'tasks'
+            ? ({
+                ...widget,
+                tasks: [
+                  ...widget.tasks,
+                  {
+                    id: Date.now().toString(),
+                    text: taskData.text,
+                    completed: false,
+                    priority: taskData.priority ?? 'medium',
+                    dueDate: taskData.dueDate ?? null,
+                    category: taskData.category ?? null,
+                    createdAt: Date.now(),
+                  },
+                ],
+              } as Widget)
+            : widget
+        )
+      );
       toast.success(`Added task: ${taskData.text}`);
     },
     onAddNote: (widgetId, noteData) => {
@@ -351,13 +360,13 @@ function App() {
       );
       toast.success(`Event added: ${eventData.title}`);
     },
-  };
+  }), [setWidgets]);
 
-  const agentContext: AgentContext = {
+  const agentContext: AgentContext = useMemo(() => ({
     widgets: currentWidgets,
     handlers: agentHandlers,
     currentDate: new Date(),
-  };
+  }), [currentWidgets, agentHandlers]);
 
   useEffect(() => {
     if (currentWidgets.length > 0 && currentWidgets.length <= 2 && !localStorage.getItem('drag-hint-shown')) {
