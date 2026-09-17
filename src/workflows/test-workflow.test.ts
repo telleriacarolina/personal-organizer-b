@@ -2,11 +2,10 @@ import { describe, expect, it } from "vitest";
 import { normalizeInputStep, testWorkflow } from "./test-workflow";
 
 describe("workflow infrastructure", () => {
-  it("runs the workflow function and uses a step function", async () => {
-    await expect(testWorkflow("  hello  ")).resolves.toEqual({
-      message: "hello",
-      status: "success",
-    });
+  it("compiles workflow directives and allows step unit execution", async () => {
+    await expect(testWorkflow("  hello  ")).rejects.toThrow(
+      "You attempted to execute workflow testWorkflow function directly",
+    );
     await expect(normalizeInputStep("  step  ")).resolves.toBe("step");
   });
 });
