@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen, Trash } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
@@ -34,6 +35,7 @@ function App() {
   const [globalLock, setGlobalLock] = useLocalStorageState<boolean>('organizer-global-lock', false);
   const [widgetAIState, setWidgetAIState] = useLocalStorageState<Record<string, WidgetAIState>>('organizer-widget-ai', {});
   const [isClearingData, setIsClearingData] = useState(false);
+  const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
   const dragStartTimeRef = useRef<number>(0);
 
   const addWidget = (type: WidgetType) => {
@@ -252,10 +254,7 @@ function App() {
   };
 
   const clearAllPersonalData = async () => {
-    const confirmed = window.confirm(
-      'This will clear all organizer data, AI history, theme settings, sync preferences, and stored media from this browser. Continue?'
-    );
-    if (!confirmed || isClearingData) return;
+    if (isClearingData) return;
 
     setIsClearingData(true);
     try {
@@ -287,6 +286,7 @@ function App() {
       setShowAddDialog(false);
       setShowWorkQuestionnaire(false);
       setShowDragHint(false);
+      setShowClearDataConfirm(false);
       toast.success('All personal data has been removed from this browser.');
     } catch {
       toast.error('Could not clear all personal data. Close other tabs and try again.');
@@ -508,7 +508,7 @@ function App() {
                 <span className="hidden lg:inline">{globalLock ? 'Locked' : 'Unlocked'}</span>
               </Button>
               <Button
-                onClick={() => void clearAllPersonalData()}
+                onClick={() => setShowClearDataConfirm(true)}
                 size="lg"
                 variant="outline"
                 className="gap-2 flex-shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10"
@@ -759,6 +759,30 @@ function App() {
         onOpenChange={setShowWorkQuestionnaire}
         onComplete={handleWorkOrganizationComplete}
       />
+
+      <AlertDialog open={showClearDataConfirm} onOpenChange={setShowClearDataConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all personal organizer data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes widgets, notes, tasks, AI history/config, theme settings, sync preferences, and stored media blobs for this browser profile.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClearingData}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                void clearAllPersonalData();
+              }}
+              disabled={isClearingData}
+            >
+              {isClearingData ? 'Clearing…' : 'Clear data'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       <Toaster position="bottom-right" toastOptions={{
         className: 'sm:mb-0 mb-16'

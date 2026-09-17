@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -57,6 +58,7 @@ function isTrustedSyncUrl(apiBaseUrl: string): boolean {
     const isLocal =
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
+      hostname === '::1' ||
       hostname.endsWith('.local') ||
       hostname.endsWith('.localhost');
     return parsed.protocol === 'http:' && isLocal;
@@ -99,6 +101,7 @@ export function CalendarWidget({
   const [location, setLocation] = useState('');
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(true);
+  const [showSyncConsentDialog, setShowSyncConsentDialog] = useState(false);
   const apiBaseUrl = import.meta.env.VITE_FAMILY_CALENDAR_API_URL as string | undefined;
   const hasExternalSyncEndpoint = Boolean(apiBaseUrl?.trim());
 
@@ -213,14 +216,18 @@ export function CalendarWidget({
     }
 
     if (!externalSyncConsent) {
-      const accepted = window.confirm(
-        'External sync sends event title, description, date/time, location, reminder, and attendee metadata to your configured calendar endpoint. Continue?'
-      );
-      if (!accepted) return;
-      setExternalSyncConsent(true);
+      setShowSyncConsentDialog(true);
+      return;
     }
 
     setExternalSyncEnabled(true);
+    toast.success('External sync enabled');
+  };
+
+  const confirmExternalSyncConsent = () => {
+    setExternalSyncConsent(true);
+    setExternalSyncEnabled(true);
+    setShowSyncConsentDialog(false);
     toast.success('External sync enabled');
   };
 
@@ -514,6 +521,23 @@ export function CalendarWidget({
             </p>
           </div>
         )}
+
+        <AlertDialog open={showSyncConsentDialog} onOpenChange={setShowSyncConsentDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Enable external calendar sync?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This sends event title, description, date/time, location, reminders, and attendee metadata to your configured sync API.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmExternalSyncConsent}>
+                I understand, enable sync
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">

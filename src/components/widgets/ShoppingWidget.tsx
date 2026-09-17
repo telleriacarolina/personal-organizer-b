@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
 import { saveMediaBlob } from '@/lib/media-storage';
-import { normalizeImageForStorage, validateImageFile } from '@/lib/media-validation';
+import { assertMaxBytes, normalizeImageForStorage, validateImageFile } from '@/lib/media-validation';
 
 interface ShoppingWidgetProps {
   items: PersonalShoppingItem[];
@@ -191,11 +191,7 @@ export function ShoppingWidget({
         maxWidth: MAX_RECEIPT_IMAGE_DIMENSION,
         maxHeight: MAX_RECEIPT_IMAGE_DIMENSION,
       });
-      await validateImageFile(normalizedImage, {
-        maxBytes: MAX_RECEIPT_IMAGE_BYTES,
-        maxWidth: MAX_RECEIPT_IMAGE_DIMENSION,
-        maxHeight: MAX_RECEIPT_IMAGE_DIMENSION,
-      });
+      assertMaxBytes(normalizedImage, MAX_RECEIPT_IMAGE_BYTES, 'Receipt image');
       setReceiptImageInput(normalizedImage);
 
       if (!receiptStoreName.trim()) {
@@ -253,11 +249,6 @@ export function ShoppingWidget({
 
       let imageRef: Receipt['imageRef'];
       if (receiptImageInput) {
-        await validateImageFile(receiptImageInput, {
-          maxBytes: MAX_RECEIPT_IMAGE_BYTES,
-          maxWidth: MAX_RECEIPT_IMAGE_DIMENSION,
-          maxHeight: MAX_RECEIPT_IMAGE_DIMENSION,
-        });
         imageRef = await saveMediaBlob(receiptImageInput);
       }
 

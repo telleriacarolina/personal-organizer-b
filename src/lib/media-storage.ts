@@ -37,10 +37,34 @@ function withStore<T>(
         const transaction = db.transaction(STORE_NAME, mode);
         const store = transaction.objectStore(STORE_NAME);
         const request = operation(store);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error ?? new Error('Media storage operation failed'));
-        transaction.oncomplete = () => db.close();
-        transaction.onerror = () => reject(transaction.error ?? new Error('Media transaction failed'));
+        let settled = false;
+        let result: T;
+        request.onsuccess = () => {
+          result = request.result;
+        };
+        request.onerror = () => {
+          settled = true;
+          db.close();
+          reject(request.error ?? new Error('Media storage operation failed'));
+        };
+        transaction.oncomplete = () => {
+          if (settled) return;
+          settled = true;
+          db.close();
+          resolve(result);
+        };
+        transaction.onerror = () => {
+          if (settled) return;
+          settled = true;
+          db.close();
+          reject(transaction.error ?? new Error('Media transaction failed'));
+        };
+        transaction.onabort = () => {
+          if (settled) return;
+          settled = true;
+          db.close();
+          reject(transaction.error ?? new Error('Media transaction aborted'));
+        };
       })
   );
 }
@@ -77,6 +101,6 @@ export async function removeMediaDatabase(): Promise<void> {
     const req = indexedDB.deleteDatabase(DB_NAME);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error ?? new Error('Could not remove media database'));
-    req.onblocked = () => resolve();
+    req.onblocked = () => reject(new Error('Media database deletion blocked by an open connection'));
   });
 }

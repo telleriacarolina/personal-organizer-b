@@ -451,7 +451,8 @@ function MediaPreview({ dataUrl, mediaType }: { dataUrl: string; mediaType: Reco
 }
 
 function useRecordMediaUrl(record: RecordNote): string | null {
-  const [url, setUrl] = useState<string | null>(record.dataUrl ?? null);
+  const [url, setUrl] = useState<string | null>(null);
+  const mediaRefId = record.mediaRef?.id;
   useEffect(() => {
     let disposed = false;
     let currentObjectUrl: string | null = null;
@@ -459,14 +460,14 @@ function useRecordMediaUrl(record: RecordNote): string | null {
       setUrl(record.dataUrl);
       return;
     }
-    if (!record.mediaRef?.id) {
+    if (!mediaRefId) {
       setUrl(null);
       return;
     }
 
     void (async () => {
       try {
-        const blob = await getMediaBlob(record.mediaRef!.id);
+        const blob = await getMediaBlob(mediaRefId);
         if (disposed || !blob) {
           if (!disposed) setUrl(null);
           return;
@@ -482,7 +483,7 @@ function useRecordMediaUrl(record: RecordNote): string | null {
       disposed = true;
       if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
     };
-  }, [record.id, record.dataUrl, record.mediaRef?.id]);
+  }, [record.id, record.dataUrl, mediaRefId]);
 
   return url;
 }
