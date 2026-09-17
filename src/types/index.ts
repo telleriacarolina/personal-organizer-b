@@ -398,6 +398,7 @@ export interface AIChatMessage {
 export interface AIChatWidget extends BaseWidget {
   type: 'ai-chat';
   messages: AIChatMessage[];
+  appliedSuggestionIds?: string[];
 }
 
 export type Widget = TasksWidget | DailyFocusWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget | AIChatWidget;

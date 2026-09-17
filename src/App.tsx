@@ -48,7 +48,7 @@ function App() {
       ...(type === 'goals' && { goals: [] }),
       ...(type === 'calendar' && { events: [] }),
       ...(type === 'shopping' && { items: [], receipts: [], trips: [], reminders: [] }),
-      ...(type === 'ai-chat' && { messages: [] }),
+      ...(type === 'ai-chat' && { messages: [], appliedSuggestionIds: [] }),
     } as Widget;
 
     setWidgets((current) => [...(current || []), newWidget]);
@@ -460,7 +460,13 @@ function App() {
                       <AIChatWidget
                         {...widgetProps}
                         messages={widget.messages}
+                        appliedSuggestionIds={widget.appliedSuggestionIds ?? []}
                         onUpdate={(messages) => updateWidget(widget.id, { messages })}
+                        onApplySuggestion={(id) =>
+                          updateWidget(widget.id, {
+                            appliedSuggestionIds: [...(widget.appliedSuggestionIds ?? []), id],
+                          })
+                        }
                         availableWidgets={currentWidgets.map((w) => ({ id: w.id, type: w.type }))}
                       />
                     );

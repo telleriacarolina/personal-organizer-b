@@ -14,7 +14,9 @@ import { toast } from 'sonner';
 interface AIChatWidgetProps {
   widgetId: string;
   messages: AIChatMessage[];
+  appliedSuggestionIds?: string[];
   onUpdate: (messages: AIChatMessage[]) => void;
+  onApplySuggestion: (id: string) => void;
   onRemove: () => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
@@ -50,7 +52,9 @@ const FEATURE_PROMPTS = [
 export function AIChatWidget({
   widgetId,
   messages,
+  appliedSuggestionIds = [],
   onUpdate,
+  onApplySuggestion,
   onRemove,
   onDragStart,
   onDragEnd,
@@ -62,7 +66,6 @@ export function AIChatWidget({
 }: AIChatWidgetProps) {
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -120,7 +123,7 @@ export function AIChatWidget({
   };
 
   const handleApply = (suggestion: AIInsight) => {
-    setAppliedIds((prev) => new Set([...prev, suggestion.id]));
+    onApplySuggestion(suggestion.id);
     toast.success(`Suggestion "${suggestion.title}" marked as applied`);
   };
 
@@ -145,9 +148,9 @@ export function AIChatWidget({
       widgetType="ai-chat"
       globalLock={globalLock}
     >
-      <div className="flex flex-col gap-3 h-full">
+      <div className="flex flex-col gap-3 h-full min-h-0">
         {/* Chat history */}
-        <ScrollArea className="flex-1 pr-1" style={{ maxHeight: size ? `${(size.height ?? 500) - 200}px` : '320px' }}>
+        <ScrollArea className="flex-1 min-h-0 pr-1">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-4 py-8 text-center">
               <div className="flex items-center justify-center w-14 h-14 rounded-full bg-primary/10">
@@ -200,7 +203,7 @@ export function AIChatWidget({
                       {msg.suggestions && msg.suggestions.length > 0 && (
                         <div className="mt-2 space-y-2">
                           {msg.suggestions.map((s) => {
-                            const isApplied = appliedIds.has(s.id);
+                            const isApplied = appliedSuggestionIds.includes(s.id);
                             return (
                               <div
                                 key={s.id}
