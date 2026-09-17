@@ -16,7 +16,7 @@ import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
 import { CalendarEvent, Task, Widget, WidgetAIState, WidgetType } from '@/types';
-import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
+import { appendImportedCalendarEvent, CalendarImportDraft } from '@/lib/calendar-imports';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
 function App() {
@@ -109,19 +109,14 @@ function App() {
   const updateCalendarWidget = (
     sourceWidgetId: string,
     updater: (events: CalendarEvent[]) => CalendarEvent[]
-  ): boolean => {
-    let updated = false;
+  ) => {
     setWidgets((current) =>
       (current || []).map((widget) =>
         widget.id === sourceWidgetId && widget.type === 'calendar'
-          ? (() => {
-              updated = true;
-              return { ...widget, events: updater(widget.events) } as Widget;
-            })()
+          ? ({ ...widget, events: updater(widget.events) } as Widget)
           : widget
       )
     );
-    return updated;
   };
 
   const addTaskToSource = (
@@ -160,15 +155,19 @@ function App() {
 
   const addCalendarEventToSource = (
     sourceWidgetId: string,
-    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location' | 'reminder' | 'color' | 'sourceType' | 'sourceId' | 'sourceWidgetId'>
+    event: CalendarImportDraft
   ): { added: boolean; reason?: 'invalid-destination' | 'duplicate' } => {
+    const hasDestination = (widgets || []).some(
+      (widget) => widget.id === sourceWidgetId && widget.type === 'calendar'
+    );
+    if (!hasDestination) return { added: false, reason: 'invalid-destination' };
+
     let importResult: ReturnType<typeof appendImportedCalendarEvent> | null = null;
-    const destinationFound = updateCalendarWidget(sourceWidgetId, (events) => {
+    updateCalendarWidget(sourceWidgetId, (events) => {
       importResult = appendImportedCalendarEvent(events, event);
       return importResult.events;
     });
 
-    if (!destinationFound) return { added: false, reason: 'invalid-destination' };
     if (!importResult?.added) return { added: false, reason: 'duplicate' };
     return { added: true };
   };

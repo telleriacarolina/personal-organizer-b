@@ -39,16 +39,12 @@ import { AIInsightAction, CalendarEvent, ClientSlot, WorkMeal, TimeEntry, Job, S
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { CalendarImportDraft } from '@/lib/calendar-imports';
 
 interface CalendarSource {
   id: string;
   events: CalendarEvent[];
 }
-
-type AddToCalendarEvent = Pick<
-  CalendarEvent,
-  'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location' | 'reminder' | 'color' | 'sourceType' | 'sourceId' | 'sourceWidgetId'
->;
 
 interface WorkWidgetProps {
   widgetId: string;
@@ -66,7 +62,7 @@ interface WorkWidgetProps {
   onAIStateChange: (state: WidgetAIState) => void;
   onAddCalendarEvent: (
     sourceWidgetId: string,
-    event: AddToCalendarEvent
+    event: CalendarImportDraft
   ) => { added: boolean; reason?: 'invalid-destination' | 'duplicate' };
   onUpdate: (data: {
     clientSlots?: ClientSlot[];
@@ -130,7 +126,7 @@ export function WorkWidget({
     }
   }, [calendarSources, selectedCalendarSourceId]);
 
-  const addItemToCalendar = (event: AddToCalendarEvent) => {
+  const addItemToCalendar = (event: CalendarImportDraft) => {
     if (!canPublishToCalendar) {
       toast.error('Add a Calendar widget first');
       return;
@@ -642,7 +638,7 @@ function ClientSlotsTab({
 }: {
   clientSlots: ClientSlot[];
   onAdd: (data: Omit<ClientSlot, 'id' | 'createdAt'>) => void;
-  onAddToCalendar: (event: AddToCalendarEvent) => void;
+  onAddToCalendar: (event: CalendarImportDraft) => void;
   canPublishToCalendar: boolean;
   onUpdateStatus: (id: string, status: ClientSlot['status']) => void;
   onDelete: (id: string) => void;
@@ -872,7 +868,7 @@ function MealsTab({
 }: {
   meals: WorkMeal[];
   onAdd: (data: Omit<WorkMeal, 'id' | 'createdAt'>) => void;
-  onAddToCalendar: (event: AddToCalendarEvent) => void;
+  onAddToCalendar: (event: CalendarImportDraft) => void;
   canPublishToCalendar: boolean;
   onDelete: (id: string) => void;
   showDialog: boolean;
@@ -1176,7 +1172,7 @@ function JobsTab({
 }: {
   jobs: Job[];
   onAdd: (data: Omit<Job, 'id' | 'createdAt'>) => void;
-  onAddToCalendar: (event: AddToCalendarEvent) => void;
+  onAddToCalendar: (event: CalendarImportDraft) => void;
   canPublishToCalendar: boolean;
   onUpdateStatus: (id: string, status: Job['status']) => void;
   onDelete: (id: string) => void;
@@ -1552,7 +1548,7 @@ function ErrandsTab({
 }: {
   errands: WorkErrand[];
   onAdd: (data: Omit<WorkErrand, 'id' | 'createdAt'>) => void;
-  onAddToCalendar: (event: AddToCalendarEvent) => void;
+  onAddToCalendar: (event: CalendarImportDraft) => void;
   canPublishToCalendar: boolean;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
