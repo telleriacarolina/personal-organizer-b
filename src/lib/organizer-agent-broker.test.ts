@@ -127,6 +127,27 @@ describe('organizer agent broker', () => {
     expect(response.summary).toContain('Permission denied');
   });
 
+  it('requires explicit boolean fields for status mutations', () => {
+    const { context } = createContext([
+      {
+        id: 'tasks-1',
+        type: 'tasks',
+        position: 0,
+        tasks: [{ id: 'task-1', text: 'Pay rent', completed: false, createdAt: 1 }],
+      },
+    ], ['read:tasks', 'write:tasks']);
+
+    const response = executeOrganizerAgentTool('tasks.set_status', {
+      requestId: 'req-2b',
+      workspaceId: context.actorContext.workspaceId,
+      actorContext: context.actorContext,
+      taskId: 'task-1',
+    }, context);
+
+    expect(response.ok).toBe(false);
+    expect(response.summary).toContain('completed must be true or false');
+  });
+
   it('returns metadata-only record note responses', () => {
     const { context } = createContext([
       {

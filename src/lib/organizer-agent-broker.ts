@@ -133,6 +133,12 @@ function assertOptionalBoolean(value: unknown, field: string) {
   }
 }
 
+function assertRequiredBoolean(value: unknown, field: string) {
+  if (typeof value !== 'boolean') {
+    throw new Error(`${field} must be true or false.`);
+  }
+}
+
 function assertOptionalNumber(value: unknown, field: string) {
   if (value === undefined || value === null || value === '') return;
   if (typeof value !== 'number' || Number.isNaN(value)) {
@@ -226,11 +232,11 @@ function normalizeDateOnly(value: unknown) {
   }
 }
 
-function ensureDateRange(fromValue: unknown, toValue: unknown) {
+function ensureDateRange(fromValue: unknown, toValue: unknown, labels: { from: string; to: string } = { from: 'from', to: 'to' }) {
   const from = normalizeDateOnly(fromValue);
   const to = normalizeDateOnly(toValue);
   if (from && to && from > to) {
-    throw new Error('dueFrom cannot be after dueTo.');
+    throw new Error(`${labels.from} cannot be after ${labels.to}.`);
   }
   return { from, to };
 }
@@ -1232,7 +1238,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     const auditId = createAuditId();
     assertOptionalEnum(input.status, new Set(['pending', 'completed', 'all']), 'status');
     assertOptionalEnum(input.priority, TASK_PRIORITIES, 'priority');
-    const { from, to } = ensureDateRange(input.dueFrom, input.dueTo);
+    const { from, to } = ensureDateRange(input.dueFrom, input.dueTo, { from: 'dueFrom', to: 'dueTo' });
     assertString(input.category, 'category', { max: 120 });
     const limit = normalizeLimit(input.limit);
     const status = typeof input.status === 'string' ? input.status : 'all';
@@ -1354,7 +1360,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'tasks.set_status': (input, context) => {
     const auditId = createAuditId();
     assertString(input.taskId, 'taskId', { required: true, max: 120 });
-    assertOptionalBoolean(input.completed, 'completed');
+    assertRequiredBoolean(input.completed, 'completed');
     const match = findTask(context.widgets, input.taskId);
     if (!match) return createResponse(auditId, 'Task not found.', { ok: false });
     const completed = Boolean(input.completed);
@@ -1569,7 +1575,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'habits.mark_completion': (input, context) => {
     const auditId = createAuditId();
     assertString(input.habitId, 'habitId', { required: true, max: 120 });
-    assertOptionalBoolean(input.completed, 'completed');
+    assertRequiredBoolean(input.completed, 'completed');
     const date = normalizeDateOnly(input.date);
     if (!date) throw new Error('date is required.');
     const match = findHabit(context.widgets, input.habitId);
@@ -1734,7 +1740,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   },
   'calendar.list': (input, context) => {
     const auditId = createAuditId();
-    const { from, to } = ensureDateRange(input.from, input.to);
+    const { from, to } = ensureDateRange(input.from, input.to, { from: 'from', to: 'to' });
     const limit = normalizeLimit(input.limit);
     let items = getWidgetsByType(context.widgets, 'calendar').flatMap((widget) =>
       widget.events.map((event) => ({
@@ -2138,7 +2144,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'shopping.mark_purchased': (input, context) => {
     const auditId = createAuditId();
     assertString(input.itemId, 'itemId', { required: true, max: 120 });
-    assertOptionalBoolean(input.purchased, 'purchased');
+    assertRequiredBoolean(input.purchased, 'purchased');
     const match = findShoppingItem(context.widgets, input.itemId);
     if (!match) return createResponse(auditId, 'Shopping item not found.', { ok: false });
     const purchased = Boolean(input.purchased);
