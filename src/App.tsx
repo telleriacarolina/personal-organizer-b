@@ -18,8 +18,7 @@ import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
 import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
 import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
-import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
-import type { CalendarImportDraft } from '@/lib/calendar-imports';
+import { appendImportedCalendarEvent, type CalendarImportDraft } from '@/lib/calendar-imports';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
 function App() {
