@@ -1,13 +1,12 @@
 /**
  * AI Gateway video generation script.
  *
- * Usage:
- *   node --import tsx/esm index.mts
- *   -- or --
- *   npx tsx index.mts
+ * Usage (Node.js 22.6+ — native TypeScript strip-types, no extra tools needed):
+ *   node --experimental-strip-types index.mts
  *
- * Requires AI_GATEWAY_API_KEY to be set in the environment or in a .env file.
- * The .env file is gitignored and must never be committed.
+ * Requires AI_GATEWAY_API_KEY to be set in the environment or in a `.env`
+ * file located in the same directory as this script.
+ * The `.env` file is gitignored and must never be committed.
  */
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -15,9 +14,10 @@ import { resolve } from "node:path";
 
 // ---------------------------------------------------------------------------
 // Load .env (if present) without any external dotenv dependency.
-// This is a minimal inline loader that handles KEY=value and KEY="value".
+// Looks for `.env` in the same directory as this script.
+// Handles KEY=value and KEY="value" / KEY='value' syntax.
 // ---------------------------------------------------------------------------
-const envPath = resolve(import.meta.dirname ?? ".", ".env");
+const envPath = resolve(import.meta.dirname, ".env");
 if (existsSync(envPath)) {
   const lines = readFileSync(envPath, "utf8").split(/\r?\n/);
   for (const line of lines) {
@@ -40,7 +40,9 @@ if (existsSync(envPath)) {
 }
 
 // ---------------------------------------------------------------------------
-// Guard: ensure the API key is available before importing the AI SDK.
+// Guard: ensure the API key is available before loading the AI SDK modules.
+// Dynamic imports below are intentional — static imports are hoisted and
+// would execute before this check and before .env is loaded.
 // ---------------------------------------------------------------------------
 if (!process.env["AI_GATEWAY_API_KEY"]) {
   console.error(
@@ -48,7 +50,7 @@ if (!process.env["AI_GATEWAY_API_KEY"]) {
       "  1. Run `npx vercel@latest login` if not already authenticated.\n" +
       "  2. Run:\n" +
       "       npx vercel@latest --scope <team-slug> ai-gateway api-keys create --name personal-organizer-video-gen\n" +
-      "  3. Store the printed key in a .env file:\n" +
+      "  3. Store the printed key in a .env file in the project root:\n" +
       "       echo 'AI_GATEWAY_API_KEY=<key>' >> .env\n" +
       "  The .env file is gitignored and safe to use locally."
   );
@@ -57,9 +59,10 @@ if (!process.env["AI_GATEWAY_API_KEY"]) {
 
 // ---------------------------------------------------------------------------
 // Generate the video via Vercel AI Gateway.
+// Dynamic imports are used so they only load after the guard above passes.
 // ---------------------------------------------------------------------------
-import { experimental_generateVideo } from "ai";
-import { createGateway } from "@ai-sdk/gateway";
+const { experimental_generateVideo } = await import("ai");
+const { createGateway } = await import("@ai-sdk/gateway");
 
 const OUTPUT_FILE = "output.mp4";
 const MODEL_ID = "google/veo-3.1-fast-generate-001" as const;
