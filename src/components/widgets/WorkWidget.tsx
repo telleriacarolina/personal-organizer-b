@@ -1378,16 +1378,21 @@ function JobsTab({
                     <SelectItem value="on-hold">On Hold</SelectItem>
                   </SelectContent>
                 </Select>
-                {job.deadline && (
+                {job.deadline !== undefined && (
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={() =>
+                    onClick={() => {
+                      const deadline = job.deadline;
+                      if (deadline === undefined) {
+                        return;
+                      }
+
                       onAddToCalendar({
                         title: `Job deadline: ${job.title}`,
                         type: 'event',
                         description: `${job.description ? `${job.description} — ` : ''}Client: ${job.client}`,
-                        date: job.deadline,
+                        date: deadline,
                         startTime: undefined,
                         endTime: undefined,
                         allDay: true,
@@ -1397,8 +1402,8 @@ function JobsTab({
                         sourceType: 'work',
                         sourceId: `job-deadline:${job.id}`,
                         sourceWidgetId: undefined,
-                      })
-                    }
+                      });
+                    }}
                     className="text-xs"
                     disabled={!canPublishToCalendar}
                   >
@@ -1699,16 +1704,21 @@ function ErrandsTab({
                         <span>📅 {format(errand.dueDate, 'MMM d, yyyy')}</span>
                       )}
                     </div>
-                    {errand.dueDate && (
+                    {errand.dueDate !== undefined && (
                       <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() =>
+                        onClick={() => {
+                          const dueDate = errand.dueDate;
+                          if (dueDate === undefined) {
+                            return;
+                          }
+
                           onAddToCalendar({
                             title: `Errand: ${errand.title}`,
                             type: 'appointment',
                             description: errand.description,
-                            date: errand.dueDate,
+                            date: dueDate,
                             startTime: undefined,
                             endTime: undefined,
                             allDay: true,
@@ -1718,8 +1728,8 @@ function ErrandsTab({
                             sourceType: 'work',
                             sourceId: `errand:${errand.id}`,
                             sourceWidgetId: undefined,
-                          })
-                        }
+                          });
+                        }}
                         className="text-xs mt-2"
                         disabled={!canPublishToCalendar}
                       >
