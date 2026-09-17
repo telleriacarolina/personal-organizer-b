@@ -9,9 +9,26 @@ function buildDateTimeIso(dateMs: number, time?: string, fallbackTime = '09:00')
   return date.toISOString();
 }
 
+function resolveEndTime(event: CalendarEvent): string | undefined {
+  if (event.endTime) {
+    return event.endTime;
+  }
+
+  if (!event.startTime) {
+    return undefined;
+  }
+
+  const [hours, minutes] = event.startTime.split(':').map(Number);
+  const endDate = new Date(event.date);
+  endDate.setHours(hours || 0, minutes || 0, 0, 0);
+  endDate.setHours(endDate.getHours() + 1);
+
+  return `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+}
+
 export function mapToFamilyCalendarPlannerEvent(event: CalendarEvent): FamilyCalendarPlannerEvent {
   const start = buildDateTimeIso(event.date, event.startTime, '09:00');
-  const end = buildDateTimeIso(event.date, event.endTime || event.startTime, '10:00');
+  const end = buildDateTimeIso(event.date, resolveEndTime(event), '10:00');
 
   return {
     id: event.id,

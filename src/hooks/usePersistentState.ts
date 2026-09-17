@@ -6,7 +6,8 @@ export function usePersistentState<T>(
   initialValue: T,
 ): [T, Dispatch<SetStateAction<T>>] {
   const initialValueRef = useRef(initialValue);
-  const isInitialMountRef = useRef(true);
+  const skipNextSaveRef = useRef(true);
+  const repositoryRef = useRef(repository);
   initialValueRef.current = initialValue;
 
   const [value, setValue] = useState<T>(() => {
@@ -18,6 +19,11 @@ export function usePersistentState<T>(
   });
 
   useEffect(() => {
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+
     try {
       repository.save(value);
     } catch (error) {
@@ -26,10 +32,12 @@ export function usePersistentState<T>(
   }, [repository, value]);
 
   useEffect(() => {
-    if (isInitialMountRef.current) {
-      isInitialMountRef.current = false;
+    if (repositoryRef.current === repository) {
       return;
     }
+
+    repositoryRef.current = repository;
+    skipNextSaveRef.current = true;
 
     try {
       setValue(repository.load());

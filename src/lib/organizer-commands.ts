@@ -26,7 +26,11 @@ import type {
 type WidgetUpdate = Partial<Widget>;
 
 function createId() {
-  return Date.now().toString();
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function createWidget(type: WidgetType, position: number, widgets: Widget[]): Widget {

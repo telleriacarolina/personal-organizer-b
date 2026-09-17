@@ -294,4 +294,6 @@ export const stateRepositories = {
   backgroundImage: backgroundImageStateRepositoryInternal,
   plannerEvents: plannerEventsStateRepositoryInternal,
   aiConfig: aiConfigStateRepositoryInternal,
+  aiSuggestions: aiSuggestionsStateRepository,
+  mediaRecords: mediaRecordsStateRepository,
 };
