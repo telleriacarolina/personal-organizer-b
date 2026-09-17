@@ -16,6 +16,7 @@ import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
 import { CalendarEvent, Task, Widget, WidgetAIState, WidgetType } from '@/types';
+import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
 function App() {
@@ -108,14 +109,19 @@ function App() {
   const updateCalendarWidget = (
     sourceWidgetId: string,
     updater: (events: CalendarEvent[]) => CalendarEvent[]
-  ) => {
+  ): boolean => {
+    let updated = false;
     setWidgets((current) =>
       (current || []).map((widget) =>
         widget.id === sourceWidgetId && widget.type === 'calendar'
-          ? ({ ...widget, events: updater(widget.events) } as Widget)
+          ? (() => {
+              updated = true;
+              return { ...widget, events: updater(widget.events) } as Widget;
+            })()
           : widget
       )
     );
+    return updated;
   };
 
   const addTaskToSource = (
@@ -154,29 +160,17 @@ function App() {
 
   const addCalendarEventToSource = (
     sourceWidgetId: string,
-    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location' | 'reminder' | 'color'>
-  ) => {
-    const eventId = crypto.randomUUID();
-    const createdAt = Date.now();
+    event: Pick<CalendarEvent, 'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location' | 'reminder' | 'color' | 'sourceType' | 'sourceId' | 'sourceWidgetId'>
+  ): { added: boolean; reason?: 'invalid-destination' | 'duplicate' } => {
+    let importResult: ReturnType<typeof appendImportedCalendarEvent> | null = null;
+    const destinationFound = updateCalendarWidget(sourceWidgetId, (events) => {
+      importResult = appendImportedCalendarEvent(events, event);
+      return importResult.events;
+    });
 
-    updateCalendarWidget(sourceWidgetId, (events) => [
-      ...events,
-      {
-        id: eventId,
-        title: event.title,
-        type: event.type,
-        description: event.description,
-        date: event.date,
-        startTime: event.startTime,
-        endTime: event.endTime,
-        allDay: event.allDay ?? false,
-        location: event.location,
-        reminder: event.reminder,
-        reminderSent: false,
-        color: event.color ?? 'blue',
-        createdAt,
-      },
-    ]);
+    if (!destinationFound) return { added: false, reason: 'invalid-destination' };
+    if (!importResult?.added) return { added: false, reason: 'duplicate' };
+    return { added: true };
   };
 
   const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {

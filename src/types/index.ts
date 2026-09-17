@@ -171,6 +171,9 @@ export interface CalendarEvent {
   reminder?: number;
   reminderSent?: boolean;
   color?: string;
+  sourceType?: 'work';
+  sourceId?: string;
+  sourceWidgetId?: string;
   createdAt: number;
 }
 

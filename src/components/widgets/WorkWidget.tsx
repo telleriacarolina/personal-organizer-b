@@ -47,7 +47,7 @@ interface CalendarSource {
 
 type AddToCalendarEvent = Pick<
   CalendarEvent,
-  'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location'
+  'title' | 'type' | 'description' | 'date' | 'startTime' | 'endTime' | 'allDay' | 'location' | 'reminder' | 'color' | 'sourceType' | 'sourceId' | 'sourceWidgetId'
 >;
 
 interface WorkWidgetProps {
@@ -66,8 +66,8 @@ interface WorkWidgetProps {
   onAIStateChange: (state: WidgetAIState) => void;
   onAddCalendarEvent: (
     sourceWidgetId: string,
-    event: AddToCalendarEvent & Pick<CalendarEvent, 'reminder' | 'color'>
-  ) => void;
+    event: AddToCalendarEvent
+  ) => { added: boolean; reason?: 'invalid-destination' | 'duplicate' };
   onUpdate: (data: {
     clientSlots?: ClientSlot[];
     meals?: WorkMeal[];
@@ -117,6 +117,7 @@ export function WorkWidget({
   const [showOrganizationDialog, setShowOrganizationDialog] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [selectedCalendarSourceId, setSelectedCalendarSourceId] = useState('');
+  const canPublishToCalendar = calendarSources.length > 0 && selectedCalendarSourceId.length > 0;
 
   useEffect(() => {
     if (calendarSources.length === 0) {
@@ -130,16 +131,24 @@ export function WorkWidget({
   }, [calendarSources, selectedCalendarSourceId]);
 
   const addItemToCalendar = (event: AddToCalendarEvent) => {
-    if (!selectedCalendarSourceId) {
+    if (!canPublishToCalendar) {
       toast.error('Add a Calendar widget first');
       return;
     }
 
-    onAddCalendarEvent(selectedCalendarSourceId, {
+    const result = onAddCalendarEvent(selectedCalendarSourceId, {
       ...event,
-      reminder: undefined,
-      color: 'blue',
+      sourceWidgetId: event.sourceWidgetId ?? widgetId,
     });
+    if (!result.added) {
+      if (result.reason === 'duplicate') {
+        toast.info('This item is already in the selected calendar');
+      } else {
+        toast.error('Select a valid Calendar destination');
+      }
+      return;
+    }
+
     toast.success('Added to calendar');
   };
 
@@ -477,6 +486,9 @@ export function WorkWidget({
             ))}
           </SelectContent>
         </Select>
+        {calendarSources.length === 0 && (
+          <p className="text-xs text-muted-foreground">Add a Calendar widget to publish scheduled work items.</p>
+        )}
       </div>
 
       <Card className="col-span-1 md:col-span-2 lg:col-span-3 border-0 shadow-none">
@@ -524,6 +536,7 @@ export function WorkWidget({
               clientSlots={clientSlots}
               onAdd={addClientSlot}
               onAddToCalendar={addItemToCalendar}
+              canPublishToCalendar={canPublishToCalendar}
               onUpdateStatus={updateClientStatus}
               onDelete={deleteClientSlot}
               showDialog={showClientDialog}
@@ -536,6 +549,7 @@ export function WorkWidget({
               meals={meals}
               onAdd={addMeal}
               onAddToCalendar={addItemToCalendar}
+              canPublishToCalendar={canPublishToCalendar}
               onDelete={deleteMeal}
               showDialog={showMealDialog}
               setShowDialog={setShowMealDialog}
@@ -557,6 +571,7 @@ export function WorkWidget({
               jobs={jobs}
               onAdd={addJob}
               onAddToCalendar={addItemToCalendar}
+              canPublishToCalendar={canPublishToCalendar}
               onUpdateStatus={updateJobStatus}
               onDelete={deleteJob}
               showDialog={showJobDialog}
@@ -579,6 +594,7 @@ export function WorkWidget({
               errands={errands}
               onAdd={addErrand}
               onAddToCalendar={addItemToCalendar}
+              canPublishToCalendar={canPublishToCalendar}
               onToggle={toggleErrand}
               onDelete={deleteErrand}
               showDialog={showErrandDialog}
@@ -618,6 +634,7 @@ function ClientSlotsTab({
   clientSlots,
   onAdd,
   onAddToCalendar,
+  canPublishToCalendar,
   onUpdateStatus,
   onDelete,
   showDialog,
@@ -626,6 +643,7 @@ function ClientSlotsTab({
   clientSlots: ClientSlot[];
   onAdd: (data: Omit<ClientSlot, 'id' | 'createdAt'>) => void;
   onAddToCalendar: (event: AddToCalendarEvent) => void;
+  canPublishToCalendar: boolean;
   onUpdateStatus: (id: string, status: ClientSlot['status']) => void;
   onDelete: (id: string) => void;
   showDialog: boolean;
@@ -815,15 +833,21 @@ function ClientSlotsTab({
                       onAddToCalendar({
                         title: slot.service ? `${slot.clientName} - ${slot.service}` : slot.clientName,
                         type: 'appointment',
-                        description: slot.notes || undefined,
+                        description: slot.notes,
                         date: slot.date,
                         startTime: slot.startTime,
-                        endTime: slot.endTime || undefined,
+                        endTime: slot.endTime,
                         allDay: false,
                         location: undefined,
+                        reminder: undefined,
+                        color: 'purple',
+                        sourceType: 'work',
+                        sourceId: `client-slot:${slot.id}`,
+                        sourceWidgetId: undefined,
                       })
                     }
                     className="text-xs ml-auto"
+                    disabled={!canPublishToCalendar}
                   >
                     Add to Calendar
                   </Button>
@@ -841,6 +865,7 @@ function MealsTab({
   meals,
   onAdd,
   onAddToCalendar,
+  canPublishToCalendar,
   onDelete,
   showDialog,
   setShowDialog
@@ -848,6 +873,7 @@ function MealsTab({
   meals: WorkMeal[];
   onAdd: (data: Omit<WorkMeal, 'id' | 'createdAt'>) => void;
   onAddToCalendar: (event: AddToCalendarEvent) => void;
+  canPublishToCalendar: boolean;
   onDelete: (id: string) => void;
   showDialog: boolean;
   setShowDialog: (show: boolean) => void;
@@ -997,15 +1023,21 @@ function MealsTab({
                     onAddToCalendar({
                       title: meal.name,
                       type: 'event',
-                      description: meal.notes || meal.items?.join(', ') || undefined,
+                      description: meal.notes || meal.items?.join(', '),
                       date: meal.date,
                       startTime: meal.time,
                       endTime: undefined,
                       allDay: false,
                       location: undefined,
+                      reminder: undefined,
+                      color: 'green',
+                      sourceType: 'work',
+                      sourceId: `meal:${meal.id}`,
+                      sourceWidgetId: undefined,
                     })
                   }
                   className="text-xs"
+                  disabled={!canPublishToCalendar}
                 >
                   Add to Calendar
                 </Button>
@@ -1135,6 +1167,7 @@ function JobsTab({
   jobs,
   onAdd,
   onAddToCalendar,
+  canPublishToCalendar,
   onUpdateStatus,
   onDelete,
   showDialog,
@@ -1144,6 +1177,7 @@ function JobsTab({
   jobs: Job[];
   onAdd: (data: Omit<Job, 'id' | 'createdAt'>) => void;
   onAddToCalendar: (event: AddToCalendarEvent) => void;
+  canPublishToCalendar: boolean;
   onUpdateStatus: (id: string, status: Job['status']) => void;
   onDelete: (id: string) => void;
   showDialog: boolean;
@@ -1363,9 +1397,15 @@ function JobsTab({
                         endTime: undefined,
                         allDay: true,
                         location: undefined,
+                        reminder: undefined,
+                        color: 'orange',
+                        sourceType: 'work',
+                        sourceId: `job-deadline:${job.id}`,
+                        sourceWidgetId: undefined,
                       })
                     }
                     className="text-xs"
+                    disabled={!canPublishToCalendar}
                   >
                     Add Deadline to Calendar
                   </Button>
@@ -1503,6 +1543,7 @@ function ErrandsTab({
   errands,
   onAdd,
   onAddToCalendar,
+  canPublishToCalendar,
   onToggle,
   onDelete,
   showDialog,
@@ -1512,6 +1553,7 @@ function ErrandsTab({
   errands: WorkErrand[];
   onAdd: (data: Omit<WorkErrand, 'id' | 'createdAt'>) => void;
   onAddToCalendar: (event: AddToCalendarEvent) => void;
+  canPublishToCalendar: boolean;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   showDialog: boolean;
@@ -1670,15 +1712,21 @@ function ErrandsTab({
                           onAddToCalendar({
                             title: `Errand: ${errand.title}`,
                             type: 'appointment',
-                            description: errand.description || undefined,
+                            description: errand.description,
                             date: errand.dueDate,
                             startTime: undefined,
                             endTime: undefined,
                             allDay: true,
-                            location: errand.location || undefined,
+                            location: errand.location,
+                            reminder: undefined,
+                            color: 'red',
+                            sourceType: 'work',
+                            sourceId: `errand:${errand.id}`,
+                            sourceWidgetId: undefined,
                           })
                         }
                         className="text-xs mt-2"
+                        disabled={!canPublishToCalendar}
                       >
                         Add to Calendar
                       </Button>
