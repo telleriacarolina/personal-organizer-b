@@ -1,17 +1,19 @@
-import { ReactNode, useState, useRef, useEffect } from 'react';
+import { ReactNode, useState, useRef, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, DotsSixVertical, CornersOut, Lock, LockOpen } from '@phosphor-icons/react';
 import { Reorder, useDragControls } from 'framer-motion';
-import { WidgetSize, WidgetType } from '@/types';
+import { Widget, WidgetSize, WidgetType } from '@/types';
 import { toast } from 'sonner';
+
+type WidgetContainerValue = Pick<Widget, 'id' | 'type'> & Record<string, unknown>;
 
 interface WidgetContainerProps {
   title: string;
   icon: ReactNode;
   onRemove: () => void;
   children: ReactNode;
-  value: any;
+  value: WidgetContainerValue;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   size?: WidgetSize;
@@ -58,6 +60,12 @@ export function WidgetContainer({
         return { minWidth: 400, minHeight: 550 };
       case 'work':
         return { minWidth: 450, minHeight: 600 };
+      case 'daily-focus':
+        return { minWidth: 380, minHeight: 480 };
+      case 'ai-chat':
+        return { minWidth: 360, minHeight: 500 };
+      case 'record-note':
+        return { minWidth: 320, minHeight: 480 };
       default:
         return { minWidth: 280, minHeight: 350 };
     }
@@ -70,10 +78,10 @@ export function WidgetContainer({
   const currentHeight = size?.height || defaultHeight;
   const isLocked = globalLock || size?.locked || false;
 
-  const snapToGridValue = (value: number) => {
+  const snapToGridValue = useCallback((value: number) => {
     if (!snapToGrid) return value;
     return Math.round(value / GRID_SIZE) * GRID_SIZE;
-  };
+  }, [snapToGrid]);
 
   const toggleLock = () => {
     if (onSizeChange) {
@@ -188,7 +196,7 @@ export function WidgetContainer({
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGrid, minWidth, minHeight]);
+  }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGridValue, minWidth, minHeight]);
 
   return (
     <Reorder.Item

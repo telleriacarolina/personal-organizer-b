@@ -1,4 +1,4 @@
-export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work' | 'shopping';
+export type WidgetType = 'tasks' | 'notes' | 'habits' | 'goals' | 'calendar' | 'work' | 'shopping' | 'daily-focus' | 'ai-chat' | 'record-note';
 
 export interface WidgetSize {
   width: number;
@@ -18,12 +18,105 @@ export interface Task {
   text: string;
   completed: boolean;
   priority?: 'low' | 'medium' | 'high';
+  dueDate?: string | null;
+  category?: string | null;
   createdAt: number;
+}
+
+export type AIProviderMode = 'mock' | 'api' | 'off';
+export type AIPrivacyMode = 'local-only' | 'remote';
+export type AIInsightStatus = 'active' | 'applied' | 'dismissed';
+export type AIWidgetFeature = 'tasks' | 'notes' | 'work' | 'shopping' | 'calendar';
+export type AIInsightKind =
+  | 'system'
+  | 'task-focus'
+  | 'note-summary'
+  | 'note-task-extraction'
+  | 'work-organization'
+  | 'shopping-insight'
+  | 'calendar-suggestion';
+export type AIInsightActionType =
+  | 'reprioritize-task'
+  | 'add-tasks-to-source'
+  | 'set-work-organization'
+  | 'set-event-reminders'
+  | 'generate-shopping-reminders';
+
+export interface ExtractedTaskDraft {
+  text: string;
+  priority: 'low' | 'medium' | 'high';
+  dueDate?: string | null;
+  category?: string | null;
+}
+
+export interface TaskPriorityUpdate {
+  taskId: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface EventReminderUpdate {
+  eventId: string;
+  reminder: number;
+}
+
+export type AIInsightActionPayload =
+  | { taskUpdates: TaskPriorityUpdate[] }
+  | { tasks: ExtractedTaskDraft[] }
+  | { organizationPreference: WorkOrganizationPreference }
+  | { reminderUpdates: EventReminderUpdate[] }
+  | { generator: 'shopping-reminders' };
+
+export interface AIInsightAction {
+  id: string;
+  label: string;
+  type: AIInsightActionType;
+  payload?: AIInsightActionPayload;
+}
+
+export interface AIInsight {
+  id: string;
+  kind: AIInsightKind;
+  title: string;
+  summary: string;
+  rationale: string;
+  confidence: number;
+  generatedAt: number;
+  status: AIInsightStatus;
+  bullets?: string[];
+  actions?: AIInsightAction[];
+}
+
+export interface WidgetAIState {
+  widgetId: string;
+  feature: AIWidgetFeature;
+  generatedAt: number;
+  sourceHash: string;
+  providerMode: AIProviderMode;
+  providerLabel: string;
+  privacyMode: AIPrivacyMode;
+  model: string;
+  dataSummary: string[];
+  insights: AIInsight[];
+  error?: string;
+}
+
+export interface DailyFocusItem {
+  id: string;
+  title: string;
+  completed: boolean;
+  priority: 'low' | 'medium' | 'high';
+  dueDate: string | null;
+  category: string | null;
 }
 
 export interface TasksWidget extends BaseWidget {
   type: 'tasks';
   tasks: Task[];
+}
+
+export interface DailyFocusWidget extends BaseWidget {
+  type: 'daily-focus';
+  sourceWidgetId?: string | null;
 }
 
 export interface Note {
@@ -78,6 +171,9 @@ export interface CalendarEvent {
   reminder?: number;
   reminderSent?: boolean;
   color?: string;
+  sourceType?: 'work' | 'ical';
+  sourceId?: string;
+  sourceWidgetId?: string;
   createdAt: number;
 }
 
@@ -256,6 +352,7 @@ export interface Receipt {
   tax?: number;
   subtotal?: number;
   notes?: string;
+  imageMediaId?: string;
   imageData?: string;
   createdAt: number;
 }
@@ -291,4 +388,45 @@ export interface ShoppingWidget extends BaseWidget {
   reminders?: ShoppingReminder[];
 }
 
-export type Widget = TasksWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget;
+export interface AIChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  timestamp: number;
+  /** If this message produced suggestions, they are stored here */
+  suggestions?: AIInsight[];
+  /** Which widget type these suggestions target */
+  targetWidget?: string;
+}
+
+export interface AIChatWidget extends BaseWidget {
+  type: 'ai-chat';
+  messages: AIChatMessage[];
+  appliedSuggestionIds?: string[];
+}
+
+export type RecordNoteMediaType = 'voice' | 'video' | 'photo';
+
+export interface RecordNote {
+  id: string;
+  title: string;
+  mediaType: RecordNoteMediaType;
+  mediaId?: string;
+  dataUrl?: string;
+  duration?: number;
+  transcription?: string;
+  createdAt: number;
+}
+
+export interface BackgroundImage {
+  mediaId?: string;
+  url?: string;
+  opacity: number;
+}
+
+export interface RecordNoteWidget extends BaseWidget {
+  type: 'record-note';
+  records: RecordNote[];
+}
+
+export type Widget = TasksWidget | DailyFocusWidget | NotesWidget | HabitsWidget | GoalsWidget | CalendarWidget | WorkWidget | ShoppingWidget | AIChatWidget | RecordNoteWidget;

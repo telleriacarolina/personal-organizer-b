@@ -10,11 +10,22 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise, Bell, BellSlash, Lightning } from '@phosphor-icons/react';
-import { PersonalShoppingItem, Receipt, ShoppingTrip, ShoppingReminder, WidgetSize, ShoppingCategory } from '@/types';
+import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
+import { ShoppingCart, Plus, Trash, Storefront, CurrencyDollar, SortAscending, FunnelSimple, Barcode, Receipt as ReceiptIcon, ChartLine, Camera, Scan, MagnifyingGlass, TrendUp, TrendDown, CalendarBlank, ClockCounterClockwise, ArrowClockwise, Bell, Lightning, Sparkle } from '@phosphor-icons/react';
+import { AIInsightAction, PersonalShoppingItem, Receipt, ShoppingTrip, ShoppingReminder, WidgetAIState, WidgetSize, ShoppingCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
+import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { createMediaId, saveMedia } from '@/lib/persistence';
+
+type ShoppingWidgetData = {
+  items: PersonalShoppingItem[];
+  budget?: number;
+  receipts?: Receipt[];
+  trips?: ShoppingTrip[];
+  reminders?: ShoppingReminder[];
+};
 
 interface ShoppingWidgetProps {
   items: PersonalShoppingItem[];
@@ -22,7 +33,14 @@ interface ShoppingWidgetProps {
   receipts?: Receipt[];
   trips?: ShoppingTrip[];
   reminders?: ShoppingReminder[];
-  onUpdate: (data: { items?: PersonalShoppingItem[]; budget?: number; receipts?: Receipt[]; trips?: ShoppingTrip[]; reminders?: ShoppingReminder[] }) => void;
+  aiState?: WidgetAIState;
+  onAIStateChange: (state: WidgetAIState) => void;
+  onUpdate: (
+    data:
+      | ShoppingWidgetData
+      | Partial<ShoppingWidgetData>
+      | ((current: ShoppingWidgetData) => ShoppingWidgetData | Partial<ShoppingWidgetData>)
+  ) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -69,6 +87,8 @@ export function ShoppingWidget({
   receipts = [],
   trips = [],
   reminders = [],
+  aiState,
+  onAIStateChange,
   onUpdate,
   onRemove,
   widgetId,
@@ -111,6 +131,8 @@ export function ShoppingWidget({
   
   const [showRemindersDialog, setShowRemindersDialog] = useState(false);
   const [activeReminders, setActiveReminders] = useState<ShoppingReminder[]>([]);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(true);
 
   const addItem = () => {
     if (newItemName.trim()) {
@@ -125,7 +147,7 @@ export function ShoppingWidget({
         priority: selectedPriority,
         createdAt: Date.now(),
       };
-      onUpdate({ items: [...items, item] });
+      onUpdate((current) => ({ items: [...current.items, item] }));
       setNewItemName('');
       setNewItemQuantity('');
       setNewItemPrice('');
@@ -151,7 +173,7 @@ export function ShoppingWidget({
         createdAt: Date.now(),
       };
 
-      onUpdate({ items: [...items, item] });
+      onUpdate((current) => ({ items: [...current.items, item] }));
       toast.success(`Added Barcode ${barcodeValue}`);
       setBarcodeInput('');
       setShowBarcodeDialog(false);
@@ -170,12 +192,6 @@ export function ShoppingWidget({
     setIsProcessingReceipt(true);
 
     try {
-      const reader = new FileReader();
-      await new Promise<void>((resolve) => {
-        reader.onload = () => resolve();
-        reader.readAsDataURL(file);
-      });
-
       if (!receiptStoreName.trim()) {
         setReceiptStoreName(file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '));
       }
@@ -225,13 +241,10 @@ export function ShoppingWidget({
       const receiptId = Date.now().toString();
       const receiptDateTs = new Date(receiptDate).getTime();
 
-      let imageData: string | undefined;
+      let imageMediaId: string | undefined;
       if (receiptImageInput) {
-        const reader = new FileReader();
-        imageData = await new Promise((resolve) => {
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(receiptImageInput);
-        });
+        imageMediaId = createMediaId('receipt-image', receiptId);
+        await saveMedia({ id: imageMediaId, kind: 'receipt-image', blob: receiptImageInput });
       }
 
       const calculatedTotal = parsedItems.reduce((sum, item) => sum + (item.price || 0), 0);
@@ -251,7 +264,7 @@ export function ShoppingWidget({
         subtotal: calculatedTotal,
         tax: total - calculatedTotal,
         notes: receiptNotes || undefined,
-        imageData,
+        imageMediaId,
         createdAt: Date.now(),
       };
 
@@ -269,33 +282,37 @@ export function ShoppingWidget({
         purchasedAt: receiptDateTs,
       }));
 
-      const existingTrip = trips.find(t => 
-        t.storeName === receiptStoreName && 
-        startOfDay(t.date).getTime() === startOfDay(receiptDateTs).getTime()
-      );
-
-      let newTrips = [...trips];
-      if (existingTrip) {
-        newTrips = trips.map(t => 
-          t.id === existingTrip.id 
-            ? { ...t, total: t.total + total, itemCount: t.itemCount + parsedItems.length, receiptIds: [...t.receiptIds, receiptId] }
-            : t
+      onUpdate((current) => {
+        const currentTrips = current.trips ?? [];
+        const currentReceipts = current.receipts ?? [];
+        const existingTrip = currentTrips.find((trip) =>
+          trip.storeName === receiptStoreName &&
+          startOfDay(trip.date).getTime() === startOfDay(receiptDateTs).getTime()
         );
-      } else {
-        newTrips.push({
-          id: `trip-${Date.now()}`,
-          date: receiptDateTs,
-          storeName: receiptStoreName,
-          total: total,
-          itemCount: parsedItems.length,
-          receiptIds: [receiptId],
-        });
-      }
 
-      onUpdate({ 
-        items: [...items, ...newItems],
-        receipts: [...receipts, newReceipt],
-        trips: newTrips
+        let nextTrips = [...currentTrips];
+        if (existingTrip) {
+          nextTrips = currentTrips.map((trip) =>
+            trip.id === existingTrip.id
+              ? { ...trip, total: trip.total + total, itemCount: trip.itemCount + parsedItems.length, receiptIds: [...trip.receiptIds, receiptId] }
+              : trip
+          );
+        } else {
+          nextTrips.push({
+            id: `trip-${Date.now()}`,
+            date: receiptDateTs,
+            storeName: receiptStoreName,
+            total: total,
+            itemCount: parsedItems.length,
+            receiptIds: [receiptId],
+          });
+        }
+
+        return {
+          items: [...current.items, ...newItems],
+          receipts: [...currentReceipts, newReceipt],
+          trips: nextTrips,
+        };
       });
 
       toast.success(`Receipt added: ${parsedItems.length} items from ${receiptStoreName}`);
@@ -314,15 +331,15 @@ export function ShoppingWidget({
   };
 
   const togglePurchased = (id: string) => {
-    onUpdate({
-      items: items.map((item) =>
+    onUpdate((current) => ({
+      items: current.items.map((item) =>
         item.id === id ? { ...item, purchased: !item.purchased, purchasedAt: !item.purchased ? Date.now() : undefined } : item
-      )
-    });
+      ),
+    }));
   };
 
   const deleteItem = (id: string) => {
-    onUpdate({ items: items.filter((item) => item.id !== id) });
+    onUpdate((current) => ({ items: current.items.filter((item) => item.id !== id) }));
     toast.success('Item removed');
   };
 
@@ -351,9 +368,10 @@ export function ShoppingWidget({
 
   const sortedItems = [...items].sort((a, b) => {
     switch (sortBy) {
-      case 'priority':
+      case 'priority': {
         const priorityOrder = { high: 0, medium: 1, low: 2 };
         return priorityOrder[a.priority] - priorityOrder[b.priority];
+      }
       case 'category':
         return a.category.localeCompare(b.category);
       case 'price':
@@ -512,7 +530,7 @@ export function ShoppingWidget({
       createdAt: Date.now(),
     }));
     
-    onUpdate({ items: [...items, ...newItems] });
+    onUpdate((current) => ({ items: [...current.items, ...newItems] }));
     toast.success(`Added ${newItems.length} items from similar trip`);
     setShowTripRevisitsDialog(false);
     setSelectedTripForRevisit(null);
@@ -618,23 +636,23 @@ export function ShoppingWidget({
       });
     }
 
-    onUpdate({ reminders: [...reminders, ...newReminders] });
+    onUpdate((current) => ({ reminders: [...(current.reminders ?? []), ...newReminders] }));
     toast.success(`Created ${newReminders.length} smart shopping reminders!`);
     setShowRemindersDialog(true);
   };
 
   const toggleReminder = (id: string) => {
-    onUpdate({
-      reminders: reminders.map(r => 
-        r.id === id ? { ...r, enabled: !r.enabled } : r
-      )
-    });
+    onUpdate((current) => ({
+      reminders: (current.reminders ?? []).map((reminder) =>
+        reminder.id === id ? { ...reminder, enabled: !reminder.enabled } : reminder
+      ),
+    }));
   };
 
   const deleteReminder = (id: string) => {
-    onUpdate({
-      reminders: reminders.filter(r => r.id !== id)
-    });
+    onUpdate((current) => ({
+      reminders: (current.reminders ?? []).filter((reminder) => reminder.id !== id),
+    }));
     toast.success('Reminder deleted');
   };
 
@@ -643,11 +661,11 @@ export function ShoppingWidget({
     if (!reminder) return;
 
     const newDate = addDays(new Date(), days).getTime();
-    onUpdate({
-      reminders: reminders.map(r => 
-        r.id === id ? { ...r, nextReminderDate: newDate, lastTriggered: Date.now() } : r
-      )
-    });
+    onUpdate((current) => ({
+      reminders: (current.reminders ?? []).map((currentReminder) =>
+        currentReminder.id === id ? { ...currentReminder, nextReminderDate: newDate, lastTriggered: Date.now() } : currentReminder
+      ),
+    }));
     toast.success(`Reminder snoozed for ${days} days`);
   };
 
@@ -690,15 +708,50 @@ export function ShoppingWidget({
         );
       });
 
-      onUpdate({
-        reminders: reminders.map(r => 
-          activeReminders.find(ar => ar.id === r.id)
-            ? { ...r, lastTriggered: Date.now() }
-            : r
-        )
-      });
+      onUpdate((current) => ({
+        reminders: (current.reminders ?? []).map((reminder) =>
+          activeReminders.find((activeReminder) => activeReminder.id === reminder.id)
+            ? { ...reminder, lastTriggered: Date.now() }
+            : reminder
+        ),
+      }));
+      setActiveReminders([]);
     }
-  }, [activeReminders]);
+  }, [activeReminders, onUpdate]);
+
+  const aiInput = { items, budget, receipts, trips, reminders };
+  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+
+  const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
+    if (!aiState) return;
+    onAIStateChange(updateAIInsightStatus(aiState, insightId, status));
+  };
+
+  const handleGenerateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const nextState = await generateWidgetAIState({
+        widgetId,
+        feature: 'shopping',
+        input: aiInput,
+        dataSummary: [
+          'Feature: receipt extraction and shopping review',
+          `${items.length} shopping list items`,
+          `${receipts.length} receipts and ${trips.length} shopping trips available`,
+          `${reminders.length} current shopping reminders`,
+        ],
+      });
+      onAIStateChange(nextState);
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  const handleApplyAction = (insightId: string, action: AIInsightAction) => {
+    void insightId;
+    void action;
+    toast.info('AI apply actions will be enabled in Phase 2');
+  };
 
   return (
     <WidgetContainer
@@ -714,6 +767,30 @@ export function ShoppingWidget({
       snapToGrid={snapToGrid}
       globalLock={globalLock}
     >
+      {showAIPanel ? (
+        <AISuggestionsPanel
+          title="AI Shopping Review"
+          featureLabel="shopping"
+          state={aiState}
+          isGenerating={isGeneratingInsights}
+          isStale={isAIStale}
+          onGenerate={handleGenerateInsights}
+          onApplyAction={handleApplyAction}
+          onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
+          onClose={() => setShowAIPanel(false)}
+        />
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 text-xs text-muted-foreground w-full"
+          onClick={() => setShowAIPanel(true)}
+        >
+          <Sparkle size={13} />
+          Show AI Suggestions
+        </Button>
+      )}
+
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">
           <Dialog open={showBarcodeDialog} onOpenChange={setShowBarcodeDialog}>
