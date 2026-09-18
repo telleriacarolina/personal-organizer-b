@@ -182,10 +182,27 @@ const themePresets: ThemePreset[] = [
   },
 ];
 
-function hexToOklch(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
+function normalizeHexColor(color: string): string | null {
+  if (!/^#([\da-f]{3}|[\da-f]{6})$/i.test(color)) {
+    return null;
+  }
+
+  if (color.length === 4) {
+    return `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`;
+  }
+
+  return color;
+}
+
+function hexToOklch(color: string): string {
+  const normalizedColor = normalizeHexColor(color);
+  if (!normalizedColor) {
+    return color;
+  }
+
+  const r = parseInt(normalizedColor.slice(1, 3), 16) / 255;
+  const g = parseInt(normalizedColor.slice(3, 5), 16) / 255;
+  const b = parseInt(normalizedColor.slice(5, 7), 16) / 255;
 
   const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
   const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
