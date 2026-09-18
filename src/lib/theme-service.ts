@@ -44,7 +44,7 @@ export function applyBackgroundImage(image: BackgroundImage | null): void {
     return;
   }
 
-  if (image) {
+  if (image?.url) {
     appContainer.style.backgroundImage = `url(${image.url})`;
     appContainer.style.backgroundSize = 'cover';
     appContainer.style.backgroundPosition = 'center';
