@@ -78,7 +78,7 @@ export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, 
           placeholder="Add a new task..."
           value={newTask}
           onChange={(e) => setNewTask(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           className="flex-1"
         />
         <div className="flex gap-1">
