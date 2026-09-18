@@ -192,6 +192,16 @@ interface ThemeCustomizationProps {
 
 export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationProps) {
   const [selectedTheme, setSelectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
+  const [customColors, setCustomColors] = useLocalStorageState<CustomColors | null>(
+    'organizer-custom-colors',
+    null,
+    { persistMode: 'debounced', debounceMs: 200 }
+  );
+  const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>(
+    'organizer-bg-image',
+    null,
+    { persistMode: 'idle', debounceMs: 500 }
+  );
   const [customColors, setCustomColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
   const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
   const { url: resolvedBackgroundUrl, isMissing: isBackgroundMissing } = useStoredMediaUrl({

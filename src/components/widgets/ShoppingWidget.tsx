@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -390,53 +390,68 @@ export function ShoppingWidget({
     }
   };
 
-  const totalEstimated = items.reduce((sum, item) => 
-    !item.purchased && item.estimatedPrice ? sum + item.estimatedPrice : sum, 0
-  );
+  const {
+    totalEstimated,
+    totalSpent,
+    groupedByCategory,
+    groupedByStore,
+    unpurchasedItems,
+    purchasedItems,
+  } = useMemo(() => {
+    const estimated = items.reduce((sum, item) =>
+      !item.purchased && item.estimatedPrice ? sum + item.estimatedPrice : sum, 0
+    );
 
-  const totalSpent = items.reduce((sum, item) => 
-    item.purchased && (item.actualPrice || item.estimatedPrice) 
-      ? sum + (item.actualPrice || item.estimatedPrice || 0) 
-      : sum, 
-    0
-  );
+    const spent = items.reduce((sum, item) =>
+      item.purchased && (item.actualPrice || item.estimatedPrice)
+        ? sum + (item.actualPrice || item.estimatedPrice || 0)
+        : sum,
+      0
+    );
 
-  const sortedItems = [...items].sort((a, b) => {
-    switch (sortBy) {
-      case 'priority': {
-        const priorityOrder = { high: 0, medium: 1, low: 2 };
-        return priorityOrder[a.priority] - priorityOrder[b.priority];
+    const sorted = [...items].sort((a, b) => {
+      switch (sortBy) {
+        case 'priority': {
+          const priorityOrder = { high: 0, medium: 1, low: 2 };
+          return priorityOrder[a.priority] - priorityOrder[b.priority];
+        }
+        case 'category':
+          return a.category.localeCompare(b.category);
+        case 'price':
+          return (b.estimatedPrice || 0) - (a.estimatedPrice || 0);
+        default:
+          return a.name.localeCompare(b.name);
       }
-      case 'category':
-        return a.category.localeCompare(b.category);
-      case 'price':
-        return (b.estimatedPrice || 0) - (a.estimatedPrice || 0);
-      default:
-        return a.name.localeCompare(b.name);
-    }
-  });
+    });
 
-  const filteredItems = filterCategory === 'all' 
-    ? sortedItems 
-    : sortedItems.filter(item => item.category === filterCategory);
+    const filtered = filterCategory === 'all'
+      ? sorted
+      : sorted.filter(item => item.category === filterCategory);
 
-  const groupedByCategory = filteredItems.reduce((acc, item) => {
-    if (!acc[item.category]) acc[item.category] = [];
-    acc[item.category].push(item);
-    return acc;
-  }, {} as Record<ShoppingCategory, PersonalShoppingItem[]>);
+    const categoryGroups = filtered.reduce((acc, item) => {
+      if (!acc[item.category]) acc[item.category] = [];
+      acc[item.category].push(item);
+      return acc;
+    }, {} as Record<ShoppingCategory, PersonalShoppingItem[]>);
 
-  const groupedByStore = filteredItems.reduce((acc, item) => {
-    const store = item.store || 'Unassigned';
-    if (!acc[store]) acc[store] = [];
-    acc[store].push(item);
-    return acc;
-  }, {} as Record<string, PersonalShoppingItem[]>);
+    const storeGroups = filtered.reduce((acc, item) => {
+      const store = item.store || 'Unassigned';
+      if (!acc[store]) acc[store] = [];
+      acc[store].push(item);
+      return acc;
+    }, {} as Record<string, PersonalShoppingItem[]>);
 
-  const unpurchasedItems = filteredItems.filter(item => !item.purchased);
-  const purchasedItems = filteredItems.filter(item => item.purchased);
+    return {
+      totalEstimated: estimated,
+      totalSpent: spent,
+      groupedByCategory: categoryGroups,
+      groupedByStore: storeGroups,
+      unpurchasedItems: filtered.filter(item => !item.purchased),
+      purchasedItems: filtered.filter(item => item.purchased),
+    };
+  }, [filterCategory, items, sortBy]);
 
-  const getComparisonData = () => {
+  const getComparisonData = useCallback(() => {
     const now = Date.now();
     let currentPeriodStart: number;
     let previousPeriodStart: number;
@@ -500,9 +515,21 @@ export function ShoppingWidget({
       categorySpending,
       percentageChange: previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0,
     };
-  };
+  }, [comparisonPeriod, receipts, trips]);
 
-  const comparisonData = getComparisonData();
+  const comparisonData = useMemo(() => {
+    if (!showAnalyticsDialog) {
+      return {
+        currentTotal: 0,
+        previousTotal: 0,
+        currentTrips: 0,
+        previousTrips: 0,
+        categorySpending: {} as Record<string, { current: number; previous: number }>,
+        percentageChange: 0,
+      };
+    }
+    return getComparisonData();
+  }, [getComparisonData, showAnalyticsDialog]);
 
   const getSimilarTrips = (trip: ShoppingTrip) => {
     const tripDate = new Date(trip.date);
@@ -754,8 +781,9 @@ export function ShoppingWidget({
     }
   }, [activeReminders, onUpdate]);
 
-  const aiInput = { items, budget, receipts, trips, reminders };
-  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+  const aiInput = useMemo(() => ({ items, budget, receipts, trips, reminders }), [items, budget, receipts, trips, reminders]);
+  const aiInputHash = useMemo(() => buildAIInputHash(aiInput), [aiInput]);
+  const isAIStale = aiState ? aiState.sourceHash !== aiInputHash : false;
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;

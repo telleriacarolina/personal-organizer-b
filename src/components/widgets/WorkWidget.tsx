@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -428,7 +428,7 @@ export function WorkWidget({
     }
   };
 
-  const aiInput = {
+  const aiInput = useMemo(() => ({
     clientSlots,
     meals,
     timeEntries,
@@ -436,8 +436,9 @@ export function WorkWidget({
     errands,
     routines,
     organizationPreference,
-  };
-  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+  }), [clientSlots, meals, timeEntries, jobs, errands, routines, organizationPreference]);
+  const aiInputHash = useMemo(() => buildAIInputHash(aiInput), [aiInput]);
+  const isAIStale = aiState ? aiState.sourceHash !== aiInputHash : false;
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;

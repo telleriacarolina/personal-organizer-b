@@ -43,6 +43,7 @@ export function WidgetContainer({
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [isPinching, setIsPinching] = useState(false);
   const [pinchStart, setPinchStart] = useState({ distance: 0, width: 0, height: 0 });
+  const [draftSize, setDraftSize] = useState<{ width: number; height: number } | null>(null);
 
   const GRID_SIZE = 50;
   
@@ -74,8 +75,10 @@ export function WidgetContainer({
   const { minWidth, minHeight } = getMinimumSize();
   const defaultWidth = Math.max(350, minWidth);
   const defaultHeight = Math.max(400, minHeight);
-  const currentWidth = size?.width || defaultWidth;
-  const currentHeight = size?.height || defaultHeight;
+  const persistedWidth = size?.width || defaultWidth;
+  const persistedHeight = size?.height || defaultHeight;
+  const currentWidth = draftSize?.width || persistedWidth;
+  const currentHeight = draftSize?.height || persistedHeight;
   const isLocked = globalLock || size?.locked || false;
 
   const snapToGridValue = useCallback((value: number) => {
@@ -86,8 +89,8 @@ export function WidgetContainer({
   const toggleLock = () => {
     if (onSizeChange) {
       onSizeChange({
-        width: currentWidth,
-        height: currentHeight,
+        width: persistedWidth,
+        height: persistedHeight,
         locked: !isLocked
       });
       toast.success(isLocked ? 'Widget size unlocked' : 'Widget size locked');
@@ -143,15 +146,17 @@ export function WidgetContainer({
         
         newWidth = snapToGridValue(newWidth);
         newHeight = snapToGridValue(newHeight);
-        
-        if (onSizeChange) {
-          onSizeChange({ width: newWidth, height: newHeight });
-        }
+
+        setDraftSize({ width: newWidth, height: newHeight });
       }
     };
 
     const handlePointerUp = () => {
+      if (isResizing && draftSize && onSizeChange) {
+        onSizeChange({ width: draftSize.width, height: draftSize.height });
+      }
       setIsResizing(false);
+      setDraftSize(null);
     };
 
     const handleTouchMove = (e: TouchEvent) => {
@@ -170,14 +175,16 @@ export function WidgetContainer({
         newWidth = snapToGridValue(newWidth);
         newHeight = snapToGridValue(newHeight);
         
-        if (onSizeChange) {
-          onSizeChange({ width: newWidth, height: newHeight });
-        }
+        setDraftSize({ width: newWidth, height: newHeight });
       }
     };
 
     const handleTouchEnd = () => {
+      if (isPinching && draftSize && onSizeChange) {
+        onSizeChange({ width: draftSize.width, height: draftSize.height });
+      }
       setIsPinching(false);
+      setDraftSize(null);
     };
 
     if (isResizing) {
@@ -196,6 +203,16 @@ export function WidgetContainer({
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
     };
+  }, [draftSize, isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGridValue, minWidth, minHeight]);
+
+  useEffect(() => {
+    if (isResizing || isPinching) {
+      return;
+    }
+    if (draftSize && (draftSize.width !== persistedWidth || draftSize.height !== persistedHeight)) {
+      setDraftSize(null);
+    }
+  }, [draftSize, isPinching, isResizing, persistedHeight, persistedWidth]);
   }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGridValue, minWidth, minHeight]);
 
   return (

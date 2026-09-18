@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,20 @@ interface HabitsWidgetProps {
 
 export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange, snapToGrid, globalLock }: HabitsWidgetProps) {
   const [newHabit, setNewHabit] = useState('');
+  const [todayKey, setTodayKey] = useState(() => new Date().toISOString().split('T')[0]);
+
+  useEffect(() => {
+    const now = new Date();
+    const nextMidnight = new Date(now);
+    nextMidnight.setHours(24, 0, 0, 0);
+    const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+
+    const timer = setTimeout(() => {
+      setTodayKey(new Date().toISOString().split('T')[0]);
+    }, msUntilMidnight + 50);
+
+    return () => clearTimeout(timer);
+  }, [todayKey]);
 
   const addHabit = () => {
     if (newHabit.trim()) {
@@ -41,29 +55,38 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
     onUpdate(deleteHabitCommand(habits, id));
   };
 
-  const getStreak = (habit: Habit): number => {
-    let streak = 0;
-    const today = new Date();
-    
-    for (let i = 0; i < 365; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      
-      if (habit.completions[dateStr]) {
-        streak++;
-      } else if (i > 0) {
-        break;
+  const dateWindow = useMemo(() => {
+    const base = new Date(todayKey);
+    return Array.from({ length: 365 }, (_, i) => {
+      const date = new Date(base);
+      date.setDate(base.getDate() - i);
+      return date.toISOString().split('T')[0];
+    });
+  }, [todayKey]);
+  const streakMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    habits.forEach((habit) => {
+      let streak = 0;
+      for (let i = 0; i < dateWindow.length; i += 1) {
+        const dateStr = dateWindow[i];
+        if (habit.completions[dateStr]) {
+          streak += 1;
+        } else if (i > 0) {
+          break;
+        }
       }
-    }
-    
-    return streak;
-  };
+      map[habit.id] = streak;
+    });
+    return map;
+  }, [dateWindow, habits]);
 
-  const isCompletedToday = (habit: Habit): boolean => {
-    const today = new Date().toISOString().split('T')[0];
-    return habit.completions[today] || false;
-  };
+  const completedTodayMap = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    habits.forEach((habit) => {
+      map[habit.id] = Boolean(habit.completions[todayKey]);
+    });
+    return map;
+  }, [habits, todayKey]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -102,8 +125,8 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
       <div className="space-y-2 max-h-96 overflow-y-auto">
         <AnimatePresence>
           {habits.map((habit) => {
-            const streak = getStreak(habit);
-            const completed = isCompletedToday(habit);
+            const streak = streakMap[habit.id] ?? 0;
+            const completed = completedTodayMap[habit.id] ?? false;
 
             return (
               <motion.div
