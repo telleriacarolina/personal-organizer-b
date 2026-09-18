@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type Dispatch, type SetStateAction } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,10 +17,12 @@ import { RecordNote, RecordNoteMediaType, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { selectMimeType, label, defaultTitle, formatDuration } from './recordNoteUtils';
+import { createMediaId, deleteMedia, saveMedia } from '@/lib/persistence';
+import { useStoredMediaUrl } from '@/hooks/useStoredMediaUrl';
 
 interface RecordNoteWidgetProps {
   records: RecordNote[];
-  onUpdate: (records: RecordNote[]) => void;
+  onUpdate: Dispatch<SetStateAction<RecordNote[]>>;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -32,6 +34,10 @@ interface RecordNoteWidgetProps {
 }
 
 type RecordingState = 'idle' | 'recording' | 'preview';
+type PreviewMedia = {
+  blob: Blob;
+  url: string;
+};
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -51,7 +57,7 @@ export function RecordNoteWidget({
 }: RecordNoteWidgetProps) {
   const [activeMode, setActiveMode] = useState<RecordNoteMediaType | null>(null);
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
-  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
+  const [previewMedia, setPreviewMedia] = useState<PreviewMedia | null>(null);
   const [pendingTitle, setPendingTitle] = useState('');
   // Display counter only — the authoritative duration is in durationRef
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
@@ -62,6 +68,7 @@ export function RecordNoteWidget({
   // Ref for the live-preview video element (rendered only during recording)
   const liveVideoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
   // Authoritative final duration in whole seconds, written on stop
   const durationRef = useRef<number>(0);
   // Re-entry guard: true while getUserMedia is pending
@@ -81,6 +88,14 @@ export function RecordNoteWidget({
     }
   };
 
+  const revokePreviewUrl = () => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    setPreviewMedia(null);
+  };
+
   // Attach the live camera stream to the video element once it mounts
   // (the <video> is only in the DOM after recordingState becomes 'recording')
   useEffect(() => {
@@ -95,6 +110,10 @@ export function RecordNoteWidget({
     return () => {
       stopTimerInterval();
       releaseStream();
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
     };
   }, []);
 
@@ -103,7 +122,7 @@ export function RecordNoteWidget({
     if (acquiringRef.current || recordingState !== 'idle') return;
     acquiringRef.current = true;
 
-    setPreviewDataUrl(null);
+    revokePreviewUrl();
     setRecordingDuration(0);
     durationRef.current = 0;
     setPendingTitle('');
@@ -145,13 +164,14 @@ export function RecordNoteWidget({
     recorder.onstop = () => {
       const effectiveMime = mimeType || recorder.mimeType;
       const blob = new Blob(chunksRef.current, { type: effectiveMime });
-      // Convert to a data URL so the recording survives page reloads in localStorage
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewDataUrl(reader.result as string);
-        setRecordingState('preview');
-      };
-      reader.readAsDataURL(blob);
+      revokePreviewUrl();
+      const objectUrl = URL.createObjectURL(blob);
+      previewUrlRef.current = objectUrl;
+      setPreviewMedia({
+        blob,
+        url: objectUrl,
+      });
+      setRecordingState('preview');
       releaseStream();
       stopTimerInterval();
     };
@@ -194,10 +214,23 @@ export function RecordNoteWidget({
           return;
         }
         ctx.drawImage(video, 0, 0);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        cleanup();
-        setPreviewDataUrl(dataUrl);
-        setRecordingState('preview');
+        canvas.toBlob((blob) => {
+          cleanup();
+          if (!blob) {
+            setRecordingState('idle');
+            setActiveMode(null);
+            toast.error('Could not capture photo. Please try again.');
+            return;
+          }
+          revokePreviewUrl();
+          const objectUrl = URL.createObjectURL(blob);
+          previewUrlRef.current = objectUrl;
+          setPreviewMedia({
+            blob,
+            url: objectUrl,
+          });
+          setRecordingState('preview');
+        }, 'image/jpeg', 0.85);
       }).catch(() => {
         cleanup();
         setRecordingState('idle');
@@ -224,7 +257,7 @@ export function RecordNoteWidget({
   };
 
   const cancelPreview = () => {
-    setPreviewDataUrl(null);
+    revokePreviewUrl();
     setRecordingState('idle');
     setActiveMode(null);
     setPendingTitle('');
@@ -232,29 +265,43 @@ export function RecordNoteWidget({
     stopTimerInterval();
   };
 
-  const saveRecord = () => {
-    if (!previewDataUrl || !activeMode) return;
+  const saveRecord = async () => {
+    if (!previewMedia || !activeMode) return;
     const title = pendingTitle.trim() || defaultTitle(activeMode);
-    const newRecord: RecordNote = {
-      id: Date.now().toString(),
-      title,
-      mediaType: activeMode,
-      dataUrl: previewDataUrl,
-      // Use the ref value — never stale React state
-      duration: activeMode !== 'photo' ? durationRef.current : undefined,
-      createdAt: Date.now(),
-    };
-    onUpdate([...records, newRecord]);
-    toast.success(`${label(activeMode)} saved!`);
-    setPreviewDataUrl(null);
-    setRecordingState('idle');
-    setActiveMode(null);
-    setPendingTitle('');
+    const recordId = Date.now().toString();
+    const mediaId = createMediaId('record-note', recordId);
+
+    try {
+      await saveMedia({ id: mediaId, kind: 'record-note', blob: previewMedia.blob });
+      const newRecord: RecordNote = {
+        id: recordId,
+        title,
+        mediaType: activeMode,
+        mediaId,
+        duration: activeMode !== 'photo' ? durationRef.current : undefined,
+        createdAt: Date.now(),
+      };
+      onUpdate((current) => [...current, newRecord]);
+      toast.success(`${label(activeMode)} saved!`);
+      revokePreviewUrl();
+      setRecordingState('idle');
+      setActiveMode(null);
+      setPendingTitle('');
+    } catch {
+      toast.error(`Could not save ${label(activeMode).toLowerCase()}. Please try again.`);
+    }
   };
 
-  const deleteRecord = (id: string) => {
-    onUpdate(records.filter((r) => r.id !== id));
-    toast.success('Record deleted');
+  const deleteRecord = async (record: RecordNote) => {
+    try {
+      if (record.mediaId) {
+        await deleteMedia(record.mediaId);
+      }
+      onUpdate((current) => current.filter((item) => item.id !== record.id));
+      toast.success('Record deleted');
+    } catch {
+      toast.error('Could not delete this record. Please try again.');
+    }
   };
 
   return (
@@ -341,14 +388,14 @@ export function RecordNoteWidget({
 
       {/* Preview / save view */}
       <AnimatePresence>
-        {recordingState === 'preview' && previewDataUrl && activeMode && (
+        {recordingState === 'preview' && previewMedia && activeMode && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             className="space-y-3 border border-border rounded-lg p-3 bg-background"
           >
-            <MediaPreview dataUrl={previewDataUrl} mediaType={activeMode} />
+            <MediaPreview src={previewMedia.url} mediaType={activeMode} />
 
             <Input
               placeholder={`Title for this ${label(activeMode).toLowerCase()}…`}
@@ -393,11 +440,11 @@ export function RecordNoteWidget({
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function MediaPreview({ dataUrl, mediaType }: { dataUrl: string; mediaType: RecordNoteMediaType }) {
+function MediaPreview({ src, mediaType }: { src: string; mediaType: RecordNoteMediaType }) {
   if (mediaType === 'photo') {
     return (
       <img
-        src={dataUrl}
+        src={src}
         alt="Captured photo preview"
         className="w-full rounded-lg object-cover max-h-48"
       />
@@ -406,23 +453,27 @@ function MediaPreview({ dataUrl, mediaType }: { dataUrl: string; mediaType: Reco
   if (mediaType === 'video') {
     return (
       <video
-        src={dataUrl}
+        src={src}
         controls
         className="w-full rounded-lg aspect-video bg-black"
         playsInline
       />
     );
   }
-  return <audio src={dataUrl} controls className="w-full" />;
+  return <audio src={src} controls className="w-full" />;
 }
 
 interface RecordCardProps {
   record: RecordNote;
-  onDelete: (id: string) => void;
+  onDelete: (record: RecordNote) => void | Promise<void>;
 }
 
 function RecordCard({ record, onDelete }: RecordCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const { url, isMissing } = useStoredMediaUrl({
+    mediaId: record.mediaId,
+    fallbackUrl: record.dataUrl ?? null,
+  });
 
   const mediaIcon =
     record.mediaType === 'voice' ? (
@@ -469,7 +520,7 @@ function RecordCard({ record, onDelete }: RecordCardProps) {
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-destructive"
-            onClick={() => onDelete(record.id)}
+            onClick={() => void onDelete(record)}
             aria-label={`Delete ${record.title}`}
           >
             <Trash size={14} />
@@ -485,16 +536,19 @@ function RecordCard({ record, onDelete }: RecordCardProps) {
             exit={{ opacity: 0, height: 0 }}
             className="mt-2 overflow-hidden"
           >
+            {isMissing && !url && (
+              <p className="text-xs text-destructive">Saved media is unavailable.</p>
+            )}
             {record.mediaType === 'photo' && (
               <img
-                src={record.dataUrl}
+                src={url ?? ''}
                 alt={record.title}
                 className="w-full rounded object-cover max-h-48"
               />
             )}
             {record.mediaType === 'video' && (
               <video
-                src={record.dataUrl}
+                src={url ?? ''}
                 controls
                 className="w-full rounded aspect-video bg-black"
                 playsInline
@@ -502,7 +556,7 @@ function RecordCard({ record, onDelete }: RecordCardProps) {
             )}
             {/* No autoPlay — blocked by browser autoplay policies and jarring UX */}
             {record.mediaType === 'voice' && (
-              <audio src={record.dataUrl} className="w-full" controls />
+              <audio src={url ?? ''} className="w-full" controls />
             )}
             {record.transcription && (
               <p className="mt-2 text-xs text-muted-foreground">{record.transcription}</p>

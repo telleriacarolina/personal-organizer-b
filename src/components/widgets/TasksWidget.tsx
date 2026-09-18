@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ListChecks, Plus, Trash } from '@phosphor-icons/react';
 import { Task, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { addTaskToTasks, deleteTask as deleteTaskCommand, toggleTask as toggleTaskCommand } from '@/lib/organizer-commands';
 
 interface TasksWidgetProps {
   tasks: Task[];
@@ -27,29 +28,18 @@ export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, 
 
   const addTask = () => {
     if (newTask.trim()) {
-      const task: Task = {
-        id: Date.now().toString(),
-        text: newTask,
-        completed: false,
-        priority,
-        createdAt: Date.now(),
-      };
-      onUpdate([...tasks, task]);
+      onUpdate(addTaskToTasks(tasks, newTask, priority));
       setNewTask('');
       setPriority('medium');
     }
   };
 
   const toggleTask = (id: string) => {
-    onUpdate(
-      tasks.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
-    );
+    onUpdate(toggleTaskCommand(tasks, id));
   };
 
   const deleteTask = (id: string) => {
-    onUpdate(tasks.filter((task) => task.id !== id));
+    onUpdate(deleteTaskCommand(tasks, id));
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
