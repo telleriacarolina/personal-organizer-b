@@ -13,6 +13,10 @@ export default defineConfig({
     tailwindcss(),
     workflow(),
   ],
+  test: {
+    environment: "jsdom",
+    setupFiles: "./src/test/setup.ts",
+  },
   resolve: {
     alias: {
       '@': resolve(projectRoot, 'src')
