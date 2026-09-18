@@ -601,7 +601,7 @@ function App() {
       <AddWidgetDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        onAddWidget={addWidget}
+        onAddWidget={(type) => addWidget(type)}
       />
 
       <WorkOrganizationQuestionnaire
