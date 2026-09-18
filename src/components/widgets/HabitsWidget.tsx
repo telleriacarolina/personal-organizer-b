@@ -6,11 +6,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Fire, Plus, Trash } from '@phosphor-icons/react';
 import { Habit, WidgetSize } from '@/types';
+import { CollectionMutation, createItem, deleteItem, updateItem } from '@/lib/atomic-state';
+import { createId } from '@/lib/id';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface HabitsWidgetProps {
   habits: Habit[];
-  onUpdate: (habits: Habit[]) => void;
+  onUpdate: (mutation: CollectionMutation<Habit>) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -25,32 +27,30 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
   const addHabit = () => {
     if (newHabit.trim()) {
       const habit: Habit = {
-        id: Date.now().toString(),
+        id: createId('habit'),
         name: newHabit,
         completions: {},
         createdAt: Date.now(),
       };
-      onUpdate([...habits, habit]);
+      onUpdate(createItem(habit));
       setNewHabit('');
     }
   };
 
   const toggleHabitToday = (id: string) => {
     const today = new Date().toISOString().split('T')[0];
-    onUpdate(
-      habits.map((habit) => {
+    onUpdate(updateItem(id, (habit) => {
         if (habit.id === id) {
           const completions = { ...habit.completions };
           completions[today] = !completions[today];
           return { ...habit, completions };
         }
         return habit;
-      })
-    );
+      }));
   };
 
   const deleteHabit = (id: string) => {
-    onUpdate(habits.filter((habit) => habit.id !== id));
+    onUpdate(deleteItem(id));
   };
 
   const getStreak = (habit: Habit): number => {
@@ -101,7 +101,7 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
           placeholder="Add a new habit..."
           value={newHabit}
           onChange={(e) => setNewHabit(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           className="flex-1"
         />
         <Button onClick={addHabit} size="icon" className="h-10 w-10">

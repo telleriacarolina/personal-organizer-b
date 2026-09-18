@@ -171,7 +171,7 @@ export interface CalendarEvent {
   reminder?: number;
   reminderSent?: boolean;
   color?: string;
-  sourceType?: 'work';
+  sourceType?: 'work' | 'ical';
   sourceId?: string;
   sourceWidgetId?: string;
   createdAt: number;
@@ -305,6 +305,8 @@ export interface WorkWidget extends BaseWidget {
   errands: WorkErrand[];
   routines?: WorkRoutine[];
   activeRoutineId?: string;
+  activeTimerEntryId?: string | null;
+  calendarSourceWidgetId?: string | null;
   organizationPreference?: WorkOrganizationPreference;
 }
 
@@ -352,7 +354,7 @@ export interface Receipt {
   tax?: number;
   subtotal?: number;
   notes?: string;
-  /** Legacy Base64 image payload kept for backward compatibility. */
+  imageMediaId?: string;
   imageData?: string;
   /** IndexedDB reference for receipt media blobs. */
   imageRef?: {
@@ -418,18 +420,17 @@ export interface RecordNote {
   id: string;
   title: string;
   mediaType: RecordNoteMediaType;
-  /** Legacy Base64 payload kept for backward compatibility. */
+  mediaId?: string;
   dataUrl?: string;
-  /** IndexedDB reference for stored media blobs. */
-  mediaRef?: {
-    id: string;
-    mimeType: string;
-    byteSize: number;
-    createdAt: number;
-  };
   duration?: number;
   transcription?: string;
   createdAt: number;
+}
+
+export interface BackgroundImage {
+  mediaId?: string;
+  url?: string;
+  opacity: number;
 }
 
 export interface RecordNoteWidget extends BaseWidget {

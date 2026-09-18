@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,8 +17,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
-import { saveMediaBlob } from '@/lib/media-storage';
-import { assertMaxBytes, normalizeImageForStorage, validateImageFile } from '@/lib/media-validation';
+import { createItem, deleteItem as deleteItemMutation, updateItem } from '@/lib/atomic-state';
+import { createId } from '@/lib/id';
+import { parseRequiredDateInput, processDueShoppingReminders, sanitizeReceipts, sanitizeReminders, sanitizeTrips, upsertShoppingReminders } from '@/lib/shopping-state';
 
 interface ShoppingWidgetProps {
   items: PersonalShoppingItem[];
@@ -28,7 +29,19 @@ interface ShoppingWidgetProps {
   reminders?: ShoppingReminder[];
   aiState?: WidgetAIState;
   onAIStateChange: (state: WidgetAIState) => void;
-  onUpdate: (data: { items?: PersonalShoppingItem[]; budget?: number; receipts?: Receipt[]; trips?: ShoppingTrip[]; reminders?: ShoppingReminder[] }) => void;
+  onUpdate: (updater: (current: {
+    items: PersonalShoppingItem[];
+    budget?: number;
+    receipts?: Receipt[];
+    trips?: ShoppingTrip[];
+    reminders?: ShoppingReminder[];
+  }) => Partial<{
+    items: PersonalShoppingItem[];
+    budget?: number;
+    receipts?: Receipt[];
+    trips?: ShoppingTrip[];
+    reminders?: ShoppingReminder[];
+  }>) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -75,9 +88,9 @@ const MAX_RECEIPT_IMAGE_DIMENSION = 4096;
 export function ShoppingWidget({
   items,
   budget,
-  receipts = [],
-  trips = [],
-  reminders = [],
+  receipts: persistedReceipts = [],
+  trips: persistedTrips = [],
+  reminders: persistedReminders = [],
   aiState,
   onAIStateChange,
   onUpdate,
@@ -90,6 +103,9 @@ export function ShoppingWidget({
   snapToGrid,
   globalLock
 }: ShoppingWidgetProps) {
+  const receipts = useMemo(() => sanitizeReceipts(persistedReceipts), [persistedReceipts]);
+  const trips = useMemo(() => sanitizeTrips(persistedTrips), [persistedTrips]);
+  const reminders = useMemo(() => sanitizeReminders(persistedReminders), [persistedReminders]);
   const [newItemName, setNewItemName] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState('');
   const [newItemPrice, setNewItemPrice] = useState('');
@@ -121,14 +137,23 @@ export function ShoppingWidget({
   const [selectedTripForRevisit, setSelectedTripForRevisit] = useState<ShoppingTrip | null>(null);
   
   const [showRemindersDialog, setShowRemindersDialog] = useState(false);
-  const [activeReminders, setActiveReminders] = useState<ShoppingReminder[]>([]);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(true);
+
+  useEffect(() => {
+    if (
+      receipts.length !== persistedReceipts.length ||
+      trips.length !== persistedTrips.length ||
+      reminders.length !== persistedReminders.length
+    ) {
+      onUpdate(() => ({ receipts, trips, reminders }));
+    }
+  }, [onUpdate, persistedReceipts.length, persistedReminders.length, persistedTrips.length, receipts, reminders, trips]);
 
   const addItem = () => {
     if (newItemName.trim()) {
       const item: PersonalShoppingItem = {
-        id: Date.now().toString(),
+        id: createId('shopping-item'),
         name: newItemName,
         quantity: newItemQuantity || undefined,
         category: selectedCategory,
@@ -138,7 +163,7 @@ export function ShoppingWidget({
         priority: selectedPriority,
         createdAt: Date.now(),
       };
-      onUpdate({ items: [...items, item] });
+      onUpdate((current) => ({ items: createItem(item)(current.items) }));
       setNewItemName('');
       setNewItemQuantity('');
       setNewItemPrice('');
@@ -155,7 +180,7 @@ export function ShoppingWidget({
     try {
       const barcodeValue = barcodeInput.trim();
       const item: PersonalShoppingItem = {
-        id: Date.now().toString(),
+        id: createId('shopping-item'),
         name: `Barcode ${barcodeValue}`,
         category: selectedCategory,
         purchased: false,
@@ -164,7 +189,7 @@ export function ShoppingWidget({
         createdAt: Date.now(),
       };
 
-      onUpdate({ items: [...items, item] });
+      onUpdate((current) => ({ items: createItem(item)(current.items) }));
       toast.success(`Added Barcode ${barcodeValue}`);
       setBarcodeInput('');
       setShowBarcodeDialog(false);
@@ -182,21 +207,9 @@ export function ShoppingWidget({
     setIsProcessingReceipt(true);
 
     try {
-      await validateImageFile(file, {
-        maxBytes: MAX_RECEIPT_IMAGE_BYTES,
-        maxWidth: MAX_RECEIPT_IMAGE_DIMENSION,
-        maxHeight: MAX_RECEIPT_IMAGE_DIMENSION,
-      });
-      const normalizedImage = await normalizeImageForStorage(file, {
-        maxWidth: MAX_RECEIPT_IMAGE_DIMENSION,
-        maxHeight: MAX_RECEIPT_IMAGE_DIMENSION,
-      });
-      assertMaxBytes(normalizedImage, MAX_RECEIPT_IMAGE_BYTES, 'Receipt image');
-      setReceiptImageInput(normalizedImage);
-
-      if (!receiptStoreName.trim()) {
-        setReceiptStoreName(file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '));
-      }
+      setReceiptStoreName((current) =>
+        current.trim() ? current : file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '),
+      );
 
       toast.success('Receipt image validated and added.');
     } catch (error) {
@@ -244,16 +257,30 @@ export function ShoppingWidget({
     setIsProcessingReceipt(true);
     try {
       const parsedItems = parseReceiptLines(receiptItems || '');
-      const receiptId = Date.now().toString();
-      const receiptDateTs = new Date(receiptDate).getTime();
+      const receiptId = createId('receipt');
+      const receiptDateTs = parseRequiredDateInput(receiptDate);
+      if (receiptDateTs === null) {
+        toast.error('Please enter a valid receipt date');
+        return;
+      }
 
       let imageRef: Receipt['imageRef'];
       if (receiptImageInput) {
-        imageRef = await saveMediaBlob(receiptImageInput);
+        const reader = new FileReader();
+        imageData = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(reader.error ?? new Error('Failed to read receipt image'));
+          reader.onabort = () => reject(new Error('Receipt image read aborted'));
+          reader.readAsDataURL(receiptImageInput);
+        });
       }
 
       const calculatedTotal = parsedItems.reduce((sum, item) => sum + (item.price || 0), 0);
       const total = receiptTotal ? parseFloat(receiptTotal) : calculatedTotal;
+      if (!Number.isFinite(total)) {
+        toast.error('Please enter a valid receipt total');
+        return;
+      }
 
       const newReceipt: Receipt = {
         id: receiptId,
@@ -274,7 +301,7 @@ export function ShoppingWidget({
       };
 
       const newItems = parsedItems.map((item) => ({
-        id: `${receiptId}-${Date.now()}-${Math.random()}`,
+        id: createId('shopping-item'),
         name: item.name,
         quantity: item.quantity,
         category: item.category,
@@ -287,33 +314,34 @@ export function ShoppingWidget({
         purchasedAt: receiptDateTs,
       }));
 
-      const existingTrip = trips.find(t => 
-        t.storeName === receiptStoreName && 
-        startOfDay(t.date).getTime() === startOfDay(receiptDateTs).getTime()
-      );
-
-      let newTrips = [...trips];
-      if (existingTrip) {
-        newTrips = trips.map(t => 
-          t.id === existingTrip.id 
-            ? { ...t, total: t.total + total, itemCount: t.itemCount + parsedItems.length, receiptIds: [...t.receiptIds, receiptId] }
-            : t
+      onUpdate((current) => {
+        const currentTrips = sanitizeTrips(current.trips || []);
+        const existingTrip = currentTrips.find((trip) =>
+          trip.storeName === receiptStoreName &&
+          startOfDay(trip.date).getTime() === startOfDay(receiptDateTs).getTime(),
         );
-      } else {
-        newTrips.push({
-          id: `trip-${Date.now()}`,
-          date: receiptDateTs,
-          storeName: receiptStoreName,
-          total: total,
-          itemCount: parsedItems.length,
-          receiptIds: [receiptId],
-        });
-      }
 
-      onUpdate({ 
-        items: [...items, ...newItems],
-        receipts: [...receipts, newReceipt],
-        trips: newTrips
+        const nextTrips = existingTrip
+          ? updateItem(existingTrip.id, (trip) => ({
+              ...trip,
+              total: trip.total + total,
+              itemCount: trip.itemCount + parsedItems.length,
+              receiptIds: [...trip.receiptIds, receiptId],
+            }))(currentTrips)
+          : createItem({
+              id: createId('shopping-trip'),
+              date: receiptDateTs,
+              storeName: receiptStoreName,
+              total,
+              itemCount: parsedItems.length,
+              receiptIds: [receiptId],
+            })(currentTrips);
+
+        return {
+          items: [...current.items, ...newItems],
+          receipts: createItem(newReceipt)(sanitizeReceipts(current.receipts || [])),
+          trips: nextTrips,
+        };
       });
 
       toast.success(`Receipt added: ${parsedItems.length} items from ${receiptStoreName}`);
@@ -332,21 +360,27 @@ export function ShoppingWidget({
   };
 
   const togglePurchased = (id: string) => {
-    onUpdate({
-      items: items.map((item) =>
-        item.id === id ? { ...item, purchased: !item.purchased, purchasedAt: !item.purchased ? Date.now() : undefined } : item
-      )
-    });
+    onUpdate((current) => ({
+      items: updateItem(id, (item) => ({
+        ...item,
+        purchased: !item.purchased,
+        purchasedAt: !item.purchased ? Date.now() : undefined,
+      }))(current.items),
+    }));
   };
 
   const deleteItem = (id: string) => {
-    onUpdate({ items: items.filter((item) => item.id !== id) });
+    onUpdate((current) => ({ items: deleteItemMutation(id)(current.items) }));
     toast.success('Item removed');
   };
 
   const updateBudget = () => {
     const newBudget = budgetInput ? parseFloat(budgetInput) : undefined;
-    onUpdate({ budget: newBudget });
+    if (budgetInput && !Number.isFinite(newBudget)) {
+      toast.error('Please enter a valid budget amount');
+      return;
+    }
+    onUpdate(() => ({ budget: newBudget }));
     toast.success(newBudget ? `Budget set to $${newBudget.toFixed(2)}` : 'Budget cleared');
   };
 
@@ -468,7 +502,9 @@ export function ShoppingWidget({
     };
   };
 
-  const comparisonData = getComparisonData();
+  const comparisonData = showAnalyticsDialog
+    ? getComparisonData()
+    : { currentTotal: 0, previousTotal: 0, currentTrips: 0, previousTrips: 0, categorySpending: {}, percentageChange: 0 };
 
   const getSimilarTrips = (trip: ShoppingTrip) => {
     const tripDate = new Date(trip.date);
@@ -501,7 +537,7 @@ export function ShoppingWidget({
         if (!itemsSet.has(receiptItem.name)) {
           itemsSet.add(receiptItem.name);
           itemsList.push({
-            id: `revisit-${Date.now()}-${Math.random()}`,
+            id: createId('shopping-item'),
             name: receiptItem.name,
             quantity: receiptItem.quantity,
             category: receiptItem.category || 'other',
@@ -526,12 +562,12 @@ export function ShoppingWidget({
   const handleAddRevisitItems = (tripItems: PersonalShoppingItem[]) => {
     const newItems = tripItems.map(item => ({
       ...item,
-      id: `revisit-${Date.now()}-${Math.random()}`,
+      id: createId('shopping-item'),
       purchased: false,
       createdAt: Date.now(),
     }));
     
-    onUpdate({ items: [...items, ...newItems] });
+    onUpdate((current) => ({ items: [...current.items, ...newItems] }));
     toast.success(`Added ${newItems.length} items from similar trip`);
     setShowTripRevisitsDialog(false);
     setSelectedTripForRevisit(null);
@@ -625,7 +661,7 @@ export function ShoppingWidget({
       const primaryCategory = (Object.entries(categoryFrequency).sort(([,a], [,b]) => b - a)[0]?.[0] || 'food') as ShoppingCategory;
 
       newReminders.push({
-        id: `reminder-${Date.now()}-${storeName}`,
+        id: createId('shopping-reminder'),
         storeName,
         category: primaryCategory,
         frequency,
@@ -637,23 +673,23 @@ export function ShoppingWidget({
       });
     }
 
-    onUpdate({ reminders: [...reminders, ...newReminders] });
+    onUpdate((current) => ({
+      reminders: upsertShoppingReminders(sanitizeReminders(current.reminders || []), newReminders),
+    }));
     toast.success(`Created ${newReminders.length} smart shopping reminders!`);
     setShowRemindersDialog(true);
   };
 
   const toggleReminder = (id: string) => {
-    onUpdate({
-      reminders: reminders.map(r => 
-        r.id === id ? { ...r, enabled: !r.enabled } : r
-      )
-    });
+    onUpdate((current) => ({
+      reminders: updateItem(id, (reminder) => ({ ...reminder, enabled: !reminder.enabled }))(
+        sanitizeReminders(current.reminders || []),
+      ),
+    }));
   };
 
   const deleteReminder = (id: string) => {
-    onUpdate({
-      reminders: reminders.filter(r => r.id !== id)
-    });
+    onUpdate((current) => ({ reminders: deleteItemMutation(id)(sanitizeReminders(current.reminders || [])) }));
     toast.success('Reminder deleted');
   };
 
@@ -662,30 +698,38 @@ export function ShoppingWidget({
     if (!reminder) return;
 
     const newDate = addDays(new Date(), days).getTime();
-    onUpdate({
-      reminders: reminders.map(r => 
-        r.id === id ? { ...r, nextReminderDate: newDate, lastTriggered: Date.now() } : r
-      )
-    });
+    onUpdate((current) => ({
+      reminders: updateItem(id, (currentReminder) => ({
+        ...currentReminder,
+        nextReminderDate: newDate,
+        lastTriggered: Date.now(),
+      }))(sanitizeReminders(current.reminders || [])),
+    }));
     toast.success(`Reminder snoozed for ${days} days`);
   };
 
   useEffect(() => {
-    const now = Date.now();
-    const triggered = reminders.filter(r => 
-      r.enabled && 
-      r.nextReminderDate <= now &&
-      (!r.lastTriggered || (now - r.lastTriggered) > 24 * 60 * 60 * 1000)
-    );
+    const processReminders = () => {
+      const now = Date.now();
+      if (
+        !reminders.some(
+          (reminder) =>
+            reminder.enabled &&
+            reminder.nextReminderDate <= now &&
+            (!reminder.lastTriggered || now - reminder.lastTriggered > 24 * 60 * 60 * 1000),
+        )
+      ) {
+        return;
+      }
 
-    if (triggered.length > 0) {
-      setActiveReminders(triggered);
-    }
-  }, [reminders]);
+      let triggered: ShoppingReminder[] = [];
+      onUpdate((current) => {
+        const result = processDueShoppingReminders(sanitizeReminders(current.reminders || []), now);
+        triggered = result.triggered;
+        return triggered.length > 0 ? { reminders: result.reminders } : {};
+      });
 
-  useEffect(() => {
-    if (activeReminders.length > 0) {
-      activeReminders.forEach(reminder => {
+      triggered.forEach((reminder) => {
         toast(
           <div className="flex flex-col gap-1">
             <div className="font-semibold flex items-center gap-2">
@@ -708,16 +752,25 @@ export function ShoppingWidget({
           }
         );
       });
+    };
 
-      onUpdate({
-        reminders: reminders.map(r => 
-          activeReminders.find(ar => ar.id === r.id)
-            ? { ...r, lastTriggered: Date.now() }
-            : r
-        )
-      });
-    }
-  }, [activeReminders]);
+    processReminders();
+    const interval = window.setInterval(processReminders, 60000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        processReminders();
+      }
+    };
+
+    window.addEventListener('focus', processReminders);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', processReminders);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [onUpdate, reminders]);
 
   const aiInput = { items, budget, receipts, trips, reminders };
   const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
@@ -818,7 +871,7 @@ export function ShoppingWidget({
                       placeholder="Enter barcode..."
                       value={barcodeInput}
                       onChange={(e) => setBarcodeInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleBarcodeSubmit()}
+                      onKeyDown={(e) => e.key === 'Enter' && handleBarcodeSubmit()}
                     />
                     <Button size="icon" variant="outline" title="Scan with camera">
                       <Scan size={18} />

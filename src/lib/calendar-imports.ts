@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '@/types';
+import { createId } from '@/lib/id';
 
 export type CalendarImportDraft = Pick<
   CalendarEvent,
@@ -16,7 +17,7 @@ export function appendImportedCalendarEvent(events: CalendarEvent[], draft: Cale
   }
 
   const createdAt = Date.now();
-  const eventId = crypto.randomUUID();
+  const eventId = createId('calendar-event');
   const nextEvent: CalendarEvent = {
     id: eventId,
     title: draft.title,

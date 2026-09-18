@@ -1,4 +1,5 @@
 import { AIInsight, AIWidgetFeature, WidgetAIState } from '@/types';
+import { createId } from '@/lib/id';
 
 export interface AIProviderRequest<TInput = unknown> {
   widgetId: string;
@@ -60,7 +61,7 @@ const createSystemInsight = (
   const generatedAt = Date.now();
 
   return {
-    id: crypto.randomUUID(),
+    id: createId('ai-insight'),
     kind: 'system',
     title,
     summary,

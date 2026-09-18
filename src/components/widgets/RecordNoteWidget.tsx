@@ -17,12 +17,12 @@ import { RecordNote, RecordNoteMediaType, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { selectMimeType, label, defaultTitle, formatDuration } from './recordNoteUtils';
-import { deleteMediaBlob, getMediaBlob, saveMediaBlob } from '@/lib/media-storage';
-import { assertMaxBytes } from '@/lib/media-validation';
+import { CollectionMutation, createItem, deleteItem } from '@/lib/atomic-state';
+import { createId } from '@/lib/id';
 
 interface RecordNoteWidgetProps {
   records: RecordNote[];
-  onUpdate: (records: RecordNote[]) => void;
+  onUpdate: (mutation: CollectionMutation<RecordNote>) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -266,36 +266,25 @@ export function RecordNoteWidget({
   const saveRecord = async () => {
     if (!previewBlob || !activeMode) return;
     const title = pendingTitle.trim() || defaultTitle(activeMode);
-    try {
-      const mediaRef = await saveMediaBlob(previewBlob);
-      const newRecord: RecordNote = {
-        id: Date.now().toString(),
-        title,
-        mediaType: activeMode,
-        mediaRef,
-        duration: activeMode !== 'photo' ? durationRef.current : undefined,
-        createdAt: Date.now(),
-      };
-      onUpdate([...records, newRecord]);
-      toast.success(`${label(activeMode)} saved!`);
-      setPreviewBlob(null);
-      setRecordingState('idle');
-      setActiveMode(null);
-      setPendingTitle('');
-    } catch {
-      toast.error('Could not save media securely. Please try again.');
-    }
+    const newRecord: RecordNote = {
+      id: createId('record-note'),
+      title,
+      mediaType: activeMode,
+      dataUrl: previewDataUrl,
+      // Use the ref value — never stale React state
+      duration: activeMode !== 'photo' ? durationRef.current : undefined,
+      createdAt: Date.now(),
+    };
+    onUpdate(createItem(newRecord));
+    toast.success(`${label(activeMode)} saved!`);
+    setPreviewDataUrl(null);
+    setRecordingState('idle');
+    setActiveMode(null);
+    setPendingTitle('');
   };
 
-  const deleteRecord = async (record: RecordNote) => {
-    if (record.mediaRef?.id) {
-      try {
-        await deleteMediaBlob(record.mediaRef.id);
-      } catch {
-        toast.error('Failed to remove stored media blob');
-      }
-    }
-    onUpdate(records.filter((r) => r.id !== record.id));
+  const deleteRecord = (id: string) => {
+    onUpdate(deleteItem(id));
     toast.success('Record deleted');
   };
 
