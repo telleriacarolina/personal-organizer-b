@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { calendarDomainReducer } from '@/lib/domain/calendar-domain';
 import { syncCalendarEventsToFamilyPlanner } from '@/lib/calendar-sync';
 import { deleteCalendarEvent as deleteCalendarEventCommand, saveCalendarEvent } from '@/lib/organizer-commands';
 import { parseICalText } from '@/lib/ical-parser';
@@ -37,6 +38,8 @@ interface CalendarWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
 const eventColors = [
@@ -65,6 +68,8 @@ export function CalendarWidget({
   onDragEnd,
   size,
   onSizeChange,
+  snapToGrid,
+  globalLock,
 }: CalendarWidgetProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
@@ -175,6 +180,10 @@ export function CalendarWidget({
       reminder: reminder !== 'none' ? parseInt(reminder) : undefined,
       reminderSent: false,
       color: color,
+      createdAt: editingEvent?.createdAt || Date.now(),
+    };
+
+    const updatedEvents = calendarDomainReducer(events, { type: 'upsert', event: newEvent });
     }, editingEvent);
 
     onUpdate(updatedEvents);
@@ -191,6 +200,7 @@ export function CalendarWidget({
   };
 
   const deleteEvent = (id: string) => {
+    const updatedEvents = calendarDomainReducer(events, { type: 'delete', id });
     const updatedEvents = deleteCalendarEventCommand(events, id);
     onUpdate(updatedEvents);
     void syncFamilyCalendarPlanner(updatedEvents);
@@ -403,6 +413,8 @@ export function CalendarWidget({
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="calendar"
     >
       {showAIPanel ? (

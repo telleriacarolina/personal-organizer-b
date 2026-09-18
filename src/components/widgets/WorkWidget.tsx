@@ -41,6 +41,7 @@ import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
 import type { CalendarImportDraft } from '@/lib/calendar-imports';
+import { reduceWorkWidget, type WorkDomainAction } from '@/lib/domain/work-domain';
 
 interface CalendarSource {
   id: string;
@@ -80,6 +81,8 @@ interface WorkWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
 export function WorkWidget({
@@ -102,7 +105,9 @@ export function WorkWidget({
   onDragStart,
   onDragEnd,
   size,
-  onSizeChange
+  onSizeChange,
+  snapToGrid,
+  globalLock,
 }: WorkWidgetProps) {
   const [activeTimer, setActiveTimer] = useState<string | null>(null);
   const [showClientDialog, setShowClientDialog] = useState(false);
@@ -149,27 +154,56 @@ export function WorkWidget({
   };
   const [showAIPanel, setShowAIPanel] = useState(true);
 
+  const applyWorkDomainAction = (action: WorkDomainAction) => {
+    const currentWidgetState = {
+      id: widgetId,
+      type: 'work' as const,
+      position: 0,
+      clientSlots,
+      meals,
+      timeEntries,
+      jobs,
+      shoppingList,
+      errands,
+      routines,
+      activeRoutineId,
+      organizationPreference,
+    };
+
+    const nextState = reduceWorkWidget(currentWidgetState, action);
+    onUpdate({
+      clientSlots: nextState.clientSlots,
+      meals: nextState.meals,
+      timeEntries: nextState.timeEntries,
+      jobs: nextState.jobs,
+      shoppingList: nextState.shoppingList,
+      errands: nextState.errands,
+      routines: nextState.routines,
+      activeRoutineId: nextState.activeRoutineId,
+      organizationPreference: nextState.organizationPreference,
+    });
+  };
+
   const addClientSlot = (data: Omit<ClientSlot, 'id' | 'createdAt'>) => {
     const newSlot: ClientSlot = {
       ...data,
       id: Date.now().toString(),
       createdAt: Date.now()
     };
-    onUpdate({ clientSlots: [...clientSlots, newSlot] });
+    applyWorkDomainAction({ type: 'set-client-slots', payload: [...clientSlots, newSlot] });
     toast.success('Client slot scheduled');
     setShowClientDialog(false);
   };
 
   const updateClientStatus = (id: string, status: ClientSlot['status']) => {
-    onUpdate({
-      clientSlots: clientSlots.map(slot =>
-        slot.id === id ? { ...slot, status } : slot
-      )
+    applyWorkDomainAction({
+      type: 'set-client-slots',
+      payload: clientSlots.map((slot) => (slot.id === id ? { ...slot, status } : slot)),
     });
   };
 
   const deleteClientSlot = (id: string) => {
-    onUpdate({ clientSlots: clientSlots.filter(s => s.id !== id) });
+    applyWorkDomainAction({ type: 'set-client-slots', payload: clientSlots.filter((slot) => slot.id !== id) });
     toast.success('Client slot deleted');
   };
 
@@ -179,13 +213,13 @@ export function WorkWidget({
       id: Date.now().toString(),
       createdAt: Date.now()
     };
-    onUpdate({ meals: [...meals, newMeal] });
+    applyWorkDomainAction({ type: 'set-meals', payload: [...meals, newMeal] });
     toast.success('Meal scheduled');
     setShowMealDialog(false);
   };
 
   const deleteMeal = (id: string) => {
-    onUpdate({ meals: meals.filter(m => m.id !== id) });
+    applyWorkDomainAction({ type: 'set-meals', payload: meals.filter((meal) => meal.id !== id) });
     toast.success('Meal deleted');
   };
 
@@ -197,7 +231,7 @@ export function WorkWidget({
       startTime: Date.now(),
       createdAt: Date.now()
     };
-    onUpdate({ timeEntries: [...timeEntries, newEntry] });
+    applyWorkDomainAction({ type: 'set-time-entries', payload: [...timeEntries, newEntry] });
     setActiveTimer(newEntry.id);
     toast.success('Timer started');
   };
@@ -207,10 +241,9 @@ export function WorkWidget({
     if (entry && !entry.endTime) {
       const endTime = Date.now();
       const duration = Math.floor((endTime - entry.startTime) / 1000 / 60);
-      onUpdate({
-        timeEntries: timeEntries.map(e =>
-          e.id === id ? { ...e, endTime, duration } : e
-        )
+      applyWorkDomainAction({
+        type: 'set-time-entries',
+        payload: timeEntries.map((entry) => (entry.id === id ? { ...entry, endTime, duration } : entry)),
       });
       setActiveTimer(null);
       toast.success(`Timer stopped: ${duration} minutes`);
@@ -218,7 +251,7 @@ export function WorkWidget({
   };
 
   const deleteTimeEntry = (id: string) => {
-    onUpdate({ timeEntries: timeEntries.filter(e => e.id !== id) });
+    applyWorkDomainAction({ type: 'set-time-entries', payload: timeEntries.filter((entry) => entry.id !== id) });
     if (activeTimer === id) setActiveTimer(null);
     toast.success('Time entry deleted');
   };
@@ -229,21 +262,20 @@ export function WorkWidget({
       id: Date.now().toString(),
       createdAt: Date.now()
     };
-    onUpdate({ jobs: [...jobs, newJob] });
+    applyWorkDomainAction({ type: 'set-jobs', payload: [...jobs, newJob] });
     toast.success('Job added');
     setShowJobDialog(false);
   };
 
   const updateJobStatus = (id: string, status: Job['status']) => {
-    onUpdate({
-      jobs: jobs.map(job =>
-        job.id === id ? { ...job, status } : job
-      )
+    applyWorkDomainAction({
+      type: 'set-jobs',
+      payload: jobs.map((job) => (job.id === id ? { ...job, status } : job)),
     });
   };
 
   const deleteJob = (id: string) => {
-    onUpdate({ jobs: jobs.filter(j => j.id !== id) });
+    applyWorkDomainAction({ type: 'set-jobs', payload: jobs.filter((job) => job.id !== id) });
     toast.success('Job deleted');
   };
 
@@ -256,19 +288,18 @@ export function WorkWidget({
       purchased: false,
       createdAt: Date.now()
     };
-    onUpdate({ shoppingList: [...shoppingList, newItem] });
+    applyWorkDomainAction({ type: 'set-shopping-list', payload: [...shoppingList, newItem] });
   };
 
   const toggleShoppingItem = (id: string) => {
-    onUpdate({
-      shoppingList: shoppingList.map(item =>
-        item.id === id ? { ...item, purchased: !item.purchased } : item
-      )
+    applyWorkDomainAction({
+      type: 'set-shopping-list',
+      payload: shoppingList.map((item) => (item.id === id ? { ...item, purchased: !item.purchased } : item)),
     });
   };
 
   const deleteShoppingItem = (id: string) => {
-    onUpdate({ shoppingList: shoppingList.filter(i => i.id !== id) });
+    applyWorkDomainAction({ type: 'set-shopping-list', payload: shoppingList.filter((item) => item.id !== id) });
   };
 
   const addErrand = (data: Omit<WorkErrand, 'id' | 'createdAt'>) => {
@@ -277,21 +308,20 @@ export function WorkWidget({
       id: Date.now().toString(),
       createdAt: Date.now()
     };
-    onUpdate({ errands: [...errands, newErrand] });
+    applyWorkDomainAction({ type: 'set-errands', payload: [...errands, newErrand] });
     toast.success('Work errand added');
     setShowErrandDialog(false);
   };
 
   const toggleErrand = (id: string) => {
-    onUpdate({
-      errands: errands.map(errand =>
-        errand.id === id ? { ...errand, completed: !errand.completed } : errand
-      )
+    applyWorkDomainAction({
+      type: 'set-errands',
+      payload: errands.map((errand) => (errand.id === id ? { ...errand, completed: !errand.completed } : errand)),
     });
   };
 
   const deleteErrand = (id: string) => {
-    onUpdate({ errands: errands.filter(e => e.id !== id) });
+    applyWorkDomainAction({ type: 'set-errands', payload: errands.filter((errand) => errand.id !== id) });
     toast.success('Work errand deleted');
   };
 
@@ -450,6 +480,8 @@ export function WorkWidget({
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="work"
     >
       {showAIPanel ? (
