@@ -1,6 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
-import { useState, useEffect } from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Button } from '@/components/ui/button';
@@ -14,17 +12,12 @@ import { Switch } from '@/components/ui/switch';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
-import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown, Sparkle } from '@phosphor-icons/react';
-import { AIInsightAction, CalendarEntryType, CalendarEvent, WidgetAIState, WidgetSize } from '@/types';
 import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown, Sparkle, UploadSimple } from '@phosphor-icons/react';
 import { AIInsightAction, CalendarEntryType, CalendarEvent, FamilyCalendarPlannerEvent, WidgetAIState, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
-import { calendarDomainReducer } from '@/lib/domain/calendar-domain';
-import { syncCalendarEventsToFamilyPlanner } from '@/lib/calendar-sync';
-import { deleteCalendarEvent as deleteCalendarEventCommand, saveCalendarEvent } from '@/lib/organizer-commands';
 import { parseICalText } from '@/lib/ical-parser';
 import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
 
@@ -39,8 +32,6 @@ interface CalendarWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
-  snapToGrid?: boolean;
-  globalLock?: boolean;
 }
 
 const eventColors = [
@@ -69,14 +60,8 @@ export function CalendarWidget({
   onDragEnd,
   size,
   onSizeChange,
-  snapToGrid,
-  globalLock,
 }: CalendarWidgetProps) {
-  const [, setPlannerEvents] = useLocalStorageState<FamilyCalendarPlannerEvent[]>(
-    'family-calendar-planner-events',
-    [],
-    { persistMode: 'debounced', debounceMs: 300 }
-  );
+  const [, setPlannerEvents] = useLocalStorageState<FamilyCalendarPlannerEvent[]>('family-calendar-planner-events', []);
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -163,8 +148,59 @@ export function CalendarWidget({
     setShowDialog(true);
   };
 
+  const buildDateTimeIso = (dateMs: number, time?: string, fallbackTime = '09:00') => {
+    const date = new Date(dateMs);
+    const [hours, minutes] = (time || fallbackTime).split(':').map(Number);
+    date.setHours(hours || 0, minutes || 0, 0, 0);
+    return date.toISOString();
+  };
+
+  const mapToFamilyCalendarPlannerEvent = (event: CalendarEvent): FamilyCalendarPlannerEvent => {
+    const start = buildDateTimeIso(event.date, event.startTime, '09:00');
+    const end = buildDateTimeIso(event.date, event.endTime || event.startTime, '10:00');
+
+    return {
+      id: event.id,
+      calendarId: 'family-calendar-default',
+      title: event.title,
+      description: event.description || undefined,
+      startTime: start,
+      endTime: end,
+      allDay: Boolean(event.allDay),
+      visibility: 'private',
+      requiresApproval: false,
+      createdBy: 'personal-organizer-user',
+      attendees: ['personal-organizer-user'],
+      location: event.location || undefined,
+      reminders: event.reminder ? [event.reminder] : [],
+      color: event.color,
+      createdAt: new Date(event.createdAt).toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  };
+
   const syncFamilyCalendarPlanner = async (calendarEvents: CalendarEvent[]) => {
-    await syncCalendarEventsToFamilyPlanner(calendarEvents);
+    const mappedEvents = calendarEvents.map(mapToFamilyCalendarPlannerEvent);
+    setPlannerEvents(mappedEvents);
+
+    const apiBaseUrl = import.meta.env.VITE_FAMILY_CALENDAR_API_URL;
+    if (!apiBaseUrl) return;
+
+    try {
+      const response = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/events/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ events: mappedEvents }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Sync failed with status ${response.status}`);
+      }
+    } catch {
+      toast.error('Unable to sync with Family Calendar Planner API');
+    }
   };
 
   const saveEvent = () => {
@@ -174,7 +210,8 @@ export function CalendarWidget({
     }
 
     const eventDateTime = new Date(eventDate).setHours(0, 0, 0, 0);
-    const updatedEvents = saveCalendarEvent(events, {
+    const newEvent: CalendarEvent = {
+      id: editingEvent?.id || Date.now().toString(),
       title: title.trim(),
       type: eventType,
       description: description.trim(),
@@ -189,8 +226,9 @@ export function CalendarWidget({
       createdAt: editingEvent?.createdAt || Date.now(),
     };
 
-    const updatedEvents = calendarDomainReducer(events, { type: 'upsert', event: newEvent });
-    }, editingEvent);
+    const updatedEvents = editingEvent
+      ? events.map((e) => (e.id === editingEvent.id ? newEvent : e))
+      : [...events, newEvent];
 
     onUpdate(updatedEvents);
     void syncFamilyCalendarPlanner(updatedEvents);
@@ -206,8 +244,7 @@ export function CalendarWidget({
   };
 
   const deleteEvent = (id: string) => {
-    const updatedEvents = calendarDomainReducer(events, { type: 'delete', id });
-    const updatedEvents = deleteCalendarEventCommand(events, id);
+    const updatedEvents = events.filter((e) => e.id !== id);
     onUpdate(updatedEvents);
     void syncFamilyCalendarPlanner(updatedEvents);
     toast.success('Event deleted');
@@ -266,30 +303,33 @@ export function CalendarWidget({
   const weekEnd = endOfWeek(currentWeek);
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  const dateKey = (date: Date) => format(date, 'yyyy-MM-dd');
-  const eventsByDate = useMemo(() => {
-    const map = new Map<string, CalendarEvent[]>();
-    events.forEach((event) => {
-      const key = dateKey(new Date(event.date));
-      const existing = map.get(key);
-      if (existing) {
-        existing.push(event);
-      } else {
-        map.set(key, [event]);
-      }
-    });
-    map.forEach((list) => {
-      list.sort((a, b) => {
-        if (!a.startTime && !b.startTime) return a.date - b.date;
-        if (!a.startTime) return 1;
-        if (!b.startTime) return -1;
-        return a.startTime.localeCompare(b.startTime);
-      });
-    });
-    return map;
-  }, [events]);
+  const compareEventsForDay = useCallback((a: CalendarEvent, b: CalendarEvent) => {
+    if (!a.startTime && !b.startTime) return a.date - b.date;
+    if (!a.startTime) return 1;
+    if (!b.startTime) return -1;
+    return a.startTime.localeCompare(b.startTime);
+  }, []);
 
-  const getEventsForDate = (date: Date) => eventsByDate.get(dateKey(date)) || [];
+  const eventsByDate = useMemo(() => {
+    const groupedEvents = new Map<string, CalendarEvent[]>();
+
+    for (const event of events) {
+      const dateKey = format(new Date(event.date), 'yyyy-MM-dd');
+      const existingEvents = groupedEvents.get(dateKey) ?? [];
+      existingEvents.push(event);
+      groupedEvents.set(dateKey, existingEvents);
+    }
+
+    groupedEvents.forEach((groupedDayEvents, dateKey) => {
+      groupedEvents.set(dateKey, groupedDayEvents.sort(compareEventsForDay));
+    });
+
+    return groupedEvents;
+  }, [compareEventsForDay, events]);
+
+  const getEventsForDate = (date: Date) => {
+    return eventsByDate.get(format(date, 'yyyy-MM-dd')) ?? [];
+  };
 
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
 
@@ -302,8 +342,10 @@ export function CalendarWidget({
   };
 
   const aiInput = useMemo(() => ({ events }), [events]);
-  const aiInputHash = useMemo(() => buildAIInputHash(aiInput), [aiInput]);
-  const isAIStale = aiState ? aiState.sourceHash !== aiInputHash : false;
+  const isAIStale = useMemo(
+    () => (aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false),
+    [aiInput, aiState]
+  );
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;
@@ -345,6 +387,7 @@ export function CalendarWidget({
   const monthEvents = useMemo(() => {
     const monthStartDate = startOfMonth(currentMonth);
     const monthEndDate = endOfMonth(currentMonth);
+
     return events
       .filter((event) => {
         const eventDate = new Date(event.date);
@@ -356,6 +399,7 @@ export function CalendarWidget({
   const weekEvents = useMemo(() => {
     const weekStartDate = startOfWeek(currentWeek);
     const weekEndDate = endOfWeek(currentWeek);
+
     return events
       .filter((event) => {
         const eventDate = new Date(event.date);
@@ -367,18 +411,14 @@ export function CalendarWidget({
   const dayEvents = useMemo(() => {
     const dayStartDate = startOfDay(currentDay);
     const dayEndDate = endOfDay(currentDay);
+
     return events
       .filter((event) => {
         const eventDate = new Date(event.date);
         return eventDate >= dayStartDate && eventDate <= dayEndDate;
       })
-      .sort((a, b) => {
-        if (!a.startTime && !b.startTime) return a.date - b.date;
-        if (!a.startTime) return 1;
-        if (!b.startTime) return -1;
-        return a.startTime.localeCompare(b.startTime);
-      });
-  }, [currentDay, events]);
+      .sort(compareEventsForDay);
+  }, [compareEventsForDay, currentDay, events]);
   const allDayEvents = useMemo(() => dayEvents.filter((event) => !event.startTime), [dayEvents]);
   const visibleRangeEvents = viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents;
 
@@ -436,8 +476,6 @@ export function CalendarWidget({
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
-      snapToGrid={snapToGrid}
-      globalLock={globalLock}
       widgetType="calendar"
     >
       {showAIPanel ? (
