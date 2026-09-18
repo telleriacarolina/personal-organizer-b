@@ -74,7 +74,7 @@ const calendarEventSchema = z
     reminder: z.number().int().optional(),
     reminderSent: z.boolean().optional(),
     color: z.string().optional(),
-    sourceType: z.literal('work').optional(),
+    sourceType: z.enum(['work', 'ical']).optional(),
     sourceId: z.string().optional(),
     sourceWidgetId: z.string().optional(),
     createdAt: z.number().int(),

@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import type { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 import type { WorkOrganizationPreference } from '@/components/WorkOrganizationQuestionnaire';
-import type { AgentHandlers } from '@/types/agent';
 import type { CalendarImportDraft } from '@/lib/calendar-imports';
 import { executeWidgetCommand } from '@/lib/widgets/widget-commands';
 
@@ -200,7 +199,7 @@ export function useWidgetDashboardState() {
     [currentWidgets],
   );
 
-  const agentHandlers: AgentHandlers = useMemo(
+  const agentHandlers = useMemo(
     () => ({
       onAddTask: (widgetId, taskData) => addTaskToSource(widgetId, taskData),
       onAddNote: (widgetId, noteData) => {
