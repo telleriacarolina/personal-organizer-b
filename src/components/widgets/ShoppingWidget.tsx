@@ -261,8 +261,10 @@ export function ShoppingWidget({
       let imageData: string | undefined;
       if (receiptImageInput) {
         const reader = new FileReader();
-        imageData = await new Promise((resolve) => {
-          reader.onload = (e) => resolve(e.target?.result as string);
+        imageData = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(reader.error ?? new Error('Failed to read receipt image'));
+          reader.onabort = () => reject(new Error('Receipt image read aborted'));
           reader.readAsDataURL(receiptImageInput);
         });
       }
