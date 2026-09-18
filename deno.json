@@ -1,0 +1,11 @@
+{
+  "lint": {
+    "exclude": ["src/", "node_modules/", "dist/"]
+  },
+  "test": {
+    "exclude": ["src/", "node_modules/", "dist/"]
+  },
+  "fmt": {
+    "exclude": ["src/", "node_modules/", "dist/"]
+  }
+}
