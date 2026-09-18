@@ -3,14 +3,23 @@ import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Note as NoteIcon, Plus, Trash } from '@phosphor-icons/react';
-import { Note, WidgetSize } from '@/types';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
+import { Note as NoteIcon, Plus, Trash, Sparkle } from '@phosphor-icons/react';
+import { AIInsightAction, Note, Task, WidgetAIState, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { toast } from 'sonner';
+import { addNote as addNoteCommand, deleteNote as deleteNoteCommand, updateNote as updateNoteCommand } from '@/lib/organizer-commands';
 
 interface NotesWidgetProps {
   notes: Note[];
   onUpdate: (notes: Note[]) => void;
+  taskSources: { id: string; tasks: Task[] }[];
+  aiState?: WidgetAIState;
+  onAIStateChange: (state: WidgetAIState) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -19,21 +28,29 @@ interface NotesWidgetProps {
   onSizeChange?: (size: WidgetSize) => void;
 }
 
-export function NotesWidget({ notes, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: NotesWidgetProps) {
+export function NotesWidget({
+  notes,
+  onUpdate,
+  taskSources,
+  aiState,
+  onAIStateChange,
+  onRemove,
+  widgetId,
+  onDragStart,
+  onDragEnd,
+  size,
+  onSizeChange,
+}: NotesWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
+  const [selectedTaskSourceId, setSelectedTaskSourceId] = useState<string>(taskSources[0]?.id || '');
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(true);
 
   const addNote = () => {
     if (newTitle.trim() || newContent.trim()) {
-      const note: Note = {
-        id: Date.now().toString(),
-        title: newTitle || 'Untitled Note',
-        content: newContent,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      onUpdate([...notes, note]);
+      onUpdate(addNoteCommand(notes, newTitle, newContent));
       setNewTitle('');
       setNewContent('');
       setShowNew(false);
@@ -41,17 +58,48 @@ export function NotesWidget({ notes, onUpdate, onRemove, widgetId, onDragStart, 
   };
 
   const deleteNote = (id: string) => {
-    onUpdate(notes.filter((note) => note.id !== id));
+    onUpdate(deleteNoteCommand(notes, id));
   };
 
   const updateNote = (id: string, title: string, content: string) => {
-    onUpdate(
-      notes.map((note) =>
-        note.id === id
-          ? { ...note, title, content, updatedAt: Date.now() }
-          : note
-      )
-    );
+    onUpdate(updateNoteCommand(notes, id, title, content));
+  };
+
+  const aiInput = { notes };
+  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+
+  const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
+    if (!aiState) return;
+    onAIStateChange(updateAIInsightStatus(aiState, insightId, status));
+  };
+
+  const handleGenerateInsights = async () => {
+    if (notes.length === 0) {
+      return;
+    }
+    setIsGeneratingInsights(true);
+    try {
+      const nextState = await generateWidgetAIState({
+        widgetId,
+        feature: 'notes',
+        input: { notes },
+        dataSummary: [
+          'Feature: note-to-task and summary review',
+          `${notes.length} notes considered`,
+          `${taskSources.length} Tasks widget destination${taskSources.length === 1 ? '' : 's'} available`,
+          'Extracted tasks must be reviewed before sending them to Tasks',
+        ],
+      });
+      onAIStateChange(nextState);
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  const handleApplyAction = (insightId: string, action: AIInsightAction) => {
+    void insightId;
+    void action;
+    toast.info('AI apply actions will be enabled in Phase 2');
   };
 
   return (
@@ -66,6 +114,54 @@ export function NotesWidget({ notes, onUpdate, onRemove, widgetId, onDragStart, 
       onSizeChange={onSizeChange}
       widgetType="notes"
     >
+      <div className="space-y-3">
+        {showAIPanel ? (
+          <AISuggestionsPanel
+            title="AI Note Assistant"
+            featureLabel="notes"
+            state={aiState}
+            isGenerating={isGeneratingInsights}
+            isStale={isAIStale}
+            onGenerate={handleGenerateInsights}
+            onApplyAction={handleApplyAction}
+            onDismissInsight={(insightId) => updateInsightStatus(insightId, 'dismissed')}
+            onClose={() => setShowAIPanel(false)}
+          />
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-xs text-muted-foreground w-full"
+            onClick={() => setShowAIPanel(true)}
+          >
+            <Sparkle size={13} />
+            Show AI Suggestions
+          </Button>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor={`notes-task-source-${widgetId}`} className="text-xs text-muted-foreground">
+            Task destination
+          </Label>
+          <Select
+            value={selectedTaskSourceId}
+            onValueChange={setSelectedTaskSourceId}
+            disabled={taskSources.length === 0}
+          >
+            <SelectTrigger id={`notes-task-source-${widgetId}`}>
+              <SelectValue placeholder="Select Tasks widget" />
+            </SelectTrigger>
+            <SelectContent>
+              {taskSources.map((source, index) => (
+                <SelectItem key={source.id} value={source.id}>
+                  Tasks Widget {index + 1}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {!showNew && (
         <Button
           onClick={() => setShowNew(true)}

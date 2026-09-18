@@ -25,6 +25,7 @@ dist-ssr
 *.sw?
 
 .env
+output.wav
 **/agent-eval-report*
 packages
 pids

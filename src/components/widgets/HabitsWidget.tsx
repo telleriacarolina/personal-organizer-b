@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Fire, Plus, Trash } from '@phosphor-icons/react';
 import { Habit, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { addHabit as addHabitCommand, deleteHabit as deleteHabitCommand, toggleHabitCompletion } from '@/lib/organizer-commands';
 
 interface HabitsWidgetProps {
   habits: Habit[];
@@ -24,33 +25,18 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
 
   const addHabit = () => {
     if (newHabit.trim()) {
-      const habit: Habit = {
-        id: Date.now().toString(),
-        name: newHabit,
-        completions: {},
-        createdAt: Date.now(),
-      };
-      onUpdate([...habits, habit]);
+      onUpdate(addHabitCommand(habits, newHabit));
       setNewHabit('');
     }
   };
 
   const toggleHabitToday = (id: string) => {
     const today = new Date().toISOString().split('T')[0];
-    onUpdate(
-      habits.map((habit) => {
-        if (habit.id === id) {
-          const completions = { ...habit.completions };
-          completions[today] = !completions[today];
-          return { ...habit, completions };
-        }
-        return habit;
-      })
-    );
+    onUpdate(toggleHabitCompletion(habits, id, today));
   };
 
   const deleteHabit = (id: string) => {
-    onUpdate(habits.filter((habit) => habit.id !== id));
+    onUpdate(deleteHabitCommand(habits, id));
   };
 
   const getStreak = (habit: Habit): number => {
