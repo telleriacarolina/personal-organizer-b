@@ -1,7 +1,36 @@
+// @vitest-environment jsdom
+
+import { render } from "@testing-library/react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 
-import { ChartStyle, type ChartConfig } from "./chart"
+import { ChartContainer, ChartStyle, type ChartConfig } from "@/components/ui/chart"
+
+describe("ChartContainer", () => {
+  it("includes Recharts 3-specific theme selectors", () => {
+    const { container } = render(
+      <ChartContainer config={{ visitors: { color: "#8884d8" } }}>
+        <div>Chart</div>
+      </ChartContainer>
+    )
+
+    const chartRoot = container.querySelector("[data-slot='chart']")
+    expect(chartRoot).not.toBeNull()
+
+    const className = chartRoot?.getAttribute("class") ?? ""
+
+    expect(className).toContain(
+      "[&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground"
+    )
+    expect(className).toContain(
+      "[&_.recharts-cross.recharts-tooltip-cursor[stroke='#ccc']]:stroke-border"
+    )
+    expect(className).toContain(
+      "[&_.recharts-rectangle.recharts-tooltip-cursor[fill='#ccc']]:fill-muted"
+    )
+    expect(className).not.toContain("recharts-cartesian-axis-tick_text")
+  })
+})
 
 describe("ChartStyle", () => {
   it("returns no style element when no color config exists", () => {
@@ -33,7 +62,7 @@ describe("ChartStyle", () => {
 
     const markup = renderToStaticMarkup(<ChartStyle id="chart-traffic" config={config} />)
 
-    expect(markup).toContain('[data-chart=chart-traffic]')
+    expect(markup).toContain("[data-chart=chart-traffic]")
     expect(markup).toContain("--color-desktop: #3b82f6;")
     expect(markup).toContain("--color-mobile: #22c55e;")
     expect(markup).toContain(".dark [data-chart=chart-traffic]")
@@ -57,38 +86,8 @@ describe("ChartStyle", () => {
     expect(markup).toContain(".dark [data-chart=chart-revenue]")
     expect(markup).toContain("--color-revenue: #f97316;")
     expect(markup).not.toContain("undefined")
-import { render } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
-
-import { ChartContainer, ChartStyle } from "@/components/ui/chart"
-
-describe("ChartContainer", () => {
-  it("includes Recharts 3-specific theme selectors", () => {
-    const { container } = render(
-      <ChartContainer config={{ visitors: { color: "#8884d8" } }}>
-        <div>Chart</div>
-      </ChartContainer>
-    )
-
-    const chartRoot = container.querySelector("[data-slot='chart']")
-    expect(chartRoot).not.toBeNull()
-
-    const className = chartRoot?.getAttribute("class") ?? ""
-
-    expect(className).toContain(
-      "[&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground"
-    )
-    expect(className).toContain(
-      "[&_.recharts-cross.recharts-tooltip-cursor[stroke='#ccc']]:stroke-border"
-    )
-    expect(className).toContain(
-      "[&_.recharts-rectangle.recharts-tooltip-cursor[fill='#ccc']]:fill-muted"
-    )
-    expect(className).not.toContain("recharts-cartesian-axis-tick_text")
   })
-})
 
-describe("ChartStyle", () => {
   it("returns null when no chart colors are configured", () => {
     const { container } = render(
       <ChartStyle id="chart-empty" config={{ visitors: { label: "Visitors" } }} />
