@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Button } from '@/components/ui/button';
@@ -303,6 +303,13 @@ export function CalendarWidget({
   const weekEnd = endOfWeek(currentWeek);
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
+  const compareEventsForDay = useCallback((a: CalendarEvent, b: CalendarEvent) => {
+    if (!a.startTime && !b.startTime) return a.date - b.date;
+    if (!a.startTime) return 1;
+    if (!b.startTime) return -1;
+    return a.startTime.localeCompare(b.startTime);
+  }, []);
+
   const eventsByDate = useMemo(() => {
     const groupedEvents = new Map<string, CalendarEvent[]>();
 
@@ -313,8 +320,12 @@ export function CalendarWidget({
       groupedEvents.set(dateKey, existingEvents);
     }
 
+    groupedEvents.forEach((groupedDayEvents, dateKey) => {
+      groupedEvents.set(dateKey, groupedDayEvents.sort(compareEventsForDay));
+    });
+
     return groupedEvents;
-  }, [events]);
+  }, [compareEventsForDay, events]);
 
   const getEventsForDate = (date: Date) => {
     return eventsByDate.get(format(date, 'yyyy-MM-dd')) ?? [];
@@ -406,13 +417,8 @@ export function CalendarWidget({
         const eventDate = new Date(event.date);
         return eventDate >= dayStartDate && eventDate <= dayEndDate;
       })
-      .sort((a, b) => {
-        if (!a.startTime && !b.startTime) return a.date - b.date;
-        if (!a.startTime) return 1;
-        if (!b.startTime) return -1;
-        return a.startTime.localeCompare(b.startTime);
-      });
-  }, [currentDay, events]);
+      .sort(compareEventsForDay);
+  }, [compareEventsForDay, currentDay, events]);
   const allDayEvents = useMemo(() => dayEvents.filter((event) => !event.startTime), [dayEvents]);
   const visibleRangeEvents = viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents;
 
