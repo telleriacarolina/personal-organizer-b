@@ -23,7 +23,7 @@ import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
 
 interface CalendarWidgetProps {
   events: CalendarEvent[];
-  onUpdate: (events: CalendarEvent[]) => void;
+  onUpdate: (mutation: CollectionMutation<CalendarEvent>) => void;
   aiState?: WidgetAIState;
   onAIStateChange: (state: WidgetAIState) => void;
   onRemove: () => void;
@@ -82,26 +82,34 @@ export function CalendarWidget({
   const [location, setLocation] = useState('');
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(true);
-  const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const checkReminders = () => {
       const now = Date.now();
-      events.forEach((event) => {
-        if (event.reminder && !event.reminderSent) {
-          const reminderTime = event.date - event.reminder * 60 * 1000;
-          if (now >= reminderTime && now < event.date) {
-            toast.info(`Reminder: ${event.title}`, {
-              description: event.startTime ? `Starting at ${event.startTime}` : 'Event coming up',
-              duration: 10000,
-            });
-            onUpdate(
-              events.map((e) =>
-                e.id === event.id ? { ...e, reminderSent: true } : e
-              )
-            );
+      if (
+        !events.some((event) => {
+          if (!event.reminder || event.reminderSent) {
+            return false;
           }
-        }
+
+          const reminderTime = event.date - event.reminder * 60 * 1000;
+          return now >= reminderTime && now < event.date;
+        })
+      ) {
+        return;
+      }
+
+      let triggered: CalendarEvent[] = [];
+      onUpdate((currentEvents) => {
+        const result = processCalendarReminders(currentEvents, now);
+        triggered = result.triggered;
+        return result.events;
+      });
+      triggered.forEach((event) => {
+        toast.info(`Reminder: ${event.title}`, {
+          description: event.startTime ? `Starting at ${event.startTime}` : 'Event coming up',
+          duration: 10000,
+        });
       });
     };
 
@@ -252,47 +260,6 @@ export function CalendarWidget({
     resetForm();
   };
 
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!importInputRef.current) return;
-    importInputRef.current.value = '';
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const text = loadEvent.target?.result;
-      if (typeof text !== 'string') return;
-
-      const drafts = parseICalText(text);
-      if (drafts.length === 0) {
-        toast.info('No events found in the selected file');
-        return;
-      }
-
-      let added = 0;
-      let updatedEvents = [...events];
-      for (const draft of drafts) {
-        const result = appendImportedCalendarEvent(updatedEvents, draft);
-        if (result.added) {
-          updatedEvents = result.events;
-          added++;
-        }
-      }
-
-      onUpdate(updatedEvents);
-      void syncFamilyCalendarPlanner(updatedEvents);
-
-      if (added === 0) {
-        toast.info('All events in the file are already imported');
-      } else {
-        toast.success(`Imported ${added} event${added !== 1 ? 's' : ''} from ${file.name}`);
-      }
-    };
-    // iCal files are UTF-8 in modern clients; legacy Latin-1 files from older
-    // Outlook exports are not supported and will render non-ASCII chars incorrectly.
-    reader.readAsText(file);
-  };
-
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const calendarStart = startOfWeek(monthStart);
@@ -384,7 +351,7 @@ export function CalendarWidget({
     return `${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}`;
   };
 
-  const monthEvents = useMemo(() => {
+  const getEventsForMonth = () => {
     const monthStartDate = startOfMonth(currentMonth);
     const monthEndDate = endOfMonth(currentMonth);
 
@@ -394,9 +361,9 @@ export function CalendarWidget({
         return eventDate >= monthStartDate && eventDate <= monthEndDate;
       })
       .sort((a, b) => a.date - b.date);
-  }, [currentMonth, events]);
+  };
 
-  const weekEvents = useMemo(() => {
+  const getEventsForWeek = () => {
     const weekStartDate = startOfWeek(currentWeek);
     const weekEndDate = endOfWeek(currentWeek);
 
@@ -406,9 +373,9 @@ export function CalendarWidget({
         return eventDate >= weekStartDate && eventDate <= weekEndDate;
       })
       .sort((a, b) => a.date - b.date);
-  }, [currentWeek, events]);
+  };
 
-  const dayEvents = useMemo(() => {
+  const getEventsForDay = () => {
     const dayStartDate = startOfDay(currentDay);
     const dayEndDate = endOfDay(currentDay);
 
@@ -553,23 +520,6 @@ export function CalendarWidget({
               <Plus size={14} />
               <span className="hidden sm:inline">Add</span>
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 h-7 text-xs flex-shrink-0"
-              onClick={() => importInputRef.current?.click()}
-              title="Import events from an iCal (.ics) file"
-            >
-              <UploadSimple size={14} />
-              <span className="hidden sm:inline">Import</span>
-            </Button>
-            <input
-              ref={importInputRef}
-              type="file"
-              accept=".ics,text/calendar"
-              className="hidden"
-              onChange={handleImportFile}
-            />
           </div>
         </div>
 
@@ -946,12 +896,12 @@ export function CalendarWidget({
                   </div>
                 </div>
                 
-                {allDayEvents.length > 0 && (
+                {dayEvents.filter(e => !e.startTime).length > 0 && (
                   <div className="mt-4 space-y-2">
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       All-Day Events
                     </h4>
-                    {allDayEvents.map((event) => (
+                    {dayEvents.filter(e => !e.startTime).map((event) => (
                       <div
                         key={event.id}
                         onClick={() => openEditDialog(event)}
@@ -1053,15 +1003,15 @@ export function CalendarWidget({
             <h4 className="font-semibold text-sm text-foreground">
               Events & Plans - {viewMode === 'month' ? format(currentMonth, 'MMMM yyyy') : viewMode === 'week' ? `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}` : format(currentDay, 'MMMM d, yyyy')}
             </h4>
-            {visibleRangeEvents.length > 0 && (
+            {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length > 0 && (
               <Badge variant="outline" className="text-xs">
-                {visibleRangeEvents.length} {visibleRangeEvents.length === 1 ? 'event' : 'events'}
+                {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length} {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length === 1 ? 'event' : 'events'}
               </Badge>
             )}
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             <AnimatePresence>
-              {visibleRangeEvents.length === 0 ? (
+              {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -1079,7 +1029,7 @@ export function CalendarWidget({
                   </p>
                 </motion.div>
               ) : (
-                visibleRangeEvents.map((event) => (
+                (viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).map((event) => (
                   <motion.div
                     key={event.id}
                     initial={{ opacity: 0, y: -10 }}

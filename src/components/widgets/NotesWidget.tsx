@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,11 +12,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
 import { toast } from 'sonner';
-import { addNote as addNoteCommand, deleteNote as deleteNoteCommand, updateNote as updateNoteCommand } from '@/lib/organizer-commands';
+import { CollectionMutation, createItem, deleteItem, updateItem } from '@/lib/atomic-state';
+import { createId } from '@/lib/id';
 
 interface NotesWidgetProps {
   notes: Note[];
-  onUpdate: (notes: Note[]) => void;
+  onUpdate: (mutation: CollectionMutation<Note>) => void;
   taskSources: { id: string; tasks: Task[] }[];
   aiState?: WidgetAIState;
   onAIStateChange: (state: WidgetAIState) => void;
@@ -26,8 +27,6 @@ interface NotesWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
-  snapToGrid?: boolean;
-  globalLock?: boolean;
 }
 
 export function NotesWidget({
@@ -42,8 +41,6 @@ export function NotesWidget({
   onDragEnd,
   size,
   onSizeChange,
-  snapToGrid,
-  globalLock,
 }: NotesWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -54,7 +51,14 @@ export function NotesWidget({
 
   const addNote = () => {
     if (newTitle.trim() || newContent.trim()) {
-      onUpdate(addNoteCommand(notes, newTitle, newContent));
+      const note: Note = {
+        id: createId('note'),
+        title: newTitle || 'Untitled Note',
+        content: newContent,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      onUpdate(createItem(note));
       setNewTitle('');
       setNewContent('');
       setShowNew(false);
@@ -62,16 +66,15 @@ export function NotesWidget({
   };
 
   const deleteNote = (id: string) => {
-    onUpdate(deleteNoteCommand(notes, id));
+    onUpdate(deleteItem(id));
   };
 
   const updateNote = (id: string, title: string, content: string) => {
-    onUpdate(updateNoteCommand(notes, id, title, content));
+    onUpdate(updateItem(id, (note) => ({ ...note, title, content, updatedAt: Date.now() })));
   };
 
-  const aiInput = useMemo(() => ({ notes }), [notes]);
-  const aiInputHash = useMemo(() => buildAIInputHash(aiInput), [aiInput]);
-  const isAIStale = aiState ? aiState.sourceHash !== aiInputHash : false;
+  const aiInput = { notes };
+  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;
@@ -117,8 +120,6 @@ export function NotesWidget({
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
-      snapToGrid={snapToGrid}
-      globalLock={globalLock}
       widgetType="notes"
     >
       <div className="space-y-3">

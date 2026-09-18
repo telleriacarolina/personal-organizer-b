@@ -8,14 +8,21 @@ import { Sparkle, PaperPlaneTilt, CheckCircle, XCircle, Robot } from '@phosphor-
 import { motion, AnimatePresence } from 'framer-motion';
 import { AIChatMessage, AIInsight, WidgetSize } from '@/types';
 import { generateWidgetAIState } from '@/lib/ai-organizer';
-import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
+import { CollectionMutation, appendItem, replaceItems } from '@/lib/atomic-state';
+import { createId } from '@/lib/id';
+import {
+  beginChatRequest,
+  clearChatRequestState,
+  createChatRequestState,
+  isChatRequestCurrent,
+} from '@/lib/ai-chat-session';
 
 interface AIChatWidgetProps {
   widgetId: string;
   messages: AIChatMessage[];
   appliedSuggestionIds?: string[];
-  onUpdate: (messages: AIChatMessage[]) => void;
+  onUpdate: (mutation: CollectionMutation<AIChatMessage>) => void;
   onApplySuggestion: (id: string) => void;
   onRemove: () => void;
   onDragStart?: () => void;
@@ -67,6 +74,7 @@ export function AIChatWidget({
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const requestStateRef = useRef(createChatRequestState());
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,14 +84,15 @@ export function AIChatWidget({
     if (!text.trim() || isGenerating) return;
 
     const userMsg: AIChatMessage = {
-      id: uuidv4(),
+      id: createId('chat-message'),
       role: 'user',
       text: text.trim(),
       timestamp: Date.now(),
     };
 
-    const optimistic = [...messages, userMsg];
-    onUpdate(optimistic);
+    const { nextState, token } = beginChatRequest(requestStateRef.current);
+    requestStateRef.current = nextState;
+    onUpdate(appendItem(userMsg));
     setInput('');
     setIsGenerating(true);
 
@@ -97,7 +106,7 @@ export function AIChatWidget({
       });
 
       const assistantMsg: AIChatMessage = {
-        id: uuidv4(),
+        id: createId('chat-message'),
         role: 'assistant',
         text:
           result.insights.length > 0
@@ -108,17 +117,27 @@ export function AIChatWidget({
         targetWidget: feature,
       };
 
-      onUpdate([...optimistic, assistantMsg]);
+      if (!isChatRequestCurrent(requestStateRef.current, token)) {
+        return;
+      }
+
+      onUpdate(appendItem(assistantMsg));
     } catch {
+      if (!isChatRequestCurrent(requestStateRef.current, token)) {
+        return;
+      }
+
       const errMsg: AIChatMessage = {
-        id: uuidv4(),
+        id: createId('chat-message'),
         role: 'assistant',
         text: 'Sorry, something went wrong. Please try again.',
         timestamp: Date.now(),
       };
-      onUpdate([...optimistic, errMsg]);
+      onUpdate(appendItem(errMsg));
     } finally {
-      setIsGenerating(false);
+      if (isChatRequestCurrent(requestStateRef.current, token)) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -316,7 +335,11 @@ export function AIChatWidget({
                 size="icon"
                 variant="ghost"
                 className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                onClick={() => onUpdate([])}
+                onClick={() => {
+                  requestStateRef.current = clearChatRequestState(requestStateRef.current);
+                  setIsGenerating(false);
+                  onUpdate(replaceItems([]));
+                }}
                 title="Clear chat"
               >
                 <XCircle size={16} />

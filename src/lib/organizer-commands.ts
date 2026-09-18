@@ -20,7 +20,6 @@ import type {
   AgentNoteData,
   AgentShoppingItemData,
   AgentTaskData,
-  AgentHandlers,
 } from '@/types/agent';
 
 type WidgetUpdate = Partial<Widget>;
@@ -317,7 +316,7 @@ export function deleteCalendarEvent(events: CalendarEvent[], id: string): Calend
   return events.filter((event) => event.id !== id);
 }
 
-export function createAgentHandlers(setWidgets: Dispatch<SetStateAction<Widget[]>>): AgentHandlers {
+export function createAgentHandlers(setWidgets: Dispatch<SetStateAction<Widget[]>>) {
   return {
     onAddTask: (widgetId, taskData) => {
       setWidgets((current) => addAgentTask(current, widgetId, taskData));

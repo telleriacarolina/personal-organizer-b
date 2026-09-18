@@ -6,30 +6,36 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Target, Plus, Trash } from '@phosphor-icons/react';
 import { Goal, WidgetSize } from '@/types';
+import { CollectionMutation, createItem, deleteItem, toggleItem } from '@/lib/atomic-state';
+import { createId } from '@/lib/id';
 import { motion, AnimatePresence } from 'framer-motion';
-import { addGoal as addGoalCommand, deleteGoal as deleteGoalCommand, toggleGoal as toggleGoalCommand } from '@/lib/organizer-commands';
 
 interface GoalsWidgetProps {
   goals: Goal[];
-  onUpdate: (goals: Goal[]) => void;
+  onUpdate: (mutation: CollectionMutation<Goal>) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
-  snapToGrid?: boolean;
-  globalLock?: boolean;
 }
 
-export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange, snapToGrid, globalLock }: GoalsWidgetProps) {
+export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: GoalsWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
 
   const addGoal = () => {
     if (newTitle.trim()) {
-      onUpdate(addGoalCommand(goals, newTitle, newDescription));
+      const goal: Goal = {
+        id: createId('goal'),
+        title: newTitle,
+        description: newDescription,
+        completed: false,
+        createdAt: Date.now(),
+      };
+      onUpdate(createItem(goal));
       setNewTitle('');
       setNewDescription('');
       setShowNew(false);
@@ -37,11 +43,11 @@ export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, 
   };
 
   const toggleGoal = (id: string) => {
-    onUpdate(toggleGoalCommand(goals, id));
+    onUpdate(toggleItem(id, (goal) => ({ ...goal, completed: !goal.completed })));
   };
 
   const deleteGoal = (id: string) => {
-    onUpdate(deleteGoalCommand(goals, id));
+    onUpdate(deleteItem(id));
   };
 
   return (
@@ -54,8 +60,6 @@ export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, 
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
-      snapToGrid={snapToGrid}
-      globalLock={globalLock}
       widgetType="goals"
     >
       {!showNew && (
