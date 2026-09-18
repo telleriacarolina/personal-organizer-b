@@ -276,9 +276,18 @@ export function CalendarWidget({
   const weekEnd = endOfWeek(currentWeek);
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  const getEventsForDate = (date: Date) => {
-    return events.filter((event) => isSameDay(new Date(event.date), date));
-  };
+  const eventsByDate = new Map<string, CalendarEvent[]>();
+  for (const event of events) {
+    const key = format(new Date(event.date), 'yyyy-MM-dd');
+    const list = eventsByDate.get(key);
+    if (list) {
+      list.push(event);
+    } else {
+      eventsByDate.set(key, [event]);
+    }
+  }
+
+  const getEventsForDate = (date: Date) => eventsByDate.get(format(date, 'yyyy-MM-dd')) || [];
 
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
 
