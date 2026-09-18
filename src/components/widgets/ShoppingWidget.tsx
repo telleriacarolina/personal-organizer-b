@@ -205,12 +205,6 @@ export function ShoppingWidget({
     setIsProcessingReceipt(true);
 
     try {
-      const reader = new FileReader();
-      await new Promise<void>((resolve) => {
-        reader.onload = () => resolve();
-        reader.readAsDataURL(file);
-      });
-
       setReceiptStoreName((current) =>
         current.trim() ? current : file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '),
       );
