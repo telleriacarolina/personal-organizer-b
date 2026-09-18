@@ -101,7 +101,7 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
           placeholder="Add a new habit..."
           value={newHabit}
           onChange={(e) => setNewHabit(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           className="flex-1"
         />
         <Button onClick={addHabit} size="icon" className="h-10 w-10">
