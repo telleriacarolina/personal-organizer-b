@@ -303,8 +303,21 @@ export function CalendarWidget({
   const weekEnd = endOfWeek(currentWeek);
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
+  const eventsByDate = useMemo(() => {
+    const groupedEvents = new Map<string, CalendarEvent[]>();
+
+    for (const event of events) {
+      const dateKey = format(new Date(event.date), 'yyyy-MM-dd');
+      const existingEvents = groupedEvents.get(dateKey) ?? [];
+      existingEvents.push(event);
+      groupedEvents.set(dateKey, existingEvents);
+    }
+
+    return groupedEvents;
+  }, [events]);
+
   const getEventsForDate = (date: Date) => {
-    return events.filter((event) => isSameDay(new Date(event.date), date));
+    return eventsByDate.get(format(date, 'yyyy-MM-dd')) ?? [];
   };
 
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
@@ -317,8 +330,11 @@ export function CalendarWidget({
     return eventTypes.find((eventTypeOption) => eventTypeOption.value === type)?.label || 'Event';
   };
 
-  const aiInput = { events };
-  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+  const aiInput = useMemo(() => ({ events }), [events]);
+  const isAIStale = useMemo(
+    () => (aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false),
+    [aiInput, aiState]
+  );
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;
@@ -397,6 +413,7 @@ export function CalendarWidget({
         return a.startTime.localeCompare(b.startTime);
       });
   }, [currentDay, events]);
+  const allDayEvents = useMemo(() => dayEvents.filter((event) => !event.startTime), [dayEvents]);
   const visibleRangeEvents = viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents;
 
   const handleNavigatePrev = () => {
@@ -923,12 +940,12 @@ export function CalendarWidget({
                   </div>
                 </div>
                 
-                {dayEvents.filter(e => !e.startTime).length > 0 && (
+                {allDayEvents.length > 0 && (
                   <div className="mt-4 space-y-2">
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       All-Day Events
                     </h4>
-                    {dayEvents.filter(e => !e.startTime).map((event) => (
+                    {allDayEvents.map((event) => (
                       <div
                         key={event.id}
                         onClick={() => openEditDialog(event)}

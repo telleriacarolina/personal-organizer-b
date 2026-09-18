@@ -601,7 +601,15 @@ function App() {
       <AddWidgetDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        onAddWidget={(type) => addWidget(type)}
+        onAddWidget={(type) => {
+          if (type === 'work') {
+            setShowAddDialog(false);
+            setShowWorkQuestionnaire(true);
+            return;
+          }
+
+          addWidget(type);
+        }}
       />
 
       <WorkOrganizationQuestionnaire
