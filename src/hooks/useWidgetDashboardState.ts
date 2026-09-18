@@ -129,7 +129,10 @@ export function useWidgetDashboardState() {
       setWidgets(result.widgets);
     }
 
-    return result.meta ?? { added: false, reason: 'invalid-destination' };
+    return {
+      added: result.meta?.added ?? false,
+      reason: result.meta?.reason ?? 'invalid-destination',
+    };
   };
 
   const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {
@@ -141,6 +144,10 @@ export function useWidgetDashboardState() {
       ...(current || {}),
       [widgetId]: state,
     }));
+  };
+
+  const updateWidgetsForAgent = (updater: (widgets: Widget[]) => Widget[]) => {
+    setWidgets((current) => updater(current || []));
   };
 
   const toggleSnapToGrid = () => {
@@ -318,6 +325,7 @@ export function useWidgetDashboardState() {
     addCalendarEventToSource,
     updateDailyFocusSourceWidget,
     updateWidgetAIState,
+    updateWidgetsForAgent,
     toggleSnapToGrid,
     toggleGlobalLock,
     handleReorder,

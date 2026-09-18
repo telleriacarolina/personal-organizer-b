@@ -1,4 +1,13 @@
-import type { BackgroundImage, Receipt, RecordNote, Widget } from '@/types';
+import type {
+  BackgroundImage,
+  FamilyCalendarPlannerEvent,
+  Receipt,
+  RecordNote,
+  Widget,
+  WidgetAIState,
+} from '@/types';
+import type { AIConfig, PersistedSuggestion } from '@/types/ai';
+import type { CustomColors } from '@/types/theme';
 
 export type PersistenceStorage = 'localStorage' | 'indexedDB';
 export type PersistenceOperation = 'read' | 'write' | 'delete' | 'migrate';
@@ -587,9 +596,6 @@ export function formatPersistenceIssue(issue: PersistenceIssue) {
 }
 
 export { LEGACY_AI_SUGGESTIONS_STORAGE_KEY };
-import type { Widget, WidgetAIState, FamilyCalendarPlannerEvent, RecordNote } from '@/types';
-import type { AIConfig, PersistedSuggestion } from '@/types/ai';
-import type { BackgroundImage, CustomColors } from '@/types/theme';
 
 export interface StateRepository<T> {
   load(): T;

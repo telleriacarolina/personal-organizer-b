@@ -154,7 +154,8 @@ function clipText(value: string, max = 140) {
   return value.length > max ? `${value.slice(0, max)}…` : value;
 }
 
-function findTask(widgets: Widget[], taskId: string) {
+function findTask(widgets: Widget[], taskId: unknown) {
+  if (typeof taskId !== 'string') return null;
   for (const widget of getWidgetsByType(widgets, 'tasks')) {
     const task = widget.tasks.find((candidate) => candidate.id === taskId);
     if (task) return { widget, task };
@@ -162,7 +163,8 @@ function findTask(widgets: Widget[], taskId: string) {
   return null;
 }
 
-function findNote(widgets: Widget[], noteId: string) {
+function findNote(widgets: Widget[], noteId: unknown) {
+  if (typeof noteId !== 'string') return null;
   for (const widget of getWidgetsByType(widgets, 'notes')) {
     const note = widget.notes.find((candidate) => candidate.id === noteId);
     if (note) return { widget, note };
@@ -170,7 +172,8 @@ function findNote(widgets: Widget[], noteId: string) {
   return null;
 }
 
-function findHabit(widgets: Widget[], habitId: string) {
+function findHabit(widgets: Widget[], habitId: unknown) {
+  if (typeof habitId !== 'string') return null;
   for (const widget of getWidgetsByType(widgets, 'habits')) {
     const habit = widget.habits.find((candidate) => candidate.id === habitId);
     if (habit) return { widget, habit };
@@ -178,7 +181,8 @@ function findHabit(widgets: Widget[], habitId: string) {
   return null;
 }
 
-function findGoal(widgets: Widget[], goalId: string) {
+function findGoal(widgets: Widget[], goalId: unknown) {
+  if (typeof goalId !== 'string') return null;
   for (const widget of getWidgetsByType(widgets, 'goals')) {
     const goal = widget.goals.find((candidate) => candidate.id === goalId);
     if (goal) return { widget, goal };
@@ -186,7 +190,8 @@ function findGoal(widgets: Widget[], goalId: string) {
   return null;
 }
 
-function findCalendarEvent(widgets: Widget[], eventId: string) {
+function findCalendarEvent(widgets: Widget[], eventId: unknown) {
+  if (typeof eventId !== 'string') return null;
   for (const widget of getWidgetsByType(widgets, 'calendar')) {
     const event = widget.events.find((candidate) => candidate.id === eventId);
     if (event) return { widget, event };
@@ -194,7 +199,8 @@ function findCalendarEvent(widgets: Widget[], eventId: string) {
   return null;
 }
 
-function findShoppingItem(widgets: Widget[], itemId: string) {
+function findShoppingItem(widgets: Widget[], itemId: unknown) {
+  if (typeof itemId !== 'string') return null;
   for (const widget of getWidgetsByType(widgets, 'shopping')) {
     const item = widget.items.find((candidate) => candidate.id === itemId);
     if (item) return { widget, item };
@@ -202,7 +208,8 @@ function findShoppingItem(widgets: Widget[], itemId: string) {
   return null;
 }
 
-function findRecordNote(widgets: Widget[], recordId: string) {
+function findRecordNote(widgets: Widget[], recordId: unknown) {
+  if (typeof recordId !== 'string') return null;
   for (const widget of getWidgetsByType(widgets, 'record-note')) {
     const record = widget.records.find((candidate) => candidate.id === recordId);
     if (record) return { widget, record };
@@ -1296,7 +1303,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     if (input.dryRun) {
       return createResponse(auditId, `Ready to add task "${task.text}".`, {
         requiresConfirmation: true,
-        confirmationToken: createConfirmationToken('tasks.create', buildFingerprint({ widgetId: widget.id, count: widget.tasks.length })),
+        confirmationToken: createConfirmationToken('tasks.create', buildFingerprint({ widgetId: widget.id, count: widget.tasks?.length ?? 0 })),
         proposedChange: { task },
         affectedResourceIds: [widget.id],
       });
@@ -1433,7 +1440,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     if (input.dryRun) {
       return createResponse(auditId, `Ready to create note "${note.title}".`, {
         requiresConfirmation: true,
-        confirmationToken: createConfirmationToken('notes.create', buildFingerprint({ widgetId: widget.id, count: widget.notes.length })),
+        confirmationToken: createConfirmationToken('notes.create', buildFingerprint({ widgetId: widget.id, count: widget.notes?.length ?? 0 })),
         proposedChange: { note },
         affectedResourceIds: [widget.id],
       });
@@ -1525,7 +1532,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     if (input.dryRun) {
       return createResponse(auditId, `Ready to add habit "${habit.name}".`, {
         requiresConfirmation: true,
-        confirmationToken: createConfirmationToken('habits.create', buildFingerprint({ widgetId: widget.id, count: widget.habits.length })),
+        confirmationToken: createConfirmationToken('habits.create', buildFingerprint({ widgetId: widget.id, count: widget.habits?.length ?? 0 })),
         proposedChange: { habit },
         affectedResourceIds: [widget.id],
       });
@@ -1654,7 +1661,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     if (input.dryRun) {
       return createResponse(auditId, `Ready to create goal "${goal.title}".`, {
         requiresConfirmation: true,
-        confirmationToken: createConfirmationToken('goals.create', buildFingerprint({ widgetId: widget.id, count: widget.goals.length })),
+        confirmationToken: createConfirmationToken('goals.create', buildFingerprint({ widgetId: widget.id, count: widget.goals?.length ?? 0 })),
         proposedChange: { goal },
         affectedResourceIds: [widget.id],
       });
@@ -1797,7 +1804,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     if (input.dryRun) {
       return createResponse(auditId, `Ready to create event "${event.title}".`, {
         requiresConfirmation: true,
-        confirmationToken: createConfirmationToken('calendar.create_event', buildFingerprint({ widgetId: widget.id, count: widget.events.length })),
+        confirmationToken: createConfirmationToken('calendar.create_event', buildFingerprint({ widgetId: widget.id, count: widget.events?.length ?? 0 })),
         proposedChange: { event },
         affectedResourceIds: [widget.id],
       });
@@ -1980,7 +1987,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     if (input.dryRun) {
       return createResponse(auditId, `Ready to publish "${draft.title}" to Calendar.`, {
         requiresConfirmation: true,
-        confirmationToken: createConfirmationToken('work.publish_to_calendar', buildFingerprint({ sourceWidgetId: workWidget.id, destinationWidgetId: calendarWidget.id, count: calendarWidget.events.length })),
+        confirmationToken: createConfirmationToken('work.publish_to_calendar', buildFingerprint({ sourceWidgetId: workWidget.id, destinationWidgetId: calendarWidget.id, count: calendarWidget.events?.length ?? 0 })),
         proposedChange: { event: draft },
         affectedResourceIds: [workWidget.id, calendarWidget.id],
       });
@@ -2058,7 +2065,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     assertString(input.quantity, 'quantity', { max: 60 });
     assertOptionalEnum(input.category, SHOPPING_CATEGORIES, 'category');
     assertOptionalEnum(input.priority, TASK_PRIORITIES, 'priority');
-    const existing = widget.items.find((item) => item.name.toLowerCase() === String(input.name).trim().toLowerCase() && !item.purchased);
+    const existing = (widget.items ?? []).find((item) => item.name.toLowerCase() === String(input.name).trim().toLowerCase() && !item.purchased);
     if (existing) {
       return createResponse(auditId, `"${existing.name}" is already on the shopping list.`, {
         ok: false,
@@ -2083,7 +2090,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     if (input.dryRun) {
       return createResponse(auditId, `Ready to add shopping item "${item.name}".`, {
         requiresConfirmation: true,
-        confirmationToken: createConfirmationToken('shopping.create_item', buildFingerprint({ widgetId: widget.id, count: widget.items.length })),
+        confirmationToken: createConfirmationToken('shopping.create_item', buildFingerprint({ widgetId: widget.id, count: widget.items?.length ?? 0 })),
         proposedChange: { item },
         affectedResourceIds: [widget.id],
       });
@@ -2460,7 +2467,7 @@ export function buildResourceFingerprint(
   switch (toolName) {
     case 'tasks.create': {
       const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'tasks');
-      return buildFingerprint({ widgetId: input.widgetId, count: widget?.tasks.length ?? 0 });
+      return buildFingerprint({ widgetId: input.widgetId, count: widget?.tasks?.length ?? 0 });
     }
     case 'tasks.update':
     case 'tasks.set_status': {
@@ -2469,7 +2476,7 @@ export function buildResourceFingerprint(
     }
     case 'notes.create': {
       const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'notes');
-      return buildFingerprint({ widgetId: input.widgetId, count: widget?.notes.length ?? 0 });
+      return buildFingerprint({ widgetId: input.widgetId, count: widget?.notes?.length ?? 0 });
     }
     case 'notes.update': {
       const match = typeof input.noteId === 'string' ? findNote(widgets, input.noteId) : null;
@@ -2477,7 +2484,7 @@ export function buildResourceFingerprint(
     }
     case 'habits.create': {
       const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'habits');
-      return buildFingerprint({ widgetId: input.widgetId, count: widget?.habits.length ?? 0 });
+      return buildFingerprint({ widgetId: input.widgetId, count: widget?.habits?.length ?? 0 });
     }
     case 'habits.update':
     case 'habits.mark_completion': {
@@ -2486,7 +2493,7 @@ export function buildResourceFingerprint(
     }
     case 'goals.create': {
       const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'goals');
-      return buildFingerprint({ widgetId: input.widgetId, count: widget?.goals.length ?? 0 });
+      return buildFingerprint({ widgetId: input.widgetId, count: widget?.goals?.length ?? 0 });
     }
     case 'goals.update':
     case 'goals.set_status': {
@@ -2495,7 +2502,7 @@ export function buildResourceFingerprint(
     }
     case 'calendar.create_event': {
       const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'calendar');
-      return buildFingerprint({ widgetId: input.widgetId, count: widget?.events.length ?? 0 });
+      return buildFingerprint({ widgetId: input.widgetId, count: widget?.events?.length ?? 0 });
     }
     case 'calendar.update_event':
     case 'calendar.set_reminder': {
@@ -2504,7 +2511,7 @@ export function buildResourceFingerprint(
     }
     case 'work.publish_to_calendar': {
       const widget = widgets.find((candidate) => candidate.id === input.calendarWidgetId && candidate.type === 'calendar');
-      return buildFingerprint({ calendarWidgetId: input.calendarWidgetId, count: widget?.events.length ?? 0 });
+      return buildFingerprint({ calendarWidgetId: input.calendarWidgetId, count: widget?.events?.length ?? 0 });
     }
     case 'shopping.create_item':
     case 'shopping.create_reminder':
@@ -2512,7 +2519,7 @@ export function buildResourceFingerprint(
       const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'shopping');
       return buildFingerprint({
         widgetId: input.widgetId,
-        items: widget?.items.length ?? 0,
+        items: widget?.items?.length ?? 0,
         reminders: widget?.reminders?.length ?? 0,
         budget: widget?.budget ?? null,
       });

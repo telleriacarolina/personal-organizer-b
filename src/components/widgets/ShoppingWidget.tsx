@@ -366,15 +366,6 @@ export function ShoppingWidget({
 
   const deleteItem = (id: string) => {
     applyShoppingDomainAction({ type: 'set-items', payload: items.filter((item) => item.id !== id) });
-    onUpdate((current) => ({
-      items: current.items.map((item) =>
-        item.id === id ? { ...item, purchased: !item.purchased, purchasedAt: !item.purchased ? Date.now() : undefined } : item
-      ),
-    }));
-  };
-
-  const deleteItem = (id: string) => {
-    onUpdate((current) => ({ items: current.items.filter((item) => item.id !== id) }));
     toast.success('Item removed');
   };
 

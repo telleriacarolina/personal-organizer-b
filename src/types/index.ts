@@ -11,6 +11,29 @@ export interface BaseWidget {
   type: WidgetType;
   position: number;
   size?: WidgetSize;
+  tasks?: Task[];
+  sourceWidgetId?: string | null;
+  notes?: Note[];
+  habits?: Habit[];
+  goals?: Goal[];
+  events?: CalendarEvent[];
+  clientSlots?: ClientSlot[];
+  meals?: WorkMeal[];
+  timeEntries?: TimeEntry[];
+  jobs?: Job[];
+  shoppingList?: ShoppingItem[];
+  errands?: WorkErrand[];
+  routines?: WorkRoutine[];
+  activeRoutineId?: string;
+  organizationPreference?: WorkOrganizationPreference;
+  items?: PersonalShoppingItem[];
+  budget?: number;
+  receipts?: Receipt[];
+  trips?: ShoppingTrip[];
+  reminders?: ShoppingReminder[];
+  messages?: AIChatMessage[];
+  appliedSuggestionIds?: string[];
+  records?: RecordNote[];
 }
 
 export interface Task {

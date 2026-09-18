@@ -6,11 +6,10 @@
 // ---------------------------------------------------------------------------
 
 import type { PersistedSuggestion } from '@/types/ai';
-import { AI_SUGGESTIONS_STORAGE_KEY, readLegacyCompatibleArrayJson, writeLocalStorageJson } from '@/lib/persistence';
+import { AI_SUGGESTIONS_STORAGE_KEY, readLegacyCompatibleArrayJson } from '@/lib/persistence';
+import { aiSuggestionRepository } from '@/lib/persistence';
 
 const STORAGE_KEY = AI_SUGGESTIONS_STORAGE_KEY;
-const MAX_PERSISTED = 200; // prevent unbounded growth
-import { aiSuggestionRepository } from '@/lib/persistence';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -20,18 +19,6 @@ function readAll(): PersistedSuggestion[] {
   if (typeof window === 'undefined') return [];
   return readLegacyCompatibleArrayJson<PersistedSuggestion>(STORAGE_KEY, 'organizer-widget-ai');
 }
-
-function writeAll(suggestions: PersistedSuggestion[]): void {
-  if (typeof window === 'undefined') return;
-  // Keep only the most recent MAX_PERSISTED entries to limit storage growth
-  const trimmed = suggestions.slice(-MAX_PERSISTED);
-  writeLocalStorageJson(STORAGE_KEY, trimmed);
-  return aiSuggestionRepository.list();
-}
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 /** Return all persisted suggestions. */
 export function getAllSuggestions(): PersistedSuggestion[] {

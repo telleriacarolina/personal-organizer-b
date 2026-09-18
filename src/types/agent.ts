@@ -167,6 +167,7 @@ export interface AgentToolSchema {
 }
 
 export interface AgentBaseToolInput {
+  [key: string]: unknown;
   requestId: string;
   workspaceId: string;
   actorContext: AgentActorContext;
@@ -268,4 +269,13 @@ export interface AgentCalendarEventData {
   location?: string;
   reminder?: number;
   visibility?: FamilyCalendarVisibility;
+}
+
+export interface AgentHandlers {
+  onAddTask: (widgetId: string, taskData: AgentTaskData) => void;
+  onAddNote: (widgetId: string, noteData: AgentNoteData) => void;
+  onAddGoal: (widgetId: string, goalData: AgentGoalData) => void;
+  onAddHabit: (widgetId: string, habitData: AgentHabitData) => void;
+  onAddShoppingItem: (widgetId: string, itemData: AgentShoppingItemData) => void;
+  onAddCalendarEvent: (widgetId: string, eventData: AgentCalendarEventData) => void;
 }

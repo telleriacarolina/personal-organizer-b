@@ -13,7 +13,6 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Palette, Check, Trash, Upload } from '@phosphor-icons/react';
 import { toast } from 'sonner';
-import { BackgroundImage } from '@/types';
 import { useStoredMediaUrl } from '@/hooks/useStoredMediaUrl';
 import {
   createMediaId,
@@ -23,38 +22,11 @@ import {
   migrateLegacyBackgroundImage,
   saveMedia,
 } from '@/lib/persistence';
-
-interface ThemePreset {
-  name: string;
-  description: string;
-  colors: {
-    background: string;
-    foreground: string;
-    card: string;
-    cardForeground: string;
-    primary: string;
-    primaryForeground: string;
-    secondary: string;
-    secondaryForeground: string;
-    accent: string;
-    accentForeground: string;
-    muted: string;
-    mutedForeground: string;
-    border: string;
-    success: string;
-    successForeground: string;
-  };
-}
-
-interface CustomColors {
-  primary: string;
-  accent: string;
-  background: string;
-}
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { stateRepositories } from '@/lib/persistence';
-import { applyBackgroundImage, applyCustomColors, applyTheme } from '@/lib/theme-service';
-import type { BackgroundImage, CustomColors, ThemePreset } from '@/types/theme';
+import { applyCustomColors, applyTheme } from '@/lib/theme-service';
+import type { BackgroundImage } from '@/types';
+import type { CustomColors, ThemePreset } from '@/types/theme';
 
 const themePresets: ThemePreset[] = [
   {
@@ -191,26 +163,13 @@ interface ThemeCustomizationProps {
 }
 
 export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationProps) {
-  const [selectedTheme, setSelectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
-  const [customColors, setCustomColors] = useLocalStorageState<CustomColors | null>(
-    'organizer-custom-colors',
-    null,
-    { persistMode: 'debounced', debounceMs: 200 }
-  );
-  const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>(
-    'organizer-bg-image',
-    null,
-    { persistMode: 'idle', debounceMs: 500 }
-  );
-  const [customColors, setCustomColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
-  const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
+  const [selectedTheme, setSelectedTheme] = usePersistentState(stateRepositories.theme, 'Warm Terracotta');
+  const [customColors, setCustomColors] = usePersistentState(stateRepositories.customColors, null);
+  const [backgroundImage, setBackgroundImage] = usePersistentState(stateRepositories.backgroundImage, null);
   const { url: resolvedBackgroundUrl, isMissing: isBackgroundMissing } = useStoredMediaUrl({
     mediaId: backgroundImage?.mediaId,
     fallbackUrl: backgroundImage?.url ?? null,
   });
-  const [selectedTheme, setSelectedTheme] = usePersistentState(stateRepositories.theme, 'Warm Terracotta');
-  const [customColors, setCustomColors] = usePersistentState(stateRepositories.customColors, null);
-  const [backgroundImage, setBackgroundImage] = usePersistentState(stateRepositories.backgroundImage, null);
   const [previewTheme, setPreviewTheme] = useState<string | null>(null);
   const [localPrimary, setLocalPrimary] = useState('#7a5c3d');
   const [localAccent, setLocalAccent] = useState('#ae6745');
@@ -225,25 +184,6 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
       setLocalBg(customColors.background);
     }
   }, [customColors]);
-
-  const applyTheme = (theme: ThemePreset) => {
-    const root = document.documentElement;
-    Object.entries(theme.colors).forEach(([key, value]) => {
-      const cssVar = key.replace(/([A-Z])/g, '-$1').toLowerCase();
-      root.style.setProperty(`--${cssVar}`, value);
-    });
-  };
-
-  const applyCustomColors = (colors: CustomColors) => {
-    const root = document.documentElement;
-    const primaryOklch = hexToOklch(colors.primary);
-    const accentOklch = hexToOklch(colors.accent);
-    const bgOklch = hexToOklch(colors.background);
-
-    root.style.setProperty('--primary', primaryOklch);
-    root.style.setProperty('--accent', accentOklch);
-    root.style.setProperty('--background', bgOklch);
-  };
 
   const applyBackgroundImage = (image: BackgroundImage | null, resolvedUrl: string | null) => {
     const appContainer = document.querySelector('.min-h-screen');

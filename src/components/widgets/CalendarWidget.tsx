@@ -1,7 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
-import { useState, useEffect } from 'react';
-import { useState, useEffect, useRef } from 'react';
-import { useLocalStorageState } from '@/hooks/useLocalStorageState';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,15 +11,12 @@ import { Switch } from '@/components/ui/switch';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
-import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown, Sparkle } from '@phosphor-icons/react';
-import { AIInsightAction, CalendarEntryType, CalendarEvent, WidgetAIState, WidgetSize } from '@/types';
 import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown, Sparkle, UploadSimple } from '@phosphor-icons/react';
-import { AIInsightAction, CalendarEntryType, CalendarEvent, FamilyCalendarPlannerEvent, WidgetAIState, WidgetSize } from '@/types';
+import { AIInsightAction, CalendarEntryType, CalendarEvent, WidgetAIState, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
-import { calendarDomainReducer } from '@/lib/domain/calendar-domain';
 import { syncCalendarEventsToFamilyPlanner } from '@/lib/calendar-sync';
 import { deleteCalendarEvent as deleteCalendarEventCommand, saveCalendarEvent } from '@/lib/organizer-commands';
 import { parseICalText } from '@/lib/ical-parser';
@@ -72,11 +66,6 @@ export function CalendarWidget({
   snapToGrid,
   globalLock,
 }: CalendarWidgetProps) {
-  const [, setPlannerEvents] = useLocalStorageState<FamilyCalendarPlannerEvent[]>(
-    'family-calendar-planner-events',
-    [],
-    { persistMode: 'debounced', debounceMs: 300 }
-  );
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -181,15 +170,11 @@ export function CalendarWidget({
       date: eventDateTime,
       startTime: allDay ? undefined : startTime || undefined,
       endTime: allDay ? undefined : endTime || undefined,
-      allDay: allDay,
+      allDay,
       location: location.trim() || undefined,
-      reminder: reminder !== 'none' ? parseInt(reminder) : undefined,
-      reminderSent: false,
-      color: color,
-      createdAt: editingEvent?.createdAt || Date.now(),
-    };
-
-    const updatedEvents = calendarDomainReducer(events, { type: 'upsert', event: newEvent });
+      reminder: reminder !== 'none' ? parseInt(reminder, 10) : undefined,
+      reminderSent: editingEvent?.reminderSent ?? false,
+      color,
     }, editingEvent);
 
     onUpdate(updatedEvents);
@@ -204,9 +189,7 @@ export function CalendarWidget({
     setShowDialog(false);
     resetForm();
   };
-
   const deleteEvent = (id: string) => {
-    const updatedEvents = calendarDomainReducer(events, { type: 'delete', id });
     const updatedEvents = deleteCalendarEventCommand(events, id);
     onUpdate(updatedEvents);
     void syncFamilyCalendarPlanner(updatedEvents);
