@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen } from '@phosphor-icons/react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen, Trash } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
 import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
@@ -340,6 +341,17 @@ function App() {
                 )}
                 <span className="hidden lg:inline">{globalLock ? 'Locked' : 'Unlocked'}</span>
               </Button>
+              <Button
+                onClick={() => setShowClearDataConfirm(true)}
+                size="lg"
+                variant="outline"
+                className="gap-2 flex-shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10"
+                disabled={isClearingData}
+                title="Clear all personal organizer data"
+              >
+                <Trash size={18} />
+                <span className="hidden lg:inline">{isClearingData ? 'Clearing…' : 'Clear Data'}</span>
+              </Button>
               <AIConfigButton />
               <OrganizerAgentButton context={agentContext} />
               <ThemeCustomizationButton />
@@ -642,6 +654,30 @@ function App() {
         onOpenChange={setShowWorkQuestionnaire}
         onComplete={handleWorkOrganizationComplete}
       />
+
+      <AlertDialog open={showClearDataConfirm} onOpenChange={setShowClearDataConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all personal organizer data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes widgets, notes, tasks, AI history/config, theme settings, sync preferences, and stored media blobs for this browser profile.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClearingData}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                void clearAllPersonalData();
+              }}
+              disabled={isClearingData}
+            >
+              {isClearingData ? 'Clearing…' : 'Clear data'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       <Toaster position="bottom-right" toastOptions={{
         className: 'sm:mb-0 mb-16'

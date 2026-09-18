@@ -82,6 +82,9 @@ const priorityColors = {
   high: 'bg-destructive/20 text-destructive',
 };
 
+const MAX_RECEIPT_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_RECEIPT_IMAGE_DIMENSION = 4096;
+
 export function ShoppingWidget({
   items,
   budget,
@@ -201,7 +204,6 @@ export function ShoppingWidget({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setReceiptImageInput(file);
     setIsProcessingReceipt(true);
 
     try {
@@ -209,9 +211,13 @@ export function ShoppingWidget({
         current.trim() ? current : file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '),
       );
 
-      toast.success('Receipt image added. Review and confirm the details below.');
-    } catch {
-      toast.error('Failed to load receipt image. You can manually enter the details instead.');
+      toast.success('Receipt image validated and added.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load receipt image');
+      setReceiptImageInput(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } finally {
       setIsProcessingReceipt(false);
     }
@@ -258,7 +264,7 @@ export function ShoppingWidget({
         return;
       }
 
-      let imageData: string | undefined;
+      let imageRef: Receipt['imageRef'];
       if (receiptImageInput) {
         const reader = new FileReader();
         imageData = await new Promise<string>((resolve, reject) => {
@@ -290,7 +296,7 @@ export function ShoppingWidget({
         subtotal: calculatedTotal,
         tax: total - calculatedTotal,
         notes: receiptNotes || undefined,
-        imageData,
+        imageRef,
         createdAt: Date.now(),
       };
 

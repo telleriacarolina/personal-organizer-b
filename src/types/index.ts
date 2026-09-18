@@ -356,6 +356,13 @@ export interface Receipt {
   notes?: string;
   imageMediaId?: string;
   imageData?: string;
+  /** IndexedDB reference for receipt media blobs. */
+  imageRef?: {
+    id: string;
+    mimeType: string;
+    byteSize: number;
+    createdAt: number;
+  };
   createdAt: number;
 }
 
