@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Fire, Plus, Trash } from '@phosphor-icons/react';
 import { Habit, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { addHabit as addHabitCommand, deleteHabit as deleteHabitCommand, toggleHabitCompletion } from '@/lib/organizer-commands';
 
 interface HabitsWidgetProps {
   habits: Habit[];
@@ -17,9 +18,11 @@ interface HabitsWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
-export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: HabitsWidgetProps) {
+export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange, snapToGrid, globalLock }: HabitsWidgetProps) {
   const [newHabit, setNewHabit] = useState('');
   const [todayKey, setTodayKey] = useState(() => new Date().toISOString().split('T')[0]);
 
@@ -38,33 +41,18 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
 
   const addHabit = () => {
     if (newHabit.trim()) {
-      const habit: Habit = {
-        id: Date.now().toString(),
-        name: newHabit,
-        completions: {},
-        createdAt: Date.now(),
-      };
-      onUpdate([...habits, habit]);
+      onUpdate(addHabitCommand(habits, newHabit));
       setNewHabit('');
     }
   };
 
   const toggleHabitToday = (id: string) => {
     const today = new Date().toISOString().split('T')[0];
-    onUpdate(
-      habits.map((habit) => {
-        if (habit.id === id) {
-          const completions = { ...habit.completions };
-          completions[today] = !completions[today];
-          return { ...habit, completions };
-        }
-        return habit;
-      })
-    );
+    onUpdate(toggleHabitCompletion(habits, id, today));
   };
 
   const deleteHabit = (id: string) => {
-    onUpdate(habits.filter((habit) => habit.id !== id));
+    onUpdate(deleteHabitCommand(habits, id));
   };
 
   const dateWindow = useMemo(() => {
@@ -116,6 +104,8 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="habits"
     >
       <div className="flex gap-2">
@@ -124,7 +114,7 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
           placeholder="Add a new habit..."
           value={newHabit}
           onChange={(e) => setNewHabit(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           className="flex-1"
         />
         <Button onClick={addHabit} size="icon" className="h-10 w-10">

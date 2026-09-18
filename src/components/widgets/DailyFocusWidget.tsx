@@ -35,6 +35,8 @@ interface DailyFocusWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
 const priorityWeight: Record<'low' | 'medium' | 'high', number> = {
@@ -61,6 +63,8 @@ export function DailyFocusWidget({
   onDragEnd,
   size,
   onSizeChange,
+  snapToGrid,
+  globalLock,
 }: DailyFocusWidgetProps) {
   const today = dateKey(new Date());
   const [quickTaskTitle, setQuickTaskTitle] = useState('');
@@ -183,6 +187,8 @@ export function DailyFocusWidget({
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="daily-focus"
     >
       <div className="space-y-3">

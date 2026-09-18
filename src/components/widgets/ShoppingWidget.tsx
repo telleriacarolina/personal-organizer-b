@@ -17,6 +17,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { reduceShoppingWidget, type ShoppingDomainAction } from '@/lib/domain/shopping-domain';
+import { createMediaId, saveMedia } from '@/lib/persistence';
+
+type ShoppingWidgetData = {
+  items: PersonalShoppingItem[];
+  budget?: number;
+  receipts?: Receipt[];
+  trips?: ShoppingTrip[];
+  reminders?: ShoppingReminder[];
+};
 
 interface ShoppingWidgetProps {
   items: PersonalShoppingItem[];
@@ -26,7 +36,12 @@ interface ShoppingWidgetProps {
   reminders?: ShoppingReminder[];
   aiState?: WidgetAIState;
   onAIStateChange: (state: WidgetAIState) => void;
-  onUpdate: (data: { items?: PersonalShoppingItem[]; budget?: number; receipts?: Receipt[]; trips?: ShoppingTrip[]; reminders?: ShoppingReminder[] }) => void;
+  onUpdate: (
+    data:
+      | ShoppingWidgetData
+      | Partial<ShoppingWidgetData>
+      | ((current: ShoppingWidgetData) => ShoppingWidgetData | Partial<ShoppingWidgetData>)
+  ) => void;
   onRemove: () => void;
   widgetId: string;
   onDragStart?: () => void;
@@ -120,6 +135,28 @@ export function ShoppingWidget({
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(true);
 
+  const applyShoppingDomainAction = (action: ShoppingDomainAction) => {
+    const currentWidgetState = {
+      id: widgetId,
+      type: 'shopping' as const,
+      position: 0,
+      items,
+      budget,
+      receipts,
+      trips,
+      reminders,
+    };
+
+    const nextState = reduceShoppingWidget(currentWidgetState, action);
+    onUpdate({
+      items: nextState.items,
+      budget: nextState.budget,
+      receipts: nextState.receipts,
+      trips: nextState.trips,
+      reminders: nextState.reminders,
+    });
+  };
+
   const addItem = () => {
     if (newItemName.trim()) {
       const item: PersonalShoppingItem = {
@@ -133,7 +170,8 @@ export function ShoppingWidget({
         priority: selectedPriority,
         createdAt: Date.now(),
       };
-      onUpdate({ items: [...items, item] });
+      applyShoppingDomainAction({ type: 'set-items', payload: [...items, item] });
+      onUpdate((current) => ({ items: [...current.items, item] }));
       setNewItemName('');
       setNewItemQuantity('');
       setNewItemPrice('');
@@ -159,7 +197,8 @@ export function ShoppingWidget({
         createdAt: Date.now(),
       };
 
-      onUpdate({ items: [...items, item] });
+      applyShoppingDomainAction({ type: 'set-items', payload: [...items, item] });
+      onUpdate((current) => ({ items: [...current.items, item] }));
       toast.success(`Added Barcode ${barcodeValue}`);
       setBarcodeInput('');
       setShowBarcodeDialog(false);
@@ -178,12 +217,6 @@ export function ShoppingWidget({
     setIsProcessingReceipt(true);
 
     try {
-      const reader = new FileReader();
-      await new Promise<void>((resolve) => {
-        reader.onload = () => resolve();
-        reader.readAsDataURL(file);
-      });
-
       if (!receiptStoreName.trim()) {
         setReceiptStoreName(file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '));
       }
@@ -233,13 +266,10 @@ export function ShoppingWidget({
       const receiptId = Date.now().toString();
       const receiptDateTs = new Date(receiptDate).getTime();
 
-      let imageData: string | undefined;
+      let imageMediaId: string | undefined;
       if (receiptImageInput) {
-        const reader = new FileReader();
-        imageData = await new Promise((resolve) => {
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(receiptImageInput);
-        });
+        imageMediaId = createMediaId('receipt-image', receiptId);
+        await saveMedia({ id: imageMediaId, kind: 'receipt-image', blob: receiptImageInput });
       }
 
       const calculatedTotal = parsedItems.reduce((sum, item) => sum + (item.price || 0), 0);
@@ -259,7 +289,7 @@ export function ShoppingWidget({
         subtotal: calculatedTotal,
         tax: total - calculatedTotal,
         notes: receiptNotes || undefined,
-        imageData,
+        imageMediaId,
         createdAt: Date.now(),
       };
 
@@ -277,33 +307,37 @@ export function ShoppingWidget({
         purchasedAt: receiptDateTs,
       }));
 
-      const existingTrip = trips.find(t => 
-        t.storeName === receiptStoreName && 
-        startOfDay(t.date).getTime() === startOfDay(receiptDateTs).getTime()
-      );
-
-      let newTrips = [...trips];
-      if (existingTrip) {
-        newTrips = trips.map(t => 
-          t.id === existingTrip.id 
-            ? { ...t, total: t.total + total, itemCount: t.itemCount + parsedItems.length, receiptIds: [...t.receiptIds, receiptId] }
-            : t
+      onUpdate((current) => {
+        const currentTrips = current.trips ?? [];
+        const currentReceipts = current.receipts ?? [];
+        const existingTrip = currentTrips.find((trip) =>
+          trip.storeName === receiptStoreName &&
+          startOfDay(trip.date).getTime() === startOfDay(receiptDateTs).getTime()
         );
-      } else {
-        newTrips.push({
-          id: `trip-${Date.now()}`,
-          date: receiptDateTs,
-          storeName: receiptStoreName,
-          total: total,
-          itemCount: parsedItems.length,
-          receiptIds: [receiptId],
-        });
-      }
 
-      onUpdate({ 
-        items: [...items, ...newItems],
-        receipts: [...receipts, newReceipt],
-        trips: newTrips
+        let nextTrips = [...currentTrips];
+        if (existingTrip) {
+          nextTrips = currentTrips.map((trip) =>
+            trip.id === existingTrip.id
+              ? { ...trip, total: trip.total + total, itemCount: trip.itemCount + parsedItems.length, receiptIds: [...trip.receiptIds, receiptId] }
+              : trip
+          );
+        } else {
+          nextTrips.push({
+            id: `trip-${Date.now()}`,
+            date: receiptDateTs,
+            storeName: receiptStoreName,
+            total: total,
+            itemCount: parsedItems.length,
+            receiptIds: [receiptId],
+          });
+        }
+
+        return {
+          items: [...current.items, ...newItems],
+          receipts: [...currentReceipts, newReceipt],
+          trips: nextTrips,
+        };
       });
 
       toast.success(`Receipt added: ${parsedItems.length} items from ${receiptStoreName}`);
@@ -322,21 +356,31 @@ export function ShoppingWidget({
   };
 
   const togglePurchased = (id: string) => {
-    onUpdate({
-      items: items.map((item) =>
-        item.id === id ? { ...item, purchased: !item.purchased, purchasedAt: !item.purchased ? Date.now() : undefined } : item
-      )
+    applyShoppingDomainAction({
+      type: 'set-items',
+      payload: items.map((item) =>
+        item.id === id ? { ...item, purchased: !item.purchased, purchasedAt: !item.purchased ? Date.now() : undefined } : item,
+      ),
     });
   };
 
   const deleteItem = (id: string) => {
-    onUpdate({ items: items.filter((item) => item.id !== id) });
+    applyShoppingDomainAction({ type: 'set-items', payload: items.filter((item) => item.id !== id) });
+    onUpdate((current) => ({
+      items: current.items.map((item) =>
+        item.id === id ? { ...item, purchased: !item.purchased, purchasedAt: !item.purchased ? Date.now() : undefined } : item
+      ),
+    }));
+  };
+
+  const deleteItem = (id: string) => {
+    onUpdate((current) => ({ items: current.items.filter((item) => item.id !== id) }));
     toast.success('Item removed');
   };
 
   const updateBudget = () => {
     const newBudget = budgetInput ? parseFloat(budgetInput) : undefined;
-    onUpdate({ budget: newBudget });
+    applyShoppingDomainAction({ type: 'set-budget', payload: newBudget });
     toast.success(newBudget ? `Budget set to $${newBudget.toFixed(2)}` : 'Budget cleared');
   };
 
@@ -548,7 +592,7 @@ export function ShoppingWidget({
       createdAt: Date.now(),
     }));
     
-    onUpdate({ items: [...items, ...newItems] });
+    onUpdate((current) => ({ items: [...current.items, ...newItems] }));
     toast.success(`Added ${newItems.length} items from similar trip`);
     setShowTripRevisitsDialog(false);
     setSelectedTripForRevisit(null);
@@ -654,23 +698,23 @@ export function ShoppingWidget({
       });
     }
 
-    onUpdate({ reminders: [...reminders, ...newReminders] });
+    onUpdate((current) => ({ reminders: [...(current.reminders ?? []), ...newReminders] }));
     toast.success(`Created ${newReminders.length} smart shopping reminders!`);
     setShowRemindersDialog(true);
   };
 
   const toggleReminder = (id: string) => {
-    onUpdate({
-      reminders: reminders.map(r => 
-        r.id === id ? { ...r, enabled: !r.enabled } : r
-      )
-    });
+    onUpdate((current) => ({
+      reminders: (current.reminders ?? []).map((reminder) =>
+        reminder.id === id ? { ...reminder, enabled: !reminder.enabled } : reminder
+      ),
+    }));
   };
 
   const deleteReminder = (id: string) => {
-    onUpdate({
-      reminders: reminders.filter(r => r.id !== id)
-    });
+    onUpdate((current) => ({
+      reminders: (current.reminders ?? []).filter((reminder) => reminder.id !== id),
+    }));
     toast.success('Reminder deleted');
   };
 
@@ -679,11 +723,11 @@ export function ShoppingWidget({
     if (!reminder) return;
 
     const newDate = addDays(new Date(), days).getTime();
-    onUpdate({
-      reminders: reminders.map(r => 
-        r.id === id ? { ...r, nextReminderDate: newDate, lastTriggered: Date.now() } : r
-      )
-    });
+    onUpdate((current) => ({
+      reminders: (current.reminders ?? []).map((currentReminder) =>
+        currentReminder.id === id ? { ...currentReminder, nextReminderDate: newDate, lastTriggered: Date.now() } : currentReminder
+      ),
+    }));
     toast.success(`Reminder snoozed for ${days} days`);
   };
 
@@ -726,15 +770,16 @@ export function ShoppingWidget({
         );
       });
 
-      onUpdate({
-        reminders: reminders.map(r => 
-          activeReminders.find(ar => ar.id === r.id)
-            ? { ...r, lastTriggered: Date.now() }
-            : r
-        )
-      });
+      onUpdate((current) => ({
+        reminders: (current.reminders ?? []).map((reminder) =>
+          activeReminders.find((activeReminder) => activeReminder.id === reminder.id)
+            ? { ...reminder, lastTriggered: Date.now() }
+            : reminder
+        ),
+      }));
+      setActiveReminders([]);
     }
-  }, [activeReminders, onUpdate, reminders]);
+  }, [activeReminders, onUpdate]);
 
   const aiInput = useMemo(() => ({ items, budget, receipts, trips, reminders }), [items, budget, receipts, trips, reminders]);
   const aiInputHash = useMemo(() => buildAIInputHash(aiInput), [aiInput]);
@@ -836,7 +881,7 @@ export function ShoppingWidget({
                       placeholder="Enter barcode..."
                       value={barcodeInput}
                       onChange={(e) => setBarcodeInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleBarcodeSubmit()}
+                      onKeyDown={(e) => e.key === 'Enter' && handleBarcodeSubmit()}
                     />
                     <Button size="icon" variant="outline" title="Scan with camera">
                       <Scan size={18} />
@@ -1460,7 +1505,7 @@ export function ShoppingWidget({
               placeholder="Item name..."
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               className="h-9"
             />
           </div>
@@ -1469,7 +1514,7 @@ export function ShoppingWidget({
               placeholder="Qty"
               value={newItemQuantity}
               onChange={(e) => setNewItemQuantity(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               className="h-9"
             />
           </div>
@@ -1480,7 +1525,7 @@ export function ShoppingWidget({
               step="0.01"
               value={newItemPrice}
               onChange={(e) => setNewItemPrice(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               className="h-9"
             />
           </div>
@@ -1502,7 +1547,7 @@ export function ShoppingWidget({
             placeholder="Store (optional)"
             value={selectedStore}
             onChange={(e) => setSelectedStore(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             className="w-36 h-9"
           />
 

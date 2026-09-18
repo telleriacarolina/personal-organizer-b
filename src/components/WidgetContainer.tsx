@@ -213,6 +213,7 @@ export function WidgetContainer({
       setDraftSize(null);
     }
   }, [draftSize, isPinching, isResizing, persistedHeight, persistedWidth]);
+  }, [isResizing, resizeStart, isPinching, pinchStart, onSizeChange, snapToGridValue, minWidth, minHeight]);
 
   return (
     <Reorder.Item

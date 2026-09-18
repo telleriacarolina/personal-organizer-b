@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Target, Plus, Trash } from '@phosphor-icons/react';
 import { Goal, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { addGoal as addGoalCommand, deleteGoal as deleteGoalCommand, toggleGoal as toggleGoalCommand } from '@/lib/organizer-commands';
 
 interface GoalsWidgetProps {
   goals: Goal[];
@@ -17,23 +18,18 @@ interface GoalsWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
-export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: GoalsWidgetProps) {
+export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange, snapToGrid, globalLock }: GoalsWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
 
   const addGoal = () => {
     if (newTitle.trim()) {
-      const goal: Goal = {
-        id: Date.now().toString(),
-        title: newTitle,
-        description: newDescription,
-        completed: false,
-        createdAt: Date.now(),
-      };
-      onUpdate([...goals, goal]);
+      onUpdate(addGoalCommand(goals, newTitle, newDescription));
       setNewTitle('');
       setNewDescription('');
       setShowNew(false);
@@ -41,15 +37,11 @@ export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, 
   };
 
   const toggleGoal = (id: string) => {
-    onUpdate(
-      goals.map((goal) =>
-        goal.id === id ? { ...goal, completed: !goal.completed } : goal
-      )
-    );
+    onUpdate(toggleGoalCommand(goals, id));
   };
 
   const deleteGoal = (id: string) => {
-    onUpdate(goals.filter((goal) => goal.id !== id));
+    onUpdate(deleteGoalCommand(goals, id));
   };
 
   return (
@@ -62,6 +54,8 @@ export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, 
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="goals"
     >
       {!showNew && (
