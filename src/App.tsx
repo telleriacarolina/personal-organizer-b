@@ -446,8 +446,6 @@ function App() {
                   onDragEnd: globalLock ? undefined : handleDragEnd,
                   size: widget.size,
                   onSizeChange: (size: { width: number; height: number }) => updateWidgetSize(widget.id, size),
-                  snapToGrid: snapToGrid,
-                  globalLock: globalLock,
                 };
 
                 switch (widget.type) {
