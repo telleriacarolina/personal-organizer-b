@@ -43,11 +43,6 @@ interface CustomColors {
   background: string;
 }
 
-interface BackgroundImage {
-  url: string;
-  opacity: number;
-}
-
 const themePresets: ThemePreset[] = [
   {
     name: 'Warm Terracotta',
@@ -177,10 +172,27 @@ const themePresets: ThemePreset[] = [
   },
 ];
 
-function hexToOklch(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
+function normalizeHexColor(color: string): string | null {
+  if (!/^#([\da-f]{3}|[\da-f]{6})$/i.test(color)) {
+    return null;
+  }
+
+  if (color.length === 4) {
+    return `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`;
+  }
+
+  return color;
+}
+
+function hexToOklch(color: string): string {
+  const normalizedColor = normalizeHexColor(color);
+  if (!normalizedColor) {
+    return color;
+  }
+
+  const r = parseInt(normalizedColor.slice(1, 3), 16) / 255;
+  const g = parseInt(normalizedColor.slice(3, 5), 16) / 255;
+  const b = parseInt(normalizedColor.slice(5, 7), 16) / 255;
 
   const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
   const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
@@ -209,6 +221,10 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
   const [selectedTheme, setSelectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
   const [customColors, setCustomColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
   const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
+  const { url: resolvedBackgroundUrl, isMissing: isBackgroundMissing } = useStoredMediaUrl({
+    mediaId: backgroundImage?.mediaId,
+    fallbackUrl: backgroundImage?.url ?? null,
+  });
   const [previewTheme, setPreviewTheme] = useState<string | null>(null);
   const [localPrimary, setLocalPrimary] = useState('#7a5c3d');
   const [localAccent, setLocalAccent] = useState('#ae6745');
@@ -636,7 +652,12 @@ export function ThemeCustomizationButton() {
   const [open, setOpen] = useState(false);
   const [selectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
   const [customColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
-  const [backgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
+  const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
+  const { url: resolvedBackgroundUrl } = useStoredMediaUrl({
+    mediaId: backgroundImage?.mediaId,
+    fallbackUrl: backgroundImage?.url ?? null,
+  });
+  const migrationErrorShownRef = useRef(false);
 
   useEffect(() => {
     if (customColors) {

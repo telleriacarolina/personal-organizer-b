@@ -18,25 +18,43 @@ import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
 import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
-import { Task, Widget, WidgetAIState, WidgetType } from '@/types';
-import { appendImportedCalendarEvent, type CalendarImportDraft } from '@/lib/calendar-imports';
-import { getOrganizerAgentToolSchemas } from '@/lib/organizer-agent-broker';
-import { createId } from '@/lib/id';
-import { applyGlobalLockState, toggleGlobalLockValue } from '@/lib/dashboard-state';
+import { Widget, WidgetAIState, WidgetType } from '@/types';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import type { AgentContext } from '@/types/agent';
-
-type WidgetOfType<TType extends Widget['type']> = Extract<Widget, { type: TType }>;
+import {
+  formatPersistenceIssue,
+  hasLegacyWidgetMediaPayload,
+  migrateWidgetsMedia,
+  preferencesRepository,
+  stateRepositories,
+  subscribeToPersistenceIssues,
+} from '@/lib/persistence';
+import {
+  addCalendarImport as addCalendarImportCommand,
+  addTaskToSource as addTaskToSourceCommand,
+  clearWidgetAIState,
+  createWidget,
+  createWorkWidget,
+  removeWidget as removeWidgetCommand,
+  reorderWidgets,
+  saveWidgetAIState,
+  toggleTaskInSource as toggleTaskInSourceCommand,
+  updateDailyFocusSourceWidget as updateDailyFocusSourceWidgetCommand,
+  updateTaskPriorityInSource as updateTaskPriorityInSourceCommand,
+  updateWidget as updateWidgetCommand,
+  updateWidgetSize as updateWidgetSizeCommand,
+} from '@/lib/organizer-commands';
+import type { AgentPermission } from '@/types/agent';
 
 function App() {
-  const [widgets, setWidgets] = useLocalStorageState<Widget[]>('organizer-widgets', []);
+  const [widgets, setWidgets] = usePersistentState(stateRepositories.widgets, []);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showWorkQuestionnaire, setShowWorkQuestionnaire] = useState(false);
-  const [snapToGrid, setSnapToGrid] = useLocalStorageState<boolean>('organizer-snap-to-grid', false);
-  const [globalLock, setGlobalLock] = useLocalStorageState<boolean>('organizer-global-lock', false);
-  const [widgetAIState, setWidgetAIState] = useLocalStorageState<Record<string, WidgetAIState>>('organizer-widget-ai', {});
+  const [snapToGrid, setSnapToGrid] = usePersistentState(stateRepositories.snapToGrid, false);
+  const [globalLock, setGlobalLock] = usePersistentState(stateRepositories.globalLock, false);
+  const [widgetAIState, setWidgetAIState] = usePersistentState(stateRepositories.widgetAIState, {});
   const dragStartTimeRef = useRef<number>(0);
   const pendingSnapToGridToastRef = useRef<string | null>(null);
   const pendingGlobalLockToastRef = useRef<string | null>(null);
@@ -97,75 +115,38 @@ function App() {
     toast.success(`Work widget added with ${preference.type} organization!`);
   };
 
-  const mutateWidgets = useCallback((mutation: (current: Widget[]) => Widget[]) => {
-    setWidgets((current) => mutation(current || []));
-  }, [setWidgets]);
-
-  const mutateTypedWidget = useCallback(
-    <TType extends Widget['type']>(
-      id: string,
-      type: TType,
-      mutation: (widget: WidgetOfType<TType>) => WidgetOfType<TType>,
-    ) => {
-      mutateWidgets((current) =>
-        current.map((widget) =>
-          widget.id === id && widget.type === type
-            ? mutation(widget as WidgetOfType<TType>)
-            : widget,
-        ),
-      );
-    },
-    [mutateWidgets],
-  );
-
   const removeWidget = (id: string) => {
-    mutateWidgets((current) => current.filter((widget) => widget.id !== id));
-    setWidgetAIState((current) => {
-      const nextState = { ...(current || {}) };
-      delete nextState[id];
-      return nextState;
-    });
+    setWidgets((current) => removeWidgetCommand(current, id));
+    setWidgetAIState((current) => clearWidgetAIState(current, id));
     toast.success('Widget removed');
   };
 
-  const updateWidgetSize = (id: string, size: { width: number; height: number }) => {
-    mutateWidgets((current) =>
-      current.map((widget) => (widget.id === id ? { ...widget, size } : widget)),
-    );
+  const updateWidget = (id: string, data: Partial<Widget> | ((widget: Widget) => Widget)) => {
+    if (typeof data === 'function') {
+      setWidgets((current) =>
+        (current || []).map((w) => {
+          if (w.id !== id) return w;
+          return data(w);
+        })
+      );
+    } else {
+      setWidgets((current) => updateWidgetCommand(current, id, data));
+    }
   };
 
-  const updateTasksWidget = (sourceWidgetId: string, updater: (tasks: Task[]) => Task[]) => {
-    mutateWidgets((current) =>
-      current.map((widget) =>
-        widget.id === sourceWidgetId && widget.type === 'tasks'
-          ? ({ ...widget, tasks: updater(widget.tasks) } as Widget)
-          : widget
-      ),
-    );
+  const updateWidgetSize = (id: string, size: { width: number; height: number }) => {
+    setWidgets((current) => updateWidgetSizeCommand(current, id, size));
   };
 
   const addTaskToSource = (
     sourceWidgetId: string,
     task: Pick<Task, 'text' | 'priority' | 'dueDate' | 'category'>
   ) => {
-    updateTasksWidget(sourceWidgetId, (tasks) => [
-      ...tasks,
-      {
-        id: createId('task'),
-        text: task.text,
-        completed: false,
-        priority: task.priority,
-        dueDate: task.dueDate ?? null,
-        category: task.category ?? null,
-        createdAt: Date.now(),
-      },
-    ]);
+    setWidgets((current) => addTaskToSourceCommand(current, sourceWidgetId, task));
   };
 
   const toggleTaskInSource = (sourceWidgetId: string, taskId: string) => {
-    updateTasksWidget(sourceWidgetId, (tasks) =>
-      tasks.map((task) => (task.id === taskId ? { ...task, completed: !task.completed } : task))
-    );
+    setWidgets((current) => toggleTaskInSourceCommand(current, sourceWidgetId, taskId));
   };
 
   const updateTaskPriorityInSource = (
@@ -173,9 +154,7 @@ function App() {
     taskId: string,
     priority: 'low' | 'medium' | 'high'
   ) => {
-    updateTasksWidget(sourceWidgetId, (tasks) =>
-      tasks.map((task) => (task.id === taskId ? { ...task, priority } : task))
-    );
+    setWidgets((current) => updateTaskPriorityInSourceCommand(current, sourceWidgetId, taskId, priority));
   };
 
   const addCalendarEventToSource = (
@@ -216,14 +195,15 @@ function App() {
   };
 
   const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {
-    mutateTypedWidget(widgetId, 'daily-focus', (widget) => ({ ...widget, sourceWidgetId }));
+    setWidgets((current) => updateDailyFocusSourceWidgetCommand(current, widgetId, sourceWidgetId));
   };
 
   const updateWidgetAIState = (widgetId: string, state: WidgetAIState) => {
-    setWidgetAIState((current) => ({
-      ...(current || {}),
-      [widgetId]: state,
-    }));
+    if (widgetId !== state.widgetId) {
+      console.warn(`Ignoring AI state update for "${state.widgetId}" on widget "${widgetId}"`);
+      return;
+    }
+    setWidgetAIState((current) => saveWidgetAIState(current, state));
   };
 
   const toggleSnapToGrid = () => {
@@ -259,13 +239,25 @@ function App() {
     }
   };
 
-  const currentWidgets = useMemo(() => widgets || [], [widgets]);
-  const taskSources = currentWidgets
-    .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
-    .map((widget) => ({ id: widget.id, tasks: widget.tasks }));
-  const calendarSources = currentWidgets
-    .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
-    .map((widget) => ({ id: widget.id }));
+  const currentWidgets = useMemo(() => widgets ?? [], [widgets]);
+  const taskSources = useMemo(
+    () =>
+      currentWidgets
+        .filter((widget): widget is Extract<Widget, { type: 'tasks' }> => widget.type === 'tasks')
+        .map((widget) => ({ id: widget.id, tasks: widget.tasks })),
+    [currentWidgets]
+  );
+  const calendarSources = useMemo(
+    () =>
+      currentWidgets
+        .filter((widget): widget is Extract<Widget, { type: 'calendar' }> => widget.type === 'calendar')
+        .map((widget) => ({ id: widget.id })),
+    [currentWidgets]
+  );
+
+  const updateWidgetsForAgent = useCallback((updater: (widgets: Widget[]) => Widget[]) => {
+    setWidgets((current) => updater(current || []));
+  }, [setWidgets]);
 
   const agentPermissions = useMemo(
     () => Array.from(new Set(getOrganizerAgentToolSchemas().flatMap((schema) => schema.permissions))),
@@ -446,6 +438,8 @@ function App() {
                   onDragEnd: globalLock ? undefined : handleDragEnd,
                   size: widget.size,
                   onSizeChange: (size: { width: number; height: number }) => updateWidgetSize(widget.id, size),
+                  snapToGrid: snapToGrid,
+                  globalLock: globalLock,
                 };
 
                 switch (widget.type) {
@@ -454,12 +448,7 @@ function App() {
                       <TasksWidget
                         {...widgetProps}
                         tasks={widget.tasks}
-                        onUpdate={(mutation) =>
-                          mutateTypedWidget(widget.id, 'tasks', (current) => ({
-                            ...current,
-                            tasks: mutation(current.tasks),
-                          }))
-                        }
+                        onUpdate={(tasks) => updateWidget(widget.id, { tasks })}
                       />
                     );
                   case 'notes':
@@ -483,12 +472,7 @@ function App() {
                       <HabitsWidget
                         {...widgetProps}
                         habits={widget.habits}
-                        onUpdate={(mutation) =>
-                          mutateTypedWidget(widget.id, 'habits', (current) => ({
-                            ...current,
-                            habits: mutation(current.habits),
-                          }))
-                        }
+                        onUpdate={(habits) => updateWidget(widget.id, { habits })}
                       />
                     );
                   case 'goals':
@@ -496,12 +480,7 @@ function App() {
                       <GoalsWidget
                         {...widgetProps}
                         goals={widget.goals}
-                        onUpdate={(mutation) =>
-                          mutateTypedWidget(widget.id, 'goals', (current) => ({
-                            ...current,
-                            goals: mutation(current.goals),
-                          }))
-                        }
+                        onUpdate={(goals) => updateWidget(widget.id, { goals })}
                       />
                     );
                   case 'calendar':
@@ -647,7 +626,15 @@ function App() {
       <AddWidgetDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        onAddWidget={addWidget}
+        onAddWidget={(type) => {
+          if (type === 'work') {
+            setShowAddDialog(false);
+            setShowWorkQuestionnaire(true);
+            return;
+          }
+
+          addWidget(type);
+        }}
       />
 
       <WorkOrganizationQuestionnaire
