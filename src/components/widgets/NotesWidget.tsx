@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
 import { toast } from 'sonner';
+import { addNote as addNoteCommand, deleteNote as deleteNoteCommand, updateNote as updateNoteCommand } from '@/lib/organizer-commands';
 
 interface NotesWidgetProps {
   notes: Note[];
@@ -25,6 +26,8 @@ interface NotesWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
 export function NotesWidget({
@@ -39,6 +42,8 @@ export function NotesWidget({
   onDragEnd,
   size,
   onSizeChange,
+  snapToGrid,
+  globalLock,
 }: NotesWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -49,14 +54,7 @@ export function NotesWidget({
 
   const addNote = () => {
     if (newTitle.trim() || newContent.trim()) {
-      const note: Note = {
-        id: Date.now().toString(),
-        title: newTitle || 'Untitled Note',
-        content: newContent,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      onUpdate([...notes, note]);
+      onUpdate(addNoteCommand(notes, newTitle, newContent));
       setNewTitle('');
       setNewContent('');
       setShowNew(false);
@@ -64,21 +62,16 @@ export function NotesWidget({
   };
 
   const deleteNote = (id: string) => {
-    onUpdate(notes.filter((note) => note.id !== id));
+    onUpdate(deleteNoteCommand(notes, id));
   };
 
   const updateNote = (id: string, title: string, content: string) => {
-    onUpdate(
-      notes.map((note) =>
-        note.id === id
-          ? { ...note, title, content, updatedAt: Date.now() }
-          : note
-      )
-    );
+    onUpdate(updateNoteCommand(notes, id, title, content));
   };
 
-  const aiInput = { notes };
-  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+  const aiInput = useMemo(() => ({ notes }), [notes]);
+  const aiInputHash = useMemo(() => buildAIInputHash(aiInput), [aiInput]);
+  const isAIStale = aiState ? aiState.sourceHash !== aiInputHash : false;
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;
@@ -124,6 +117,8 @@ export function NotesWidget({
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="notes"
     >
       <div className="space-y-3">

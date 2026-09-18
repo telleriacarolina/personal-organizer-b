@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Fire, Plus, Trash } from '@phosphor-icons/react';
 import { Habit, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { addHabit as addHabitCommand, deleteHabit as deleteHabitCommand, toggleHabitCompletion } from '@/lib/organizer-commands';
 
 interface HabitsWidgetProps {
   habits: Habit[];
@@ -17,65 +18,75 @@ interface HabitsWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
-export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: HabitsWidgetProps) {
+export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange, snapToGrid, globalLock }: HabitsWidgetProps) {
   const [newHabit, setNewHabit] = useState('');
+  const [todayKey, setTodayKey] = useState(() => new Date().toISOString().split('T')[0]);
+
+  useEffect(() => {
+    const now = new Date();
+    const nextMidnight = new Date(now);
+    nextMidnight.setHours(24, 0, 0, 0);
+    const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+
+    const timer = setTimeout(() => {
+      setTodayKey(new Date().toISOString().split('T')[0]);
+    }, msUntilMidnight + 50);
+
+    return () => clearTimeout(timer);
+  }, [todayKey]);
 
   const addHabit = () => {
     if (newHabit.trim()) {
-      const habit: Habit = {
-        id: Date.now().toString(),
-        name: newHabit,
-        completions: {},
-        createdAt: Date.now(),
-      };
-      onUpdate([...habits, habit]);
+      onUpdate(addHabitCommand(habits, newHabit));
       setNewHabit('');
     }
   };
 
   const toggleHabitToday = (id: string) => {
     const today = new Date().toISOString().split('T')[0];
-    onUpdate(
-      habits.map((habit) => {
-        if (habit.id === id) {
-          const completions = { ...habit.completions };
-          completions[today] = !completions[today];
-          return { ...habit, completions };
-        }
-        return habit;
-      })
-    );
+    onUpdate(toggleHabitCompletion(habits, id, today));
   };
 
   const deleteHabit = (id: string) => {
-    onUpdate(habits.filter((habit) => habit.id !== id));
+    onUpdate(deleteHabitCommand(habits, id));
   };
 
-  const getStreak = (habit: Habit): number => {
-    let streak = 0;
-    const today = new Date();
-    
-    for (let i = 0; i < 365; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      
-      if (habit.completions[dateStr]) {
-        streak++;
-      } else if (i > 0) {
-        break;
+  const dateWindow = useMemo(() => {
+    const base = new Date(todayKey);
+    return Array.from({ length: 365 }, (_, i) => {
+      const date = new Date(base);
+      date.setDate(base.getDate() - i);
+      return date.toISOString().split('T')[0];
+    });
+  }, [todayKey]);
+  const streakMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    habits.forEach((habit) => {
+      let streak = 0;
+      for (let i = 0; i < dateWindow.length; i += 1) {
+        const dateStr = dateWindow[i];
+        if (habit.completions[dateStr]) {
+          streak += 1;
+        } else if (i > 0) {
+          break;
+        }
       }
-    }
-    
-    return streak;
-  };
+      map[habit.id] = streak;
+    });
+    return map;
+  }, [dateWindow, habits]);
 
-  const isCompletedToday = (habit: Habit): boolean => {
-    const today = new Date().toISOString().split('T')[0];
-    return habit.completions[today] || false;
-  };
+  const completedTodayMap = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    habits.forEach((habit) => {
+      map[habit.id] = Boolean(habit.completions[todayKey]);
+    });
+    return map;
+  }, [habits, todayKey]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -93,6 +104,8 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="habits"
     >
       <div className="flex gap-2">
@@ -101,7 +114,7 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
           placeholder="Add a new habit..."
           value={newHabit}
           onChange={(e) => setNewHabit(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           className="flex-1"
         />
         <Button onClick={addHabit} size="icon" className="h-10 w-10">
@@ -112,8 +125,8 @@ export function HabitsWidget({ habits, onUpdate, onRemove, widgetId, onDragStart
       <div className="space-y-2 max-h-96 overflow-y-auto">
         <AnimatePresence>
           {habits.map((habit) => {
-            const streak = getStreak(habit);
-            const completed = isCompletedToday(habit);
+            const streak = streakMap[habit.id] ?? 0;
+            const completed = completedTodayMap[habit.id] ?? false;
 
             return (
               <motion.div

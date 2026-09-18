@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ListChecks, Plus, Trash } from '@phosphor-icons/react';
 import { Task, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { addTaskToTasks, deleteTask as deleteTaskCommand, toggleTask as toggleTaskCommand } from '@/lib/organizer-commands';
 
 interface TasksWidgetProps {
   tasks: Task[];
@@ -17,37 +18,28 @@ interface TasksWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
-export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: TasksWidgetProps) {
+export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange, snapToGrid, globalLock }: TasksWidgetProps) {
   const [newTask, setNewTask] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
 
   const addTask = () => {
     if (newTask.trim()) {
-      const task: Task = {
-        id: Date.now().toString(),
-        text: newTask,
-        completed: false,
-        priority,
-        createdAt: Date.now(),
-      };
-      onUpdate([...tasks, task]);
+      onUpdate(addTaskToTasks(tasks, newTask, priority));
       setNewTask('');
       setPriority('medium');
     }
   };
 
   const toggleTask = (id: string) => {
-    onUpdate(
-      tasks.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
-    );
+    onUpdate(toggleTaskCommand(tasks, id));
   };
 
   const deleteTask = (id: string) => {
-    onUpdate(tasks.filter((task) => task.id !== id));
+    onUpdate(deleteTaskCommand(tasks, id));
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -72,6 +64,8 @@ export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, 
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="tasks"
     >
       <div className="flex gap-2">
@@ -80,7 +74,7 @@ export function TasksWidget({ tasks, onUpdate, onRemove, widgetId, onDragStart, 
           placeholder="Add a new task..."
           value={newTask}
           onChange={(e) => setNewTask(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           className="flex-1"
         />
         <div className="flex gap-1">
