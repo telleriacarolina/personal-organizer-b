@@ -13,17 +13,14 @@ export default defineConfig({
     tailwindcss(),
     workflow(),
   ],
-  test: {
-    environment: "jsdom",
-    setupFiles: "./src/test/setup.ts",
-  },
   resolve: {
     alias: {
       '@': resolve(projectRoot, 'src')
     }
   },
   test: {
-    environment: 'node',
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
     globals: true,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },

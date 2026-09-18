@@ -15,7 +15,6 @@ import type {
   AISuggestion,
 } from '@/types/ai';
 import { DEFAULT_AI_CONFIG } from '@/types/ai';
-import { readLocalStorageJson, writeLocalStorageJson } from '@/lib/persistence';
 import { preferencesRepository } from '@/lib/persistence';
 
 // ---------------------------------------------------------------------------
@@ -140,7 +139,6 @@ export function normalizeSuggestion(raw: Partial<AISuggestion>): AISuggestion | 
 
 function readConfigFromStorage(): AIConfig {
   if (typeof window === 'undefined') return { ...DEFAULT_AI_CONFIG };
-  return { ...DEFAULT_AI_CONFIG, ...readLocalStorageJson<Partial<AIConfig>>(CONFIG_STORAGE_KEY, {}) };
   try {
     return { ...DEFAULT_AI_CONFIG, ...preferencesRepository.getAIConfig() };
   } catch {
@@ -171,6 +169,10 @@ function buildProvider(mode: AIMode): AIProvider {
   }
 }
 
+function isExternalMode(mode: AIMode): boolean {
+  return mode === 'openai';
+}
+
 export class AIService {
   private provider: AIProvider;
   private config: AIConfig;
@@ -186,17 +188,18 @@ export class AIService {
   }
 
   get isEnabled(): boolean {
+    if (isExternalMode(this.config.mode) && !this.config.privacyAccepted) return false;
     return this.config.mode !== 'off' && this.provider.isAvailable() && this.provider.mode !== 'off';
   }
 
   configure(updates: Partial<AIConfig>): void {
     this.config = { ...this.config, ...updates };
-    this.provider = buildProvider(this.config.mode);
-    if (typeof window !== 'undefined') {
-      // Never persist the API key to localStorage
-      const { apiKey: _ignored, ...safe } = this.config;
-      writeLocalStorageJson(CONFIG_STORAGE_KEY, safe);
+    if (isExternalMode(this.config.mode) && !this.config.privacyAccepted) {
+      this.config.mode = 'off';
+      this.config.providerLabel = 'Disabled';
     }
+    this.provider = buildProvider(this.config.mode);
+    // Never persist the API key to localStorage
     const { apiKey: _ignored, ...safe } = this.config;
     preferencesRepository.setAIConfig(safe);
   }

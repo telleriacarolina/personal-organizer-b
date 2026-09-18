@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { AIInsightAction, DailyFocusItem, Task, WidgetAIState, WidgetSize } from '@/types';
 import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { validateWidgetReference } from '@/lib/reference-validation';
 
 interface TaskSource {
   id: string;
@@ -73,12 +74,9 @@ export function DailyFocusWidget({
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(true);
 
-  const selectedSourceId =
-    sourceWidgetId && taskSources.some((source) => source.id === sourceWidgetId)
-      ? sourceWidgetId
-      : taskSources[0]?.id ?? null;
-
-  const selectedSource = taskSources.find((source) => source.id === selectedSourceId);
+  const sourceValidation = validateWidgetReference(sourceWidgetId, taskSources);
+  const selectedSourceId = sourceValidation.state === 'valid' ? sourceValidation.targetId : null;
+  const selectedSource = sourceValidation.state === 'valid' ? sourceValidation.target : undefined;
 
   const normalizedTasks = useMemo<DailyFocusItem[]>(
     () =>
@@ -237,6 +235,12 @@ export function DailyFocusWidget({
             </SelectContent>
           </Select>
         </div>
+
+        {sourceValidation.state === 'missing-widget' && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+            The selected Tasks widget is no longer available. Choose a replacement source to continue.
+          </div>
+        )}
 
         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2">
           <Input

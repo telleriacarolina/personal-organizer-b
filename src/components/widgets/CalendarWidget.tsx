@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -23,7 +24,7 @@ import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
 
 interface CalendarWidgetProps {
   events: CalendarEvent[];
-  onUpdate: (events: CalendarEvent[]) => void;
+  onUpdate: (mutation: CollectionMutation<CalendarEvent>) => void;
   aiState?: WidgetAIState;
   onAIStateChange: (state: WidgetAIState) => void;
   onRemove: () => void;
@@ -49,6 +50,25 @@ const eventTypes: { value: CalendarEntryType; label: string }[] = [
   { value: 'occasion', label: 'Occasion' },
 ];
 
+const SYNC_TOKEN_SESSION_KEY = 'family-calendar-sync-token';
+
+function isTrustedSyncUrl(apiBaseUrl: string): boolean {
+  try {
+    const parsed = new URL(apiBaseUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    if (parsed.protocol === 'https:') return true;
+    const isLocal =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.localhost');
+    return parsed.protocol === 'http:' && isLocal;
+  } catch {
+    return false;
+  }
+}
+
 export function CalendarWidget({
   events,
   onUpdate,
@@ -61,7 +81,8 @@ export function CalendarWidget({
   size,
   onSizeChange,
 }: CalendarWidgetProps) {
-  const [, setPlannerEvents] = useLocalStorageState<FamilyCalendarPlannerEvent[]>('family-calendar-planner-events', []);
+  const [externalSyncEnabled, setExternalSyncEnabled] = useLocalStorageState<boolean>('family-calendar-sync-enabled', false);
+  const [externalSyncConsent, setExternalSyncConsent] = useLocalStorageState<boolean>('family-calendar-sync-consent', false);
   const [showDialog, setShowDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -82,26 +103,37 @@ export function CalendarWidget({
   const [location, setLocation] = useState('');
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(true);
-  const importInputRef = useRef<HTMLInputElement>(null);
+  const [showSyncConsentDialog, setShowSyncConsentDialog] = useState(false);
+  const apiBaseUrl = import.meta.env.VITE_FAMILY_CALENDAR_API_URL as string | undefined;
+  const hasExternalSyncEndpoint = Boolean(apiBaseUrl?.trim());
 
   useEffect(() => {
     const checkReminders = () => {
       const now = Date.now();
-      events.forEach((event) => {
-        if (event.reminder && !event.reminderSent) {
-          const reminderTime = event.date - event.reminder * 60 * 1000;
-          if (now >= reminderTime && now < event.date) {
-            toast.info(`Reminder: ${event.title}`, {
-              description: event.startTime ? `Starting at ${event.startTime}` : 'Event coming up',
-              duration: 10000,
-            });
-            onUpdate(
-              events.map((e) =>
-                e.id === event.id ? { ...e, reminderSent: true } : e
-              )
-            );
+      if (
+        !events.some((event) => {
+          if (!event.reminder || event.reminderSent) {
+            return false;
           }
-        }
+
+          const reminderTime = event.date - event.reminder * 60 * 1000;
+          return now >= reminderTime && now < event.date;
+        })
+      ) {
+        return;
+      }
+
+      let triggered: CalendarEvent[] = [];
+      onUpdate((currentEvents) => {
+        const result = processCalendarReminders(currentEvents, now);
+        triggered = result.triggered;
+        return result.events;
+      });
+      triggered.forEach((event) => {
+        toast.info(`Reminder: ${event.title}`, {
+          description: event.startTime ? `Starting at ${event.startTime}` : 'Event coming up',
+          duration: 10000,
+        });
       });
     };
 
@@ -179,23 +211,65 @@ export function CalendarWidget({
     };
   };
 
+  const handleExternalSyncToggle = (enabled: boolean) => {
+    if (!enabled) {
+      setExternalSyncEnabled(false);
+      return;
+    }
+
+    if (!hasExternalSyncEndpoint) {
+      toast.error('External sync endpoint is not configured');
+      return;
+    }
+    if (!apiBaseUrl || !isTrustedSyncUrl(apiBaseUrl)) {
+      toast.error('External sync requires HTTPS (HTTP allowed only on localhost)');
+      return;
+    }
+
+    if (!externalSyncConsent) {
+      setShowSyncConsentDialog(true);
+      return;
+    }
+
+    setExternalSyncEnabled(true);
+    toast.success('External sync enabled');
+  };
+
+  const confirmExternalSyncConsent = () => {
+    setExternalSyncConsent(true);
+    setExternalSyncEnabled(true);
+    setShowSyncConsentDialog(false);
+    toast.success('External sync enabled');
+  };
+
   const syncFamilyCalendarPlanner = async (calendarEvents: CalendarEvent[]) => {
     const mappedEvents = calendarEvents.map(mapToFamilyCalendarPlannerEvent);
-    setPlannerEvents(mappedEvents);
-
-    const apiBaseUrl = import.meta.env.VITE_FAMILY_CALENDAR_API_URL;
-    if (!apiBaseUrl) return;
+    if (!externalSyncEnabled || !externalSyncConsent || !apiBaseUrl) return;
+    if (!isTrustedSyncUrl(apiBaseUrl)) {
+      toast.error('Unsafe sync URL blocked. Use HTTPS (or localhost in development).');
+      return;
+    }
+    const token = window.sessionStorage.getItem(SYNC_TOKEN_SESSION_KEY);
+    if (!token) {
+      toast.error(`External sync requires a short-lived access token in sessionStorage key "${SYNC_TOKEN_SESSION_KEY}".`);
+      return;
+    }
 
     try {
       const response = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/events/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Organizer-Session-Token': token,
         },
         body: JSON.stringify({ events: mappedEvents }),
       });
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          toast.error('Calendar sync authentication failed. Refresh your short-lived token and try again.');
+          return;
+        }
         throw new Error(`Sync failed with status ${response.status}`);
       }
     } catch {
@@ -250,47 +324,6 @@ export function CalendarWidget({
     toast.success('Event deleted');
     setShowDialog(false);
     resetForm();
-  };
-
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!importInputRef.current) return;
-    importInputRef.current.value = '';
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const text = loadEvent.target?.result;
-      if (typeof text !== 'string') return;
-
-      const drafts = parseICalText(text);
-      if (drafts.length === 0) {
-        toast.info('No events found in the selected file');
-        return;
-      }
-
-      let added = 0;
-      let updatedEvents = [...events];
-      for (const draft of drafts) {
-        const result = appendImportedCalendarEvent(updatedEvents, draft);
-        if (result.added) {
-          updatedEvents = result.events;
-          added++;
-        }
-      }
-
-      onUpdate(updatedEvents);
-      void syncFamilyCalendarPlanner(updatedEvents);
-
-      if (added === 0) {
-        toast.info('All events in the file are already imported');
-      } else {
-        toast.success(`Imported ${added} event${added !== 1 ? 's' : ''} from ${file.name}`);
-      }
-    };
-    // iCal files are UTF-8 in modern clients; legacy Latin-1 files from older
-    // Outlook exports are not supported and will render non-ASCII chars incorrectly.
-    reader.readAsText(file);
   };
 
   const monthStart = startOfMonth(currentMonth);
@@ -384,7 +417,7 @@ export function CalendarWidget({
     return `${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}`;
   };
 
-  const monthEvents = useMemo(() => {
+  const getEventsForMonth = () => {
     const monthStartDate = startOfMonth(currentMonth);
     const monthEndDate = endOfMonth(currentMonth);
 
@@ -394,9 +427,9 @@ export function CalendarWidget({
         return eventDate >= monthStartDate && eventDate <= monthEndDate;
       })
       .sort((a, b) => a.date - b.date);
-  }, [currentMonth, events]);
+  };
 
-  const weekEvents = useMemo(() => {
+  const getEventsForWeek = () => {
     const weekStartDate = startOfWeek(currentWeek);
     const weekEndDate = endOfWeek(currentWeek);
 
@@ -406,9 +439,9 @@ export function CalendarWidget({
         return eventDate >= weekStartDate && eventDate <= weekEndDate;
       })
       .sort((a, b) => a.date - b.date);
-  }, [currentWeek, events]);
+  };
 
-  const dayEvents = useMemo(() => {
+  const getEventsForDay = () => {
     const dayStartDate = startOfDay(currentDay);
     const dayEndDate = endOfDay(currentDay);
 
@@ -503,6 +536,40 @@ export function CalendarWidget({
       )}
 
       <div className="space-y-4">
+        {hasExternalSyncEndpoint && (
+          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium text-foreground">External calendar sync</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Sends title, description, date/time, location, reminders, and attendee metadata to your configured API.
+                </p>
+              </div>
+              <Switch checked={externalSyncEnabled} onCheckedChange={handleExternalSyncToggle} />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {`Production endpoints must use HTTPS. A short-lived token is required in sessionStorage key "${SYNC_TOKEN_SESSION_KEY}".`}
+            </p>
+          </div>
+        )}
+
+        <AlertDialog open={showSyncConsentDialog} onOpenChange={setShowSyncConsentDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Enable external calendar sync?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This sends event title, description, date/time, location, reminders, and attendee metadata to your configured sync API.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmExternalSyncConsent}>
+                I understand, enable sync
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Button
@@ -553,23 +620,6 @@ export function CalendarWidget({
               <Plus size={14} />
               <span className="hidden sm:inline">Add</span>
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 h-7 text-xs flex-shrink-0"
-              onClick={() => importInputRef.current?.click()}
-              title="Import events from an iCal (.ics) file"
-            >
-              <UploadSimple size={14} />
-              <span className="hidden sm:inline">Import</span>
-            </Button>
-            <input
-              ref={importInputRef}
-              type="file"
-              accept=".ics,text/calendar"
-              className="hidden"
-              onChange={handleImportFile}
-            />
           </div>
         </div>
 
@@ -946,12 +996,12 @@ export function CalendarWidget({
                   </div>
                 </div>
                 
-                {allDayEvents.length > 0 && (
+                {dayEvents.filter(e => !e.startTime).length > 0 && (
                   <div className="mt-4 space-y-2">
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       All-Day Events
                     </h4>
-                    {allDayEvents.map((event) => (
+                    {dayEvents.filter(e => !e.startTime).map((event) => (
                       <div
                         key={event.id}
                         onClick={() => openEditDialog(event)}
@@ -1053,15 +1103,15 @@ export function CalendarWidget({
             <h4 className="font-semibold text-sm text-foreground">
               Events & Plans - {viewMode === 'month' ? format(currentMonth, 'MMMM yyyy') : viewMode === 'week' ? `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}` : format(currentDay, 'MMMM d, yyyy')}
             </h4>
-            {visibleRangeEvents.length > 0 && (
+            {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length > 0 && (
               <Badge variant="outline" className="text-xs">
-                {visibleRangeEvents.length} {visibleRangeEvents.length === 1 ? 'event' : 'events'}
+                {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length} {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length === 1 ? 'event' : 'events'}
               </Badge>
             )}
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             <AnimatePresence>
-              {visibleRangeEvents.length === 0 ? (
+              {(viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -1079,7 +1129,7 @@ export function CalendarWidget({
                   </p>
                 </motion.div>
               ) : (
-                visibleRangeEvents.map((event) => (
+                (viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents).map((event) => (
                   <motion.div
                     key={event.id}
                     initial={{ opacity: 0, y: -10 }}

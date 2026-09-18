@@ -14,16 +14,6 @@ import { Slider } from '@/components/ui/slider';
 import { Palette, Check, Trash, Upload } from '@phosphor-icons/react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { toast } from 'sonner';
-import { BackgroundImage } from '@/types';
-import { useStoredMediaUrl } from '@/hooks/useStoredMediaUrl';
-import {
-  createMediaId,
-  deleteMedia,
-  formatPersistenceIssue,
-  hasLegacyBackgroundImagePayload,
-  migrateLegacyBackgroundImage,
-  saveMedia,
-} from '@/lib/persistence';
 
 interface ThemePreset {
   name: string;
@@ -269,11 +259,11 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     root.style.setProperty('--background', bgOklch);
   };
 
-  const applyBackgroundImage = (image: BackgroundImage | null, resolvedUrl: string | null) => {
+  const applyBackgroundImage = (image: BackgroundImage | null) => {
     const appContainer = document.querySelector('.min-h-screen');
     if (appContainer instanceof HTMLElement) {
-      if (image && resolvedUrl) {
-        appContainer.style.backgroundImage = `url(${resolvedUrl})`;
+      if (image) {
+        appContainer.style.backgroundImage = `url(${image.url})`;
         appContainer.style.backgroundSize = 'cover';
         appContainer.style.backgroundPosition = 'center';
         appContainer.style.backgroundAttachment = 'fixed';
@@ -303,10 +293,6 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
       }
     }
   };
-
-  useEffect(() => {
-    applyBackgroundImage(backgroundImage, resolvedBackgroundUrl);
-  }, [backgroundImage, resolvedBackgroundUrl]);
 
   const handleThemeSelect = (themeName: string) => {
     const theme = themePresets.find((t) => t.name === themeName);
@@ -350,7 +336,7 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     toast.success('Custom colors applied!');
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -358,26 +344,18 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
         return;
       }
 
-      const nextMediaId = createMediaId('theme-background');
-      const previousMediaId = backgroundImage?.mediaId;
-
-      try {
-        await saveMedia({ id: nextMediaId, kind: 'theme-background', blob: file });
-        setBackgroundImage({
-          mediaId: nextMediaId,
-          opacity,
-        });
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const imageUrl = event.target?.result as string;
+        const newBgImage: BackgroundImage = {
+          url: imageUrl,
+          opacity: opacity,
+        };
+        setBackgroundImage(newBgImage);
+        applyBackgroundImage(newBgImage);
         toast.success('Background image uploaded!');
-        if (previousMediaId) {
-          void deleteMedia(previousMediaId).catch(() => {
-            toast.error('Background image changed, but the previous stored image could not be cleaned up.');
-          });
-        }
-      } catch {
-        toast.error('Could not save background image. Please try again.');
-      } finally {
-        e.target.value = '';
-      }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -385,20 +363,16 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     const newOpacity = value[0];
     setOpacity(newOpacity);
     if (backgroundImage) {
-      setBackgroundImage((current) => current ? { ...current, opacity: newOpacity } : current);
+      const updated = { ...backgroundImage, opacity: newOpacity };
+      setBackgroundImage(updated);
+      applyBackgroundImage(updated);
     }
   };
 
-  const handleRemoveImage = async () => {
-    try {
-      if (backgroundImage?.mediaId) {
-        await deleteMedia(backgroundImage.mediaId);
-      }
-      setBackgroundImage(null);
-      toast.success('Background image removed');
-    } catch {
-      toast.error('Could not remove background image. Please try again.');
-    }
+  const handleRemoveImage = () => {
+    setBackgroundImage(null);
+    applyBackgroundImage(null);
+    toast.success('Background image removed');
   };
 
   return (
@@ -593,7 +567,7 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
                 <div className="space-y-4">
                   <div className="relative rounded-lg overflow-hidden border-2 border-border">
                     <img 
-                      src={resolvedBackgroundUrl ?? ''} 
+                      src={backgroundImage.url} 
                       alt="Background preview" 
                       className="w-full h-48 object-cover"
                     />
@@ -602,9 +576,6 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
                       style={{ opacity: backgroundImage.opacity / 100 }}
                     />
                   </div>
-                  {isBackgroundMissing && (
-                    <p className="text-sm text-destructive">The saved background image is unavailable.</p>
-                  )}
 
                   <div className="space-y-3">
                     <Label htmlFor="opacity-slider" className="text-base font-medium">
@@ -711,10 +682,10 @@ export function ThemeCustomizationButton() {
   }, [selectedTheme, customColors]);
 
   useEffect(() => {
-    if (backgroundImage && resolvedBackgroundUrl) {
+    if (backgroundImage) {
       const appContainer = document.querySelector('.min-h-screen');
       if (appContainer instanceof HTMLElement) {
-        appContainer.style.backgroundImage = `url(${resolvedBackgroundUrl})`;
+        appContainer.style.backgroundImage = `url(${backgroundImage.url})`;
         appContainer.style.backgroundSize = 'cover';
         appContainer.style.backgroundPosition = 'center';
         appContainer.style.backgroundAttachment = 'fixed';
@@ -736,44 +707,8 @@ export function ThemeCustomizationButton() {
         }
         overlay.style.opacity = (backgroundImage.opacity / 100).toString();
       }
-    } else {
-      const appContainer = document.querySelector('.min-h-screen');
-      if (appContainer instanceof HTMLElement) {
-        appContainer.style.backgroundImage = '';
-        const overlay = appContainer.querySelector('.bg-overlay');
-        if (overlay) {
-          overlay.remove();
-        }
-      }
     }
-  }, [backgroundImage, resolvedBackgroundUrl]);
-
-  useEffect(() => {
-    if (!hasLegacyBackgroundImagePayload(backgroundImage)) {
-      return;
-    }
-
-    let cancelled = false;
-
-    void (async () => {
-      if (!backgroundImage) return;
-      const migration = await migrateLegacyBackgroundImage(backgroundImage);
-      if (cancelled) return;
-
-      if (migration.migrated) {
-        setBackgroundImage(migration.value);
-      }
-
-      if (migration.issue && !migrationErrorShownRef.current) {
-        migrationErrorShownRef.current = true;
-        toast.error(`${formatPersistenceIssue(migration.issue)} Original image was kept.`);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [backgroundImage, setBackgroundImage]);
+  }, [backgroundImage]);
 
   return (
     <>

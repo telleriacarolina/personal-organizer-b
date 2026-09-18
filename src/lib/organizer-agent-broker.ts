@@ -1711,7 +1711,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'goals.set_status': (input, context) => {
     const auditId = createAuditId();
     assertString(input.goalId, 'goalId', { required: true, max: 120 });
-    assertOptionalBoolean(input.completed, 'completed');
+    assertRequiredBoolean(input.completed, 'completed');
     const match = findGoal(context.widgets, input.goalId);
     if (!match) return createResponse(auditId, 'Goal not found.', { ok: false });
     const goal = { ...match.goal, completed: Boolean(input.completed) };
@@ -1985,25 +1985,20 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
         affectedResourceIds: [workWidget.id, calendarWidget.id],
       });
     }
-    let createdEvent: CalendarEvent | undefined;
-    context.updateWidgets((widgets) =>
-      widgets.map((candidate) => {
-        if (candidate.id !== calendarWidget.id || candidate.type !== 'calendar') return candidate;
-        const result = appendImportedCalendarEvent(candidate.events, draft);
-        if (!result.added) {
-          createdEvent = undefined;
-          return candidate;
-        }
-        createdEvent = result.events[result.events.length - 1];
-        return { ...candidate, events: result.events };
-      }),
-    );
-    if (!createdEvent) {
+    const importResult = appendImportedCalendarEvent(calendarWidget.events, draft);
+    if (!importResult.added) {
       return createResponse(auditId, 'The selected work item is already in that calendar.', {
         ok: false,
         affectedResourceIds: [calendarWidget.id],
       });
     }
+    const createdEvent = importResult.events[importResult.events.length - 1];
+    context.updateWidgets((widgets) =>
+      widgets.map((candidate) => {
+        if (candidate.id !== calendarWidget.id || candidate.type !== 'calendar') return candidate;
+        return { ...candidate, events: importResult.events };
+      }),
+    );
     return createResponse(auditId, `Published "${createdEvent.title}" to Calendar.`, {
       data: { event: createdEvent },
       affectedResourceIds: [createdEvent.id],
@@ -2273,7 +2268,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
       duration: match.record.duration,
       transcription: match.record.transcription,
       createdAt: match.record.createdAt,
-      hasMedia: Boolean(match.record.dataUrl),
+      hasMedia: Boolean(match.record.mediaId || match.record.dataUrl),
     };
     return createResponse(auditId, `Loaded metadata for "${match.record.title}".`, {
       data: { record },
