@@ -496,7 +496,9 @@ export function ShoppingWidget({
     };
   };
 
-  const comparisonData = getComparisonData();
+  const comparisonData = showAnalyticsDialog
+    ? getComparisonData()
+    : { currentTotal: 0, previousTotal: 0, currentTrips: 0, previousTrips: 0, categorySpending: {}, percentageChange: 0 };
 
   const getSimilarTrips = (trip: ShoppingTrip) => {
     const tripDate = new Date(trip.date);
