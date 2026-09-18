@@ -867,7 +867,7 @@ export function ShoppingWidget({
                       placeholder="Enter barcode..."
                       value={barcodeInput}
                       onChange={(e) => setBarcodeInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleBarcodeSubmit()}
+                      onKeyDown={(e) => e.key === 'Enter' && handleBarcodeSubmit()}
                     />
                     <Button size="icon" variant="outline" title="Scan with camera">
                       <Scan size={18} />
