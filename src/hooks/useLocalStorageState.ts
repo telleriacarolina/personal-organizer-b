@@ -39,6 +39,20 @@ export function useLocalStorageState<T>(key: string, initialValue: T) {
     if (typeof window === 'undefined') {
       return;
     }
+
+    const serializedValue = window.localStorage.getItem(key);
+    if (serializedValue === null) {
+      latestSerializedRef.current = null;
+      return;
+    }
+
+    latestSerializedRef.current = serializedValue;
+  }, [key]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
       return;

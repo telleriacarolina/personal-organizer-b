@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,6 +26,8 @@ interface NotesWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
 export function NotesWidget({
@@ -40,6 +42,8 @@ export function NotesWidget({
   onDragEnd,
   size,
   onSizeChange,
+  snapToGrid,
+  globalLock,
 }: NotesWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -65,8 +69,9 @@ export function NotesWidget({
     onUpdate(updateNoteCommand(notes, id, title, content));
   };
 
-  const aiInput = { notes };
-  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+  const aiInput = useMemo(() => ({ notes }), [notes]);
+  const aiInputHash = useMemo(() => buildAIInputHash(aiInput), [aiInput]);
+  const isAIStale = aiState ? aiState.sourceHash !== aiInputHash : false;
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;
@@ -112,6 +117,8 @@ export function NotesWidget({
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="notes"
     >
       <div className="space-y-3">

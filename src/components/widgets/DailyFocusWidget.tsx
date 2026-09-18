@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,8 @@ interface DailyFocusWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
 const priorityWeight: Record<'low' | 'medium' | 'high', number> = {
@@ -61,6 +63,8 @@ export function DailyFocusWidget({
   onDragEnd,
   size,
   onSizeChange,
+  snapToGrid,
+  globalLock,
 }: DailyFocusWidgetProps) {
   const today = dateKey(new Date());
   const [quickTaskTitle, setQuickTaskTitle] = useState('');
@@ -89,30 +93,38 @@ export function DailyFocusWidget({
     [selectedSource]
   );
 
-  const isOverdue = (task: DailyFocusItem) => !!task.dueDate && task.dueDate < today;
+  const isOverdue = useCallback((task: DailyFocusItem) => !!task.dueDate && task.dueDate < today, [today]);
 
-  const sortByPriorityThenDate = (a: DailyFocusItem, b: DailyFocusItem) => {
+  const sortByPriorityThenDate = useCallback((a: DailyFocusItem, b: DailyFocusItem) => {
     const priorityDelta = priorityWeight[a.priority] - priorityWeight[b.priority];
     if (priorityDelta !== 0) return priorityDelta;
     if (!a.dueDate && !b.dueDate) return 0;
     if (!a.dueDate) return 1;
     if (!b.dueDate) return -1;
     return a.dueDate.localeCompare(b.dueDate);
-  };
+  }, []);
 
-  const incompleteTasks = normalizedTasks.filter((task) => !task.completed);
-  const completedTaskCount = normalizedTasks.filter((task) => task.completed).length;
-  const completedTasks = normalizedTasks.filter((task) => task.completed).sort(sortByPriorityThenDate).slice(0, 5);
-  const overdueTasks = incompleteTasks.filter(isOverdue).sort(sortByPriorityThenDate);
-  const todayTasks = incompleteTasks
-    .filter((task) => task.dueDate === today && !isOverdue(task))
-    .sort(sortByPriorityThenDate);
-  const fallbackTasks = incompleteTasks
-    .filter((task) => !isOverdue(task) && task.dueDate !== today)
-    .sort(sortByPriorityThenDate);
-  const focusTasks = (todayTasks.length > 0 ? todayTasks : fallbackTasks).slice(0, 8);
-  const aiInput = { tasks: selectedSource?.tasks ?? [] };
-  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+  const { completedTaskCount, completedTasks, overdueTasks, focusTasks } = useMemo(() => {
+    const completed = normalizedTasks.filter((task) => task.completed);
+    const incomplete = normalizedTasks.filter((task) => !task.completed);
+    const overdue = incomplete.filter(isOverdue).sort(sortByPriorityThenDate);
+    const todayList = incomplete
+      .filter((task) => task.dueDate === today && !isOverdue(task))
+      .sort(sortByPriorityThenDate);
+    const fallback = incomplete
+      .filter((task) => !isOverdue(task) && task.dueDate !== today)
+      .sort(sortByPriorityThenDate);
+
+    return {
+      completedTaskCount: completed.length,
+      completedTasks: completed.sort(sortByPriorityThenDate).slice(0, 5),
+      overdueTasks: overdue,
+      focusTasks: (todayList.length > 0 ? todayList : fallback).slice(0, 8),
+    };
+  }, [isOverdue, normalizedTasks, sortByPriorityThenDate, today]);
+  const aiInput = useMemo(() => ({ tasks: selectedSource?.tasks ?? [] }), [selectedSource]);
+  const aiInputHash = useMemo(() => buildAIInputHash(aiInput), [aiInput]);
+  const isAIStale = aiState ? aiState.sourceHash !== aiInputHash : false;
 
   const handleQuickAdd = () => {
     if (!selectedSourceId) {
@@ -175,6 +187,8 @@ export function DailyFocusWidget({
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="daily-focus"
     >
       <div className="space-y-3">

@@ -18,9 +18,11 @@ interface GoalsWidgetProps {
   onDragEnd?: () => void;
   size?: WidgetSize;
   onSizeChange?: (size: WidgetSize) => void;
+  snapToGrid?: boolean;
+  globalLock?: boolean;
 }
 
-export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange }: GoalsWidgetProps) {
+export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, onDragEnd, size, onSizeChange, snapToGrid, globalLock }: GoalsWidgetProps) {
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -52,6 +54,8 @@ export function GoalsWidget({ goals, onUpdate, onRemove, widgetId, onDragStart, 
       onDragEnd={onDragEnd}
       size={size}
       onSizeChange={onSizeChange}
+      snapToGrid={snapToGrid}
+      globalLock={globalLock}
       widgetType="goals"
     >
       {!showNew && (

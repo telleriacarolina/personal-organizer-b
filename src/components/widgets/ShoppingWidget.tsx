@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfDay, startOfMonth, startOfYear, subDays, subMonths, subYears, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { reduceShoppingWidget, type ShoppingDomainAction } from '@/lib/domain/shopping-domain';
 import { createMediaId, saveMedia } from '@/lib/persistence';
 
 type ShoppingWidgetData = {
@@ -134,6 +135,28 @@ export function ShoppingWidget({
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(true);
 
+  const applyShoppingDomainAction = (action: ShoppingDomainAction) => {
+    const currentWidgetState = {
+      id: widgetId,
+      type: 'shopping' as const,
+      position: 0,
+      items,
+      budget,
+      receipts,
+      trips,
+      reminders,
+    };
+
+    const nextState = reduceShoppingWidget(currentWidgetState, action);
+    onUpdate({
+      items: nextState.items,
+      budget: nextState.budget,
+      receipts: nextState.receipts,
+      trips: nextState.trips,
+      reminders: nextState.reminders,
+    });
+  };
+
   const addItem = () => {
     if (newItemName.trim()) {
       const item: PersonalShoppingItem = {
@@ -147,6 +170,7 @@ export function ShoppingWidget({
         priority: selectedPriority,
         createdAt: Date.now(),
       };
+      applyShoppingDomainAction({ type: 'set-items', payload: [...items, item] });
       onUpdate((current) => ({ items: [...current.items, item] }));
       setNewItemName('');
       setNewItemQuantity('');
@@ -173,6 +197,7 @@ export function ShoppingWidget({
         createdAt: Date.now(),
       };
 
+      applyShoppingDomainAction({ type: 'set-items', payload: [...items, item] });
       onUpdate((current) => ({ items: [...current.items, item] }));
       toast.success(`Added Barcode ${barcodeValue}`);
       setBarcodeInput('');
@@ -331,6 +356,16 @@ export function ShoppingWidget({
   };
 
   const togglePurchased = (id: string) => {
+    applyShoppingDomainAction({
+      type: 'set-items',
+      payload: items.map((item) =>
+        item.id === id ? { ...item, purchased: !item.purchased, purchasedAt: !item.purchased ? Date.now() : undefined } : item,
+      ),
+    });
+  };
+
+  const deleteItem = (id: string) => {
+    applyShoppingDomainAction({ type: 'set-items', payload: items.filter((item) => item.id !== id) });
     onUpdate((current) => ({
       items: current.items.map((item) =>
         item.id === id ? { ...item, purchased: !item.purchased, purchasedAt: !item.purchased ? Date.now() : undefined } : item
@@ -345,7 +380,7 @@ export function ShoppingWidget({
 
   const updateBudget = () => {
     const newBudget = budgetInput ? parseFloat(budgetInput) : undefined;
-    onUpdate({ budget: newBudget });
+    applyShoppingDomainAction({ type: 'set-budget', payload: newBudget });
     toast.success(newBudget ? `Budget set to $${newBudget.toFixed(2)}` : 'Budget cleared');
   };
 
@@ -355,53 +390,68 @@ export function ShoppingWidget({
     }
   };
 
-  const totalEstimated = items.reduce((sum, item) => 
-    !item.purchased && item.estimatedPrice ? sum + item.estimatedPrice : sum, 0
-  );
+  const {
+    totalEstimated,
+    totalSpent,
+    groupedByCategory,
+    groupedByStore,
+    unpurchasedItems,
+    purchasedItems,
+  } = useMemo(() => {
+    const estimated = items.reduce((sum, item) =>
+      !item.purchased && item.estimatedPrice ? sum + item.estimatedPrice : sum, 0
+    );
 
-  const totalSpent = items.reduce((sum, item) => 
-    item.purchased && (item.actualPrice || item.estimatedPrice) 
-      ? sum + (item.actualPrice || item.estimatedPrice || 0) 
-      : sum, 
-    0
-  );
+    const spent = items.reduce((sum, item) =>
+      item.purchased && (item.actualPrice || item.estimatedPrice)
+        ? sum + (item.actualPrice || item.estimatedPrice || 0)
+        : sum,
+      0
+    );
 
-  const sortedItems = [...items].sort((a, b) => {
-    switch (sortBy) {
-      case 'priority': {
-        const priorityOrder = { high: 0, medium: 1, low: 2 };
-        return priorityOrder[a.priority] - priorityOrder[b.priority];
+    const sorted = [...items].sort((a, b) => {
+      switch (sortBy) {
+        case 'priority': {
+          const priorityOrder = { high: 0, medium: 1, low: 2 };
+          return priorityOrder[a.priority] - priorityOrder[b.priority];
+        }
+        case 'category':
+          return a.category.localeCompare(b.category);
+        case 'price':
+          return (b.estimatedPrice || 0) - (a.estimatedPrice || 0);
+        default:
+          return a.name.localeCompare(b.name);
       }
-      case 'category':
-        return a.category.localeCompare(b.category);
-      case 'price':
-        return (b.estimatedPrice || 0) - (a.estimatedPrice || 0);
-      default:
-        return a.name.localeCompare(b.name);
-    }
-  });
+    });
 
-  const filteredItems = filterCategory === 'all' 
-    ? sortedItems 
-    : sortedItems.filter(item => item.category === filterCategory);
+    const filtered = filterCategory === 'all'
+      ? sorted
+      : sorted.filter(item => item.category === filterCategory);
 
-  const groupedByCategory = filteredItems.reduce((acc, item) => {
-    if (!acc[item.category]) acc[item.category] = [];
-    acc[item.category].push(item);
-    return acc;
-  }, {} as Record<ShoppingCategory, PersonalShoppingItem[]>);
+    const categoryGroups = filtered.reduce((acc, item) => {
+      if (!acc[item.category]) acc[item.category] = [];
+      acc[item.category].push(item);
+      return acc;
+    }, {} as Record<ShoppingCategory, PersonalShoppingItem[]>);
 
-  const groupedByStore = filteredItems.reduce((acc, item) => {
-    const store = item.store || 'Unassigned';
-    if (!acc[store]) acc[store] = [];
-    acc[store].push(item);
-    return acc;
-  }, {} as Record<string, PersonalShoppingItem[]>);
+    const storeGroups = filtered.reduce((acc, item) => {
+      const store = item.store || 'Unassigned';
+      if (!acc[store]) acc[store] = [];
+      acc[store].push(item);
+      return acc;
+    }, {} as Record<string, PersonalShoppingItem[]>);
 
-  const unpurchasedItems = filteredItems.filter(item => !item.purchased);
-  const purchasedItems = filteredItems.filter(item => item.purchased);
+    return {
+      totalEstimated: estimated,
+      totalSpent: spent,
+      groupedByCategory: categoryGroups,
+      groupedByStore: storeGroups,
+      unpurchasedItems: filtered.filter(item => !item.purchased),
+      purchasedItems: filtered.filter(item => item.purchased),
+    };
+  }, [filterCategory, items, sortBy]);
 
-  const getComparisonData = () => {
+  const getComparisonData = useCallback(() => {
     const now = Date.now();
     let currentPeriodStart: number;
     let previousPeriodStart: number;
@@ -465,9 +515,21 @@ export function ShoppingWidget({
       categorySpending,
       percentageChange: previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0,
     };
-  };
+  }, [comparisonPeriod, receipts, trips]);
 
-  const comparisonData = getComparisonData();
+  const comparisonData = useMemo(() => {
+    if (!showAnalyticsDialog) {
+      return {
+        currentTotal: 0,
+        previousTotal: 0,
+        currentTrips: 0,
+        previousTrips: 0,
+        categorySpending: {} as Record<string, { current: number; previous: number }>,
+        percentageChange: 0,
+      };
+    }
+    return getComparisonData();
+  }, [getComparisonData, showAnalyticsDialog]);
 
   const getSimilarTrips = (trip: ShoppingTrip) => {
     const tripDate = new Date(trip.date);
@@ -715,21 +777,13 @@ export function ShoppingWidget({
             : reminder
         ),
       }));
-    }
-  }, [activeReminders, onUpdate]);
-      onUpdate({
-        reminders: reminders.map(r => 
-          activeReminders.find(ar => ar.id === r.id)
-            ? { ...r, lastTriggered: Date.now() }
-            : r
-        )
-      });
       setActiveReminders([]);
     }
-  }, [activeReminders, onUpdate, reminders]);
+  }, [activeReminders, onUpdate]);
 
-  const aiInput = { items, budget, receipts, trips, reminders };
-  const isAIStale = aiState ? aiState.sourceHash !== buildAIInputHash(aiInput) : false;
+  const aiInput = useMemo(() => ({ items, budget, receipts, trips, reminders }), [items, budget, receipts, trips, reminders]);
+  const aiInputHash = useMemo(() => buildAIInputHash(aiInput), [aiInput]);
+  const isAIStale = aiState ? aiState.sourceHash !== aiInputHash : false;
 
   const updateInsightStatus = (insightId: string, status: 'applied' | 'dismissed') => {
     if (!aiState) return;
@@ -827,7 +881,7 @@ export function ShoppingWidget({
                       placeholder="Enter barcode..."
                       value={barcodeInput}
                       onChange={(e) => setBarcodeInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleBarcodeSubmit()}
+                      onKeyDown={(e) => e.key === 'Enter' && handleBarcodeSubmit()}
                     />
                     <Button size="icon" variant="outline" title="Scan with camera">
                       <Scan size={18} />
@@ -1451,7 +1505,7 @@ export function ShoppingWidget({
               placeholder="Item name..."
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               className="h-9"
             />
           </div>
@@ -1460,7 +1514,7 @@ export function ShoppingWidget({
               placeholder="Qty"
               value={newItemQuantity}
               onChange={(e) => setNewItemQuantity(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               className="h-9"
             />
           </div>
@@ -1471,7 +1525,7 @@ export function ShoppingWidget({
               step="0.01"
               value={newItemPrice}
               onChange={(e) => setNewItemPrice(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               className="h-9"
             />
           </div>
@@ -1493,7 +1547,7 @@ export function ShoppingWidget({
             placeholder="Store (optional)"
             value={selectedStore}
             onChange={(e) => setSelectedStore(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             className="w-36 h-9"
           />
 
