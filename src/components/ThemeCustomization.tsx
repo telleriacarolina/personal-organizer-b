@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Palette, Check, Trash, Upload } from '@phosphor-icons/react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
+import { useStoredMediaUrl } from '@/hooks/useStoredMediaUrl';
 import { toast } from 'sonner';
 
 interface ThemePreset {
