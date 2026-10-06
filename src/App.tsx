@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useLocalStorageState } from '@/hooks/useLocalStorageState';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen, Trash } from '@phosphor-icons/react';
@@ -19,25 +18,15 @@ import { WorkWidget } from '@/components/widgets/WorkWidget';
 import { ShoppingWidget } from '@/components/widgets/ShoppingWidget';
 import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
 import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
-import { Widget, WidgetAIState, WidgetType } from '@/types';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import type { AgentContext } from '@/types/agent';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { createId } from '@/lib/id';
+import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
+import { stateRepositories } from '@/lib/persistence';
 import {
-  formatPersistenceIssue,
-  hasLegacyWidgetMediaPayload,
-  migrateWidgetsMedia,
-  preferencesRepository,
-  stateRepositories,
-  subscribeToPersistenceIssues,
-} from '@/lib/persistence';
-import {
-  addCalendarImport as addCalendarImportCommand,
   addTaskToSource as addTaskToSourceCommand,
   clearWidgetAIState,
-  createWidget,
-  createWorkWidget,
   removeWidget as removeWidgetCommand,
-  reorderWidgets,
   saveWidgetAIState,
   toggleTaskInSource as toggleTaskInSourceCommand,
   updateDailyFocusSourceWidget as updateDailyFocusSourceWidgetCommand,
@@ -45,7 +34,9 @@ import {
   updateWidget as updateWidgetCommand,
   updateWidgetSize as updateWidgetSizeCommand,
 } from '@/lib/organizer-commands';
-import type { AgentPermission } from '@/types/agent';
+import { type AgentContext, type AgentPermission } from '@/types/agent';
+import type { CalendarImportDraft } from '@/lib/calendar-imports';
+import type { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 
 function App() {
   const [widgets, setWidgets] = usePersistentState(stateRepositories.widgets, []);
@@ -255,10 +246,6 @@ function App() {
         .map((widget) => ({ id: widget.id })),
     [currentWidgets]
   );
-
-  const updateWidgetsForAgent = useCallback((updater: (widgets: Widget[]) => Widget[]) => {
-    setWidgets((current) => updater(current || []));
-  }, [setWidgets]);
 
   const agentPermissions = useMemo(
     () => Array.from(new Set(getOrganizerAgentToolSchemas().flatMap((schema) => schema.permissions))),

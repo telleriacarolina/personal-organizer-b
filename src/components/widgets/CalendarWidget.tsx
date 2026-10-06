@@ -429,6 +429,8 @@ export function CalendarWidget({
       .sort((a, b) => a.date - b.date);
   };
 
+  const monthEvents = useMemo(() => getEventsForMonth(), [currentMonth, events]);
+
   const getEventsForWeek = () => {
     const weekStartDate = startOfWeek(currentWeek);
     const weekEndDate = endOfWeek(currentWeek);
@@ -441,6 +443,8 @@ export function CalendarWidget({
       .sort((a, b) => a.date - b.date);
   };
 
+  const weekEvents = useMemo(() => getEventsForWeek(), [currentWeek, events]);
+
   const getEventsForDay = () => {
     const dayStartDate = startOfDay(currentDay);
     const dayEndDate = endOfDay(currentDay);
@@ -451,7 +455,9 @@ export function CalendarWidget({
         return eventDate >= dayStartDate && eventDate <= dayEndDate;
       })
       .sort(compareEventsForDay);
-  }, [compareEventsForDay, currentDay, events]);
+  };
+
+  const dayEvents = useMemo(() => getEventsForDay(), [compareEventsForDay, currentDay, events]);
   const allDayEvents = useMemo(() => dayEvents.filter((event) => !event.startTime), [dayEvents]);
   const visibleRangeEvents = viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents;
 

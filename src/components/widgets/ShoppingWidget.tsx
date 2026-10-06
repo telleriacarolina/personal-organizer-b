@@ -82,9 +82,6 @@ const priorityColors = {
   high: 'bg-destructive/20 text-destructive',
 };
 
-const MAX_RECEIPT_IMAGE_BYTES = 8 * 1024 * 1024;
-const MAX_RECEIPT_IMAGE_DIMENSION = 4096;
-
 export function ShoppingWidget({
   items,
   budget,
@@ -267,12 +264,14 @@ export function ShoppingWidget({
       let imageRef: Receipt['imageRef'];
       if (receiptImageInput) {
         const reader = new FileReader();
-        imageData = await new Promise<string>((resolve, reject) => {
+        const imageData = await new Promise<string>((resolve, reject) => {
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = () => reject(reader.error ?? new Error('Failed to read receipt image'));
           reader.onabort = () => reject(new Error('Receipt image read aborted'));
           reader.readAsDataURL(receiptImageInput);
         });
+        imageRef = { id: createId('receipt-image'), mimeType: receiptImageInput.type || 'image/png', byteSize: receiptImageInput.size, createdAt: Date.now() };
+        void imageData;
       }
 
       const calculatedTotal = parsedItems.reduce((sum, item) => sum + (item.price || 0), 0);

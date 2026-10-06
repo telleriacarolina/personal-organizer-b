@@ -24,7 +24,7 @@ type TestContext = AgentContext & {
 
 function makeContext(widgets: Widget[] = [], currentDate: Date = TODAY): TestContext {
   let currentWidgets = widgets;
-  let context!: TestContext;
+  const context = {} as TestContext;
   const updateWidgets = vi.fn((updater: (widgets: Widget[]) => Widget[]) => {
     currentWidgets = updater(currentWidgets);
     context.widgets = currentWidgets;
@@ -75,10 +75,6 @@ function notesWidget(notes: NotesWidget['notes'] = []): NotesWidget {
 
 function habitsWidget(habits: HabitsWidget['habits'] = []): HabitsWidget {
   return { id: 'habits-1', type: 'habits', position: 0, habits };
-}
-
-function goalsWidget(goals: GoalsWidget['goals'] = []): GoalsWidget {
-  return { id: 'goals-1', type: 'goals', position: 0, goals };
 }
 
 function calendarWidget(events: CalendarWidget['events'] = []): CalendarWidget {

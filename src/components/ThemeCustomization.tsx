@@ -221,7 +221,7 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
   const [selectedTheme, setSelectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
   const [customColors, setCustomColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
   const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
-  const { url: resolvedBackgroundUrl, isMissing: isBackgroundMissing } = useStoredMediaUrl({
+  const { url: _resolvedBackgroundUrl, isMissing: _isBackgroundMissing } = useStoredMediaUrl({
     mediaId: backgroundImage?.mediaId,
     fallbackUrl: backgroundImage?.url ?? null,
   });
@@ -652,12 +652,12 @@ export function ThemeCustomizationButton() {
   const [open, setOpen] = useState(false);
   const [selectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
   const [customColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
-  const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
-  const { url: resolvedBackgroundUrl } = useStoredMediaUrl({
+  const [backgroundImage, _setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
+  const { url: _resolvedBackgroundUrl } = useStoredMediaUrl({
     mediaId: backgroundImage?.mediaId,
     fallbackUrl: backgroundImage?.url ?? null,
   });
-  const migrationErrorShownRef = useRef(false);
+  const _migrationErrorShownRef = useRef(false);
 
   useEffect(() => {
     if (customColors) {
