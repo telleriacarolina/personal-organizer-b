@@ -88,7 +88,7 @@
         "@testing-library/jest-dom": "^7.0.1",
         "@testing-library/react": "^16.3.3",
         "@ai-sdk/gateway": "^4.0.85",
-        "@eslint/js": "9.39.1",
+        "@eslint/js": "10.0.1",
         "@tailwindcss/postcss": "^4.3.3",
         "@types/node": "^22.20.3",
         "@types/react": "^19.0.10",
