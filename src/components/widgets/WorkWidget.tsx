@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,7 @@ import { createItem, deleteItem, updateItem } from '@/lib/atomic-state';
 import { createId } from '@/lib/id';
 import { validateWidgetReference } from '@/lib/reference-validation';
 import { resolveActiveTimerEntryId } from '@/lib/work-timers';
+import { parseRideshareCsv, type RideshareProvider } from '@/lib/rideshare-imports';
 
 interface CalendarSource {
   id: string;
@@ -238,6 +239,36 @@ export function WorkWidget({
       activeTimerEntryId: current.activeTimerEntryId === id ? null : current.activeTimerEntryId,
     }));
     toast.success('Time entry deleted');
+  };
+
+  const importRideshareEntries = (entries: Array<Omit<TimeEntry, 'id' | 'createdAt'>>) => {
+    const signature = (entry: Pick<TimeEntry, 'description' | 'project' | 'startTime' | 'endTime' | 'duration'>) => [
+      entry.description.trim().toLowerCase(),
+      (entry.project ?? '').trim().toLowerCase(),
+      entry.startTime,
+      entry.endTime ?? '',
+      entry.duration ?? '',
+    ].join('|');
+
+    const existingSignatures = new Set(timeEntries.map((entry) => signature(entry)));
+    const importedEntries: TimeEntry[] = [];
+
+    entries.forEach((entry) => {
+      const entrySignature = signature(entry);
+      if (existingSignatures.has(entrySignature)) return;
+      existingSignatures.add(entrySignature);
+      importedEntries.push({
+        ...entry,
+        id: createId('time-entry'),
+        createdAt: Date.now(),
+      });
+    });
+
+    if (importedEntries.length > 0) {
+      onUpdate((current) => ({ timeEntries: [...current.timeEntries, ...importedEntries] }));
+    }
+
+    return { added: importedEntries.length, skipped: entries.length - importedEntries.length };
   };
 
   const addJob = (data: Omit<Job, 'id' | 'createdAt'>) => {
@@ -591,6 +622,7 @@ export function WorkWidget({
               onStart={startTimer}
               onStop={stopTimer}
               onDelete={deleteTimeEntry}
+              onImportEntries={importRideshareEntries}
             />
           </TabsContent>
 
@@ -1083,16 +1115,19 @@ function TimeTrackingTab({
   activeTimer,
   onStart,
   onStop,
-  onDelete
+  onDelete,
+  onImportEntries,
 }: {
   timeEntries: TimeEntry[];
   activeTimer: string | null;
   onStart: (description: string, project?: string) => void;
   onStop: (id: string) => void;
   onDelete: (id: string) => void;
+  onImportEntries: (entries: Array<Omit<TimeEntry, 'id' | 'createdAt'>>) => { added: number; skipped: number };
 }) {
   const [description, setDescription] = useState('');
   const [project, setProject] = useState('');
+  const [importSource, setImportSource] = useState<RideshareProvider>('uber');
 
   const handleStart = () => {
     if (!description) {
@@ -1102,6 +1137,39 @@ function TimeTrackingTab({
     onStart(description, project || undefined);
     setDescription('');
     setProject('');
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const csv = await file.text();
+      const parsed = parseRideshareCsv(importSource, csv);
+      if (parsed.entries.length === 0) {
+        toast.error(
+          parsed.skippedRows > 0
+            ? `No importable rides were found (${parsed.skippedRows} row${parsed.skippedRows === 1 ? '' : 's'} skipped)`
+            : 'No importable rides were found in this file'
+        );
+        return;
+      }
+
+      const result = onImportEntries(parsed.entries);
+      const parserSkips = parsed.skippedRows;
+      const duplicateSkips = result.skipped;
+      const skipDetails = [
+        duplicateSkips > 0 ? `${duplicateSkips} duplicate${duplicateSkips === 1 ? '' : 's'}` : null,
+        parserSkips > 0 ? `${parserSkips} unreadable row${parserSkips === 1 ? '' : 's'}` : null,
+      ].filter(Boolean).join(', ');
+      toast.success(
+        `Imported ${result.added} ride${result.added === 1 ? '' : 's'}${skipDetails ? ` (${skipDetails} skipped)` : ''}`
+      );
+    } catch {
+      toast.error('Unable to import this file');
+    } finally {
+      event.target.value = '';
+    }
   };
 
   return (
@@ -1142,6 +1210,28 @@ function TimeTrackingTab({
             Start Timer
           </Button>
         )}
+      </div>
+
+      <div className="space-y-3 p-4 rounded-lg border bg-card/50">
+        <Label className="text-sm font-medium">Import rideshare trips</Label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="rideshareSource">Source</Label>
+            <Select value={importSource} onValueChange={(value) => setImportSource(value as RideshareProvider)}>
+              <SelectTrigger id="rideshareSource">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="uber">Uber Driver</SelectItem>
+                <SelectItem value="lyft">Lyft Driver</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="rideshareFile">CSV Export</Label>
+            <Input id="rideshareFile" type="file" accept=".csv,text/csv" onChange={handleImportFile} />
+          </div>
+        </div>
       </div>
 
       <ScrollArea className="h-[300px]">
