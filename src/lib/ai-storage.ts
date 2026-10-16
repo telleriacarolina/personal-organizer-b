@@ -33,7 +33,7 @@ function writeAll(suggestions: PersistedSuggestion[]): void {
 
 /** Return all persisted suggestions. */
 export function getAllSuggestions(): PersistedSuggestion[] {
-  return aiSuggestionRepository.list();
+  return readAll();
 }
 
 /** Return only suggestions with status === 'pending'. */
