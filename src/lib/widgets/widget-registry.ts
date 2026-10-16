@@ -308,10 +308,10 @@ export const widgetDefinitions: WidgetDefinitions = {
         shoppingList: widget.shoppingList ?? [],
         errands: widget.errands ?? [],
         routines: widget.routines ?? [],
-        activeRoutineId: widget.activeRoutineId ?? undefined,
+        activeRoutineId: widget.activeRoutineId,
         activeTimerEntryId: widget.activeTimerEntryId ?? null,
         calendarSourceWidgetId: widget.calendarSourceWidgetId ?? null,
-        organizationPreference: widget.organizationPreference ?? undefined,
+        organizationPreference: widget.organizationPreference,
       }),
     validate: (widget) => {
       const parsed = workWidgetSchema.safeParse(widget);
