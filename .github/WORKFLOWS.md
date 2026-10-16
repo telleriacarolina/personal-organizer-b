@@ -176,21 +176,18 @@ This document provides detailed information about all GitHub Actions workflows c
 ### 6. Copilot Setup Steps (`copilot-setup-steps.yml`)
 
 **Triggers:**
-- Manual workflow dispatch
-- Push to `main` branch
-- Pull requests to `main` branch (opened, synchronized, reopened)
+- Manual workflow dispatch only
 
 **Jobs:**
 
 #### Setup Job
 - Checks out code
-- Sets up Node.js 20 with npm caching
+- Sets up Node.js 24 with npm caching
 - Installs dependencies
-- Installs GitHub Copilot CLI extension
 
 **Special Configuration:**
 - Uses built-in `GITHUB_TOKEN`
-- Prepares development environment
+- Prepares the runner for Copilot coding-agent work
 
 ---
 

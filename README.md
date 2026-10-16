@@ -67,7 +67,7 @@ Current behavior:
 * `mock`: demo provider for UI testing without credentials; data stays in the browser
 * `api`: marks an external provider as configured, but live provider requests are intentionally deferred beyond Phase 1
 
-The AI review flow is always explicit: generate → review → apply or dismiss. Suggestions are stored separately from widget source data in `organizer-widget-ai` local storage and never modify widget data until you explicitly apply them.
+The AI review flow is always explicit: generate → review → apply or dismiss. Suggestions are stored separately from widget source data under the `organizer-ai-suggestions` localStorage key; the app also reads the legacy `organizer-widget-ai` key as a compatibility fallback so older browser state can be migrated without data loss. Suggestions never modify widget data until you explicitly apply them.
 
 #### Organizer Agent
 
