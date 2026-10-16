@@ -23,7 +23,7 @@ type TestContext = AgentContext & {
 
 function makeContext(widgets: Widget[] = [], currentDate: Date = TODAY): TestContext {
   let currentWidgets = widgets;
-  const context = {} as TestContext;
+  let context = {} as TestContext;
   const updateWidgets = vi.fn((updater: (widgets: Widget[]) => Widget[]) => {
     currentWidgets = updater(currentWidgets);
     context.widgets = currentWidgets;
