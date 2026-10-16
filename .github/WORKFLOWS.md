@@ -184,7 +184,7 @@ This document provides detailed information about all GitHub Actions workflows c
 
 #### Setup Job
 - Checks out code
-- Sets up Node.js 20 with npm caching
+- Sets up Node.js 22 with npm caching
 - Installs dependencies
 - Installs GitHub Copilot CLI extension
 
@@ -302,7 +302,7 @@ Each workflow generates a summary with:
 ### Common Issues
 
 **Build Fails:**
-- Check Node.js version (must be 20)
+- Check Node.js version (must be 22)
 - Verify dependencies installed
 - Review TypeScript errors
 - Check ESLint output
@@ -335,7 +335,7 @@ Each workflow generates a summary with:
 
 3. **Validate Environment:**
    ```bash
-   node --version  # Should be 20.x
+   node --version  # Should be 22.x
    npm --version
    ```
 
