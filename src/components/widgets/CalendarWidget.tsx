@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
+import { type CollectionMutation } from '@/lib/atomic-state';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
+import { processCalendarReminders } from '@/lib/calendar-reminders';
 
 interface CalendarWidgetProps {
   events: CalendarEvent[];
@@ -302,7 +304,7 @@ export function CalendarWidget({
       ? events.map((e) => (e.id === editingEvent.id ? newEvent : e))
       : [...events, newEvent];
 
-    onUpdate(updatedEvents);
+    onUpdate(() => updatedEvents);
     void syncFamilyCalendarPlanner(updatedEvents);
 
     if (editingEvent) {
@@ -317,7 +319,7 @@ export function CalendarWidget({
 
   const deleteEvent = (id: string) => {
     const updatedEvents = events.filter((e) => e.id !== id);
-    onUpdate(updatedEvents);
+    onUpdate(() => updatedEvents);
     void syncFamilyCalendarPlanner(updatedEvents);
     toast.success('Event deleted');
     setShowDialog(false);

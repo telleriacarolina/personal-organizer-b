@@ -128,7 +128,10 @@ export function useWidgetDashboardState() {
       setWidgets(result.widgets);
     }
 
-    return result.meta ?? { added: false, reason: 'invalid-destination' };
+    return {
+      added: Boolean(result.meta?.added),
+      reason: result.meta?.reason ?? (result.meta?.added ? undefined : 'invalid-destination'),
+    };
   };
 
   const updateDailyFocusSourceWidget = (widgetId: string, sourceWidgetId: string | null) => {

@@ -321,13 +321,13 @@ export function ShoppingWidget({
         );
 
         const nextTrips = existingTrip
-          ? updateItem(existingTrip.id, (trip) => ({
+          ? updateItem<ShoppingTrip>(existingTrip.id, (trip) => ({
               ...trip,
               total: trip.total + total,
               itemCount: trip.itemCount + parsedItems.length,
               receiptIds: [...trip.receiptIds, receiptId],
             }))(currentTrips)
-          : createItem({
+          : createItem<ShoppingTrip>({
               id: createId('shopping-trip'),
               date: receiptDateTs,
               storeName: receiptStoreName,
@@ -338,7 +338,7 @@ export function ShoppingWidget({
 
         return {
           items: [...current.items, ...newItems],
-          receipts: createItem(newReceipt)(sanitizeReceipts(current.receipts || [])),
+          receipts: createItem<Receipt>(newReceipt)(sanitizeReceipts(current.receipts || [])),
           trips: nextTrips,
         };
       });
@@ -360,7 +360,7 @@ export function ShoppingWidget({
 
   const togglePurchased = (id: string) => {
     onUpdate((current) => ({
-      items: updateItem(id, (item) => ({
+      items: updateItem<PersonalShoppingItem>(id, (item) => ({
         ...item,
         purchased: !item.purchased,
         purchasedAt: !item.purchased ? Date.now() : undefined,
@@ -369,7 +369,7 @@ export function ShoppingWidget({
   };
 
   const deleteItem = (id: string) => {
-    onUpdate((current) => ({ items: deleteItemMutation(id)(current.items) }));
+    onUpdate((current) => ({ items: deleteItemMutation<PersonalShoppingItem>(id)(current.items) }));
     toast.success('Item removed');
   };
 
@@ -681,14 +681,14 @@ export function ShoppingWidget({
 
   const toggleReminder = (id: string) => {
     onUpdate((current) => ({
-      reminders: updateItem(id, (reminder) => ({ ...reminder, enabled: !reminder.enabled }))(
+      reminders: updateItem<ShoppingReminder>(id, (reminder) => ({ ...reminder, enabled: !reminder.enabled }))(
         sanitizeReminders(current.reminders || []),
       ),
     }));
   };
 
   const deleteReminder = (id: string) => {
-    onUpdate((current) => ({ reminders: deleteItemMutation(id)(sanitizeReminders(current.reminders || [])) }));
+    onUpdate((current) => ({ reminders: deleteItemMutation<ShoppingReminder>(id)(sanitizeReminders(current.reminders || [])) }));
     toast.success('Reminder deleted');
   };
 
@@ -698,7 +698,7 @@ export function ShoppingWidget({
 
     const newDate = addDays(new Date(), days).getTime();
     onUpdate((current) => ({
-      reminders: updateItem(id, (currentReminder) => ({
+      reminders: updateItem<ShoppingReminder>(id, (currentReminder) => ({
         ...currentReminder,
         nextReminderDate: newDate,
         lastTriggered: Date.now(),

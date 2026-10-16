@@ -110,8 +110,8 @@ describe('read intents', () => {
   it('lists shopping items and purchased count', async () => {
     const ctx = makeContext([
       shoppingWidget([
-        { id: '1', name: 'Milk', purchased: false, priority: 'medium', category: 'dairy', createdAt: Date.now() },
-        { id: '2', name: 'Eggs', purchased: true, priority: 'medium', category: 'dairy', createdAt: Date.now() },
+        { id: '1', name: 'Milk', purchased: false, priority: 'medium', category: 'food', createdAt: Date.now() },
+        { id: '2', name: 'Eggs', purchased: true, priority: 'medium', category: 'food', createdAt: Date.now() },
       ]),
     ]);
 
@@ -173,7 +173,7 @@ describe('write intents', () => {
       'add Milk to my shopping list',
       makeContext([
         shoppingWidget([
-          { id: '1', name: 'Milk', purchased: false, priority: 'medium', category: 'dairy', createdAt: Date.now() },
+          { id: '1', name: 'Milk', purchased: false, priority: 'medium', category: 'food', createdAt: Date.now() },
         ]),
       ]),
     );

@@ -19,6 +19,8 @@ import { toast } from 'sonner';
 import { selectMimeType, label, defaultTitle, formatDuration } from './recordNoteUtils';
 import { CollectionMutation, createItem, deleteItem } from '@/lib/atomic-state';
 import { createId } from '@/lib/id';
+import { assertMaxBytes } from '@/lib/media-validation';
+import { getMediaBlob } from '@/lib/media-storage';
 
 interface RecordNoteWidgetProps {
   records: RecordNote[];
@@ -38,6 +40,21 @@ type RecordingState = 'idle' | 'recording' | 'preview';
 const MAX_RECORDING_SECONDS = 300;
 const MAX_RECORDING_BYTES = 25 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error('Failed to read media payload.'));
+    };
+    reader.onerror = () => reject(new Error('Failed to read media payload.'));
+    reader.readAsDataURL(blob);
+  });
+}
 
 export function RecordNoteWidget({
   records,
@@ -266,18 +283,19 @@ export function RecordNoteWidget({
   const saveRecord = async () => {
     if (!previewBlob || !activeMode) return;
     const title = pendingTitle.trim() || defaultTitle(activeMode);
+    const dataUrl = await blobToDataUrl(previewBlob);
     const newRecord: RecordNote = {
       id: createId('record-note'),
       title,
       mediaType: activeMode,
-      dataUrl: previewDataUrl,
+      dataUrl,
       // Use the ref value — never stale React state
       duration: activeMode !== 'photo' ? durationRef.current : undefined,
       createdAt: Date.now(),
     };
     onUpdate(createItem(newRecord));
     toast.success(`${label(activeMode)} saved!`);
-    setPreviewDataUrl(null);
+    setPreviewBlob(null);
     setRecordingState('idle');
     setActiveMode(null);
     setPendingTitle('');
@@ -441,7 +459,7 @@ function MediaPreview({ dataUrl, mediaType }: { dataUrl: string; mediaType: Reco
 
 function useRecordMediaUrl(record: RecordNote): string | null {
   const [url, setUrl] = useState<string | null>(null);
-  const mediaRefId = record.mediaRef?.id;
+  const mediaRefId = record.mediaId;
   useEffect(() => {
     let disposed = false;
     let currentObjectUrl: string | null = null;
@@ -479,7 +497,7 @@ function useRecordMediaUrl(record: RecordNote): string | null {
 
 interface RecordCardProps {
   record: RecordNote;
-  onDelete: (record: RecordNote) => void;
+  onDelete: (id: string) => void;
 }
 
 function RecordCard({ record, onDelete }: RecordCardProps) {
@@ -531,7 +549,7 @@ function RecordCard({ record, onDelete }: RecordCardProps) {
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-destructive"
-            onClick={() => void onDelete(record)}
+            onClick={() => void onDelete(record.id)}
             aria-label={`Delete ${record.title}`}
           >
             <Trash size={14} />
