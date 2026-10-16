@@ -90,4 +90,16 @@ describe('parseRideshareCsv', () => {
     expect(result.entries).toHaveLength(1);
     expect(result.entries[0].duration).toBe(25);
   });
+
+  it('parses hour-and-minute duration text', () => {
+    const csv = [
+      'Trip ID,Start Date,End Date,Duration (minutes)',
+      'trip-1,2026-10-10T08:00:00Z,2026-10-10T09:30:00Z,1 hour 30 minutes',
+    ].join('\n');
+
+    const result = parseRideshareCsv('uber', csv);
+
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].duration).toBe(90);
+  });
 });

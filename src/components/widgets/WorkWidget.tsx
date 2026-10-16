@@ -1158,8 +1158,12 @@ function TimeTrackingTab({
       const result = onImportEntries(parsed.entries);
       const parserSkips = parsed.skippedRows;
       const duplicateSkips = result.skipped;
+      const skipDetails = [
+        duplicateSkips > 0 ? `${duplicateSkips} duplicate${duplicateSkips === 1 ? '' : 's'}` : null,
+        parserSkips > 0 ? `${parserSkips} unreadable row${parserSkips === 1 ? '' : 's'}` : null,
+      ].filter(Boolean).join(', ');
       toast.success(
-        `Imported ${result.added} ride${result.added === 1 ? '' : 's'}${parserSkips + duplicateSkips > 0 ? ` (${parserSkips + duplicateSkips} skipped)` : ''}`
+        `Imported ${result.added} ride${result.added === 1 ? '' : 's'}${skipDetails ? ` (${skipDetails} skipped)` : ''}`
       );
     } catch {
       toast.error('Unable to import this file');

@@ -95,8 +95,13 @@ function parseDurationMinutes(rawDuration: string | undefined, startTime: number
         if (Number.isNaN(numericMinutes)) {
           return undefined;
         }
-        if (text.toLowerCase().includes('hour') && parts.length === 1) {
-          const totalMinutes = Math.round(numericMinutes * 60);
+        if (text.toLowerCase().includes('hour')) {
+          const hourPortion = numericMinutes;
+          const minutePortion = parts.length > 1 ? Number(parts[1]) : 0;
+          if (Number.isNaN(minutePortion)) {
+            return undefined;
+          }
+          const totalMinutes = Math.round((hourPortion * 60) + minutePortion);
           if (totalMinutes > 0 && totalMinutes <= MAX_REASONABLE_DURATION_MINUTES) {
             return totalMinutes;
           }
