@@ -7,7 +7,7 @@ export interface RideshareImportResult {
   skippedRows: number;
 }
 
-const DATE_HEADER_HINTS = ['date', 'start', 'request', 'pickup', 'accepted', 'time'];
+const DATE_HEADER_HINTS = ['start date', 'start time', 'pickup time', 'request time', 'accepted at', 'date', 'start', 'pickup', 'request'];
 const END_HEADER_HINTS = ['end', 'dropoff', 'completed', 'finish'];
 const DURATION_HEADER_HINTS = ['duration', 'online minutes', 'minutes'];
 const DESCRIPTION_HEADER_HINTS = ['rider', 'passenger', 'trip id', 'ride id', 'request id'];
@@ -88,6 +88,10 @@ function parseDurationMinutes(rawDuration: string | undefined, startTime: number
           if (totalMinutes > 0 && totalMinutes <= MAX_REASONABLE_DURATION_MINUTES) {
             return totalMinutes;
           }
+          if (endTime && endTime > startTime) {
+            return Math.max(1, Math.round((endTime - startTime) / 60000));
+          }
+          return undefined;
         }
       }
 

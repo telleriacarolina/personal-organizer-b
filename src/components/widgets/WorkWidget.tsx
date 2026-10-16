@@ -1147,7 +1147,11 @@ function TimeTrackingTab({
       const csv = await file.text();
       const parsed = parseRideshareCsv(importSource, csv);
       if (parsed.entries.length === 0) {
-        toast.error('No importable rides were found in this file');
+        toast.error(
+          parsed.skippedRows > 0
+            ? `No importable rides were found (${parsed.skippedRows} row${parsed.skippedRows === 1 ? '' : 's'} skipped)`
+            : 'No importable rides were found in this file'
+        );
         return;
       }
 
