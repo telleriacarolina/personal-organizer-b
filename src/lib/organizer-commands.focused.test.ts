@@ -85,6 +85,9 @@ describe('organizer command helpers (focused)', () => {
     const workWidget = createWorkWidget(preference, 2);
 
     expect(workWidget.type).toBe('work');
+    if (workWidget.type !== 'work') {
+      throw new Error('Expected work widget');
+    }
     expect(workWidget.position).toBe(2);
     expect(workWidget.organizationPreference).toEqual(preference);
     expect(workWidget.clientSlots).toEqual([]);
