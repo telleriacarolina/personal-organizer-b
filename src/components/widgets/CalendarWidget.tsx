@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { WidgetContainer } from '@/components/WidgetContainer';
 import { Button } from '@/components/ui/button';
@@ -13,14 +13,12 @@ import { Switch } from '@/components/ui/switch';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { AISuggestionsPanel } from '@/components/AISuggestionsPanel';
-import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown, Sparkle, UploadSimple } from '@phosphor-icons/react';
+import { Calendar, Plus, Clock, Bell, Trash, Pencil, CaretLeft, CaretRight, CalendarBlank, Rows, CalendarDot, ClockCountdown, Sparkle } from '@phosphor-icons/react';
 import { AIInsightAction, CalendarEntryType, CalendarEvent, FamilyCalendarPlannerEvent, WidgetAIState, WidgetSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, isToday, addWeeks, subWeeks, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
 import { buildAIInputHash, generateWidgetAIState, updateAIInsightStatus } from '@/lib/ai-organizer';
-import { parseICalText } from '@/lib/ical-parser';
-import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
 
 interface CalendarWidgetProps {
   events: CalendarEvent[];
@@ -458,9 +456,6 @@ export function CalendarWidget({
   };
 
   const dayEvents = useMemo(() => getEventsForDay(), [compareEventsForDay, currentDay, events]);
-  const allDayEvents = useMemo(() => dayEvents.filter((event) => !event.startTime), [dayEvents]);
-  const visibleRangeEvents = viewMode === 'month' ? monthEvents : viewMode === 'week' ? weekEvents : dayEvents;
-
   const handleNavigatePrev = () => {
     if (viewMode === 'month') {
       setCurrentMonth(subMonths(currentMonth, 1));

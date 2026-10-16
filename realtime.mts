@@ -11,7 +11,9 @@
  *   output.wav — playable WAV file containing the assistant's spoken response
  */
 
+import { Buffer } from "node:buffer";
 import { writeFileSync } from "node:fs";
+import process from "node:process";
 import WebSocket from "ws";
 import { createGateway, getGatewayRealtimeProtocols } from "@ai-sdk/gateway";
 
