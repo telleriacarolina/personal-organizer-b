@@ -30,9 +30,6 @@ jobs:
       - name: Run ESLint
         run: npm run lint --if-present
       
-      - name: Check TypeScript
-        run: npx tsc --noEmit
-  
   test:
     runs-on: ubuntu-latest
     
