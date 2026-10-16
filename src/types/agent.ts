@@ -5,8 +5,6 @@ import type {
   Widget,
 } from './index';
 
-export type JsonRecord = Record<string, unknown>;
-
 export type OrganizerToolDomain =
   | 'tasks'
   | 'notes'
