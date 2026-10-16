@@ -14,11 +14,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up Node.js
+      - name: Install Neovim
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y neovim
+
+      - name: Set up Node.js and npm
         uses: actions/setup-node@v6
         with:
-          node-version: "24"
+          node-version: "22"
           cache: npm
+
+      - name: Install Copilot Vim plugin for Neovim
+        run: |
+          mkdir -p ~/.config/nvim/pack/github/start
+          git clone --depth=1 https://github.com/github/copilot.vim.git \
+            ~/.config/nvim/pack/github/start/copilot.vim
 
       - name: Install dependencies
         run: npm ci
