@@ -4,7 +4,6 @@ import { handleAgentMessage } from './organizer-agent-service';
 import type { AgentContext, AgentMessage, AgentPendingAction, OrganizerToolName } from '@/types/agent';
 import type {
   CalendarWidget,
-  GoalsWidget,
   HabitsWidget,
   NotesWidget,
   ShoppingWidget,
@@ -24,7 +23,7 @@ type TestContext = AgentContext & {
 
 function makeContext(widgets: Widget[] = [], currentDate: Date = TODAY): TestContext {
   let currentWidgets = widgets;
-  const context = {} as TestContext;
+  let context = {} as TestContext;
   const updateWidgets = vi.fn((updater: (widgets: Widget[]) => Widget[]) => {
     currentWidgets = updater(currentWidgets);
     context.widgets = currentWidgets;
@@ -111,8 +110,8 @@ describe('read intents', () => {
   it('lists shopping items and purchased count', async () => {
     const ctx = makeContext([
       shoppingWidget([
-        { id: '1', name: 'Milk', purchased: false, priority: 'medium', category: 'dairy', createdAt: Date.now() },
-        { id: '2', name: 'Eggs', purchased: true, priority: 'medium', category: 'dairy', createdAt: Date.now() },
+        { id: '1', name: 'Milk', purchased: false, priority: 'medium', category: 'food', createdAt: Date.now() },
+        { id: '2', name: 'Eggs', purchased: true, priority: 'medium', category: 'food', createdAt: Date.now() },
       ]),
     ]);
 
@@ -174,7 +173,7 @@ describe('write intents', () => {
       'add Milk to my shopping list',
       makeContext([
         shoppingWidget([
-          { id: '1', name: 'Milk', purchased: false, priority: 'medium', category: 'dairy', createdAt: Date.now() },
+          { id: '1', name: 'Milk', purchased: false, priority: 'medium', category: 'food', createdAt: Date.now() },
         ]),
       ]),
     );

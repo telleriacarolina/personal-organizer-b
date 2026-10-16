@@ -22,7 +22,11 @@ import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { createId } from '@/lib/id';
 import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
+import { getOrganizerAgentToolSchemas } from '@/lib/organizer-agent-broker';
 import { stateRepositories } from '@/lib/persistence';
+import { clearAllMediaBlobs } from '@/lib/media-storage';
+import { applyGlobalLockState, toggleGlobalLockValue } from '@/lib/dashboard-state';
+import { DEFAULT_AI_CONFIG } from '@/types/ai';
 import {
   addTaskToSource as addTaskToSourceCommand,
   clearWidgetAIState,
@@ -31,7 +35,6 @@ import {
   toggleTaskInSource as toggleTaskInSourceCommand,
   updateDailyFocusSourceWidget as updateDailyFocusSourceWidgetCommand,
   updateTaskPriorityInSource as updateTaskPriorityInSourceCommand,
-  updateWidget as updateWidgetCommand,
   updateWidgetSize as updateWidgetSizeCommand,
 } from '@/lib/organizer-commands';
 import { type AgentContext, type AgentPermission } from '@/types/agent';
@@ -43,6 +46,8 @@ function App() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
+  const [isClearingData, setIsClearingData] = useState(false);
   const [showWorkQuestionnaire, setShowWorkQuestionnaire] = useState(false);
   const [snapToGrid, setSnapToGrid] = usePersistentState(stateRepositories.snapToGrid, false);
   const [globalLock, setGlobalLock] = usePersistentState(stateRepositories.globalLock, false);
@@ -113,17 +118,22 @@ function App() {
     toast.success('Widget removed');
   };
 
-  const updateWidget = (id: string, data: Partial<Widget> | ((widget: Widget) => Widget)) => {
-    if (typeof data === 'function') {
-      setWidgets((current) =>
-        (current || []).map((w) => {
-          if (w.id !== id) return w;
-          return data(w);
-        })
-      );
-    } else {
-      setWidgets((current) => updateWidgetCommand(current, id, data));
-    }
+  const mutateWidgets = (updater: (current: Widget[]) => Widget[]) => {
+    setWidgets((current) => updater(current || []));
+  };
+
+  const mutateTypedWidget = <TWidgetType extends Widget['type']>(
+    widgetId: string,
+    widgetType: TWidgetType,
+    updater: (current: Extract<Widget, { type: TWidgetType }>) => Extract<Widget, { type: TWidgetType }>
+  ) => {
+    mutateWidgets((current) =>
+      current.map((widget) =>
+        widget.id === widgetId && widget.type === widgetType
+          ? updater(widget as Extract<Widget, { type: TWidgetType }>)
+          : widget
+      )
+    );
   };
 
   const updateWidgetSize = (id: string, size: { width: number; height: number }) => {
@@ -198,6 +208,33 @@ function App() {
     setWidgetAIState((current) => saveWidgetAIState(current, state));
   };
 
+  const clearAllPersonalData = async () => {
+    if (isClearingData) return;
+    setIsClearingData(true);
+    try {
+      await clearAllMediaBlobs();
+      setWidgets([]);
+      setSnapToGrid(false);
+      setGlobalLock(false);
+      setWidgetAIState({});
+      stateRepositories.theme.save('Warm Terracotta');
+      stateRepositories.customColors.save(null);
+      stateRepositories.backgroundImage.save(null);
+      stateRepositories.plannerEvents.save([]);
+      stateRepositories.aiConfig.save(DEFAULT_AI_CONFIG);
+      stateRepositories.aiSuggestions.save([]);
+      stateRepositories.mediaRecords.save([]);
+      localStorage.removeItem('drag-hint-shown');
+      setShowClearDataConfirm(false);
+      toast.success('All personal organizer data cleared');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to clear all data');
+    } finally {
+      setIsClearingData(false);
+    }
+  };
+
   const toggleSnapToGrid = () => {
     setSnapToGrid((current) => {
       const next = !current;
@@ -248,7 +285,7 @@ function App() {
   );
 
   const agentPermissions = useMemo(
-    () => Array.from(new Set(getOrganizerAgentToolSchemas().flatMap((schema) => schema.permissions))),
+    () => Array.from(new Set(getOrganizerAgentToolSchemas().flatMap((schema) => schema.permissions))) as AgentPermission[],
     [],
   );
 
@@ -447,7 +484,12 @@ function App() {
                       <TasksWidget
                         {...widgetProps}
                         tasks={widget.tasks}
-                        onUpdate={(tasks) => updateWidget(widget.id, { tasks })}
+                        onUpdate={(mutation) =>
+                          mutateTypedWidget(widget.id, 'tasks', (current) => ({
+                            ...current,
+                            tasks: mutation(current.tasks),
+                          }))
+                        }
                       />
                     );
                   case 'notes':
@@ -471,7 +513,12 @@ function App() {
                       <HabitsWidget
                         {...widgetProps}
                         habits={widget.habits}
-                        onUpdate={(habits) => updateWidget(widget.id, { habits })}
+                        onUpdate={(mutation) =>
+                          mutateTypedWidget(widget.id, 'habits', (current) => ({
+                            ...current,
+                            habits: mutation(current.habits),
+                          }))
+                        }
                       />
                     );
                   case 'goals':
@@ -479,7 +526,12 @@ function App() {
                       <GoalsWidget
                         {...widgetProps}
                         goals={widget.goals}
-                        onUpdate={(goals) => updateWidget(widget.id, { goals })}
+                        onUpdate={(mutation) =>
+                          mutateTypedWidget(widget.id, 'goals', (current) => ({
+                            ...current,
+                            goals: mutation(current.goals),
+                          }))
+                        }
                       />
                     );
                   case 'calendar':

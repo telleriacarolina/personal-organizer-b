@@ -132,6 +132,8 @@ export type AgentActivityStatus =
   | 'blocked'
   | 'expired';
 
+export type JsonRecord = Record<string, unknown>;
+
 export interface AgentMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -166,7 +168,7 @@ export interface AgentToolSchema {
   v1Available: boolean;
 }
 
-export interface AgentBaseToolInput {
+export interface AgentBaseToolInput extends JsonRecord {
   requestId: string;
   workspaceId: string;
   actorContext: AgentActorContext;
