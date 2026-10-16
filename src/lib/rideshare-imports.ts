@@ -10,7 +10,7 @@ export interface RideshareImportResult {
 const DATE_HEADER_HINTS = ['date', 'start', 'request', 'pickup', 'accepted', 'time'];
 const END_HEADER_HINTS = ['end', 'dropoff', 'completed', 'finish'];
 const DURATION_HEADER_HINTS = ['duration', 'online minutes', 'minutes'];
-const DESCRIPTION_HEADER_HINTS = ['trip id', 'ride id', 'request id', 'rider', 'passenger'];
+const DESCRIPTION_HEADER_HINTS = ['rider', 'passenger', 'trip id', 'ride id', 'request id'];
 
 export function parseRideshareCsv(provider: RideshareProvider, rawCsv: string): RideshareImportResult {
   const rows = parseCsvRows(rawCsv);
@@ -61,7 +61,11 @@ function normalizeHeader(header: string) {
 }
 
 function resolveHeaderIndex(headers: string[], hints: string[]) {
-  return headers.findIndex((header) => hints.some((hint) => header.includes(hint)));
+  for (const hint of hints) {
+    const index = headers.findIndex((header) => header.includes(hint));
+    if (index >= 0) return index;
+  }
+  return -1;
 }
 
 function normalizeText(value: string | undefined) {

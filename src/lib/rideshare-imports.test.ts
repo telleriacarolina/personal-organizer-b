@@ -51,7 +51,7 @@ describe('parseRideshareCsv', () => {
 
     expect(result.skippedRows).toBe(1);
     expect(result.entries).toHaveLength(1);
-    expect(result.entries[0].description).toBe('Uber Driver trip');
+    expect(result.entries[0].description).toBe('Uber Driver trip (trip-2)');
   });
 
   it('returns all rows as skipped when no date-like header exists', () => {
