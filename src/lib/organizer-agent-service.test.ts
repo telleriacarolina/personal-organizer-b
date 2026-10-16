@@ -4,7 +4,6 @@ import { handleAgentMessage } from './organizer-agent-service';
 import type { AgentContext, AgentMessage, AgentPendingAction, OrganizerToolName } from '@/types/agent';
 import type {
   CalendarWidget,
-  GoalsWidget,
   HabitsWidget,
   NotesWidget,
   ShoppingWidget,
