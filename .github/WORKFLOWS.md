@@ -184,7 +184,7 @@ This document provides detailed information about all GitHub Actions workflows c
 
 #### Setup Job
 - Checks out code
-- Sets up Node.js 22 with npm caching
+- Sets up Node.js 24 with npm caching
 - Installs dependencies
 - Installs GitHub Copilot CLI extension
 
