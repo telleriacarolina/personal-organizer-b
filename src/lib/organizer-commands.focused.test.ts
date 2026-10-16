@@ -91,5 +91,7 @@ describe('organizer command helpers (focused)', () => {
     expect(workWidget.position).toBe(2);
     expect(workWidget.organizationPreference).toEqual(preference);
     expect(workWidget.clientSlots).toEqual([]);
+    expect(workWidget.activeTimerEntryId).toBeNull();
+    expect(workWidget.calendarSourceWidgetId).toBeNull();
   });
 });
