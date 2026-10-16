@@ -162,6 +162,8 @@ const workWidgetSchema: z.ZodType<WorkWidget> = baseWidgetSchema.extend({
   errands: z.array(z.any()),
   routines: z.array(z.any()).optional(),
   activeRoutineId: z.string().optional(),
+  activeTimerEntryId: z.string().nullable().optional(),
+  calendarSourceWidgetId: z.string().nullable().optional(),
   organizationPreference: z.any().optional(),
 });
 
@@ -291,6 +293,10 @@ export const widgetDefinitions: WidgetDefinitions = {
       shoppingList: [],
       errands: [],
       routines: [],
+      activeRoutineId: undefined,
+      activeTimerEntryId: null,
+      calendarSourceWidgetId: null,
+      organizationPreference: undefined,
     }),
     normalize: (widget) =>
       ensurePosition({
@@ -302,6 +308,10 @@ export const widgetDefinitions: WidgetDefinitions = {
         shoppingList: widget.shoppingList ?? [],
         errands: widget.errands ?? [],
         routines: widget.routines ?? [],
+        activeRoutineId: widget.activeRoutineId ?? undefined,
+        activeTimerEntryId: widget.activeTimerEntryId ?? null,
+        calendarSourceWidgetId: widget.calendarSourceWidgetId ?? null,
+        organizationPreference: widget.organizationPreference ?? undefined,
       }),
     validate: (widget) => {
       const parsed = workWidgetSchema.safeParse(widget);
