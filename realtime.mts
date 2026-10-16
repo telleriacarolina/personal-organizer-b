@@ -12,6 +12,8 @@
  */
 
 import { writeFileSync } from "node:fs";
+import { Buffer } from "node:buffer";
+import process from "node:process";
 import WebSocket from "ws";
 import { createGateway, getGatewayRealtimeProtocols } from "@ai-sdk/gateway";
 
