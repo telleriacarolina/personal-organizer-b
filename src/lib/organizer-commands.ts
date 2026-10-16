@@ -62,6 +62,8 @@ export function createWorkWidget(preference: WorkOrganizationPreference, positio
     errands: [],
     routines: [],
     activeRoutineId: undefined,
+    activeTimerEntryId: null,
+    calendarSourceWidgetId: null,
     organizationPreference: preference,
   } as Widget;
 }
