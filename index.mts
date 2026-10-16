@@ -12,6 +12,7 @@ import { generateImage } from "ai";
 import { createGateway } from "@ai-sdk/gateway";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import process from "node:process";
 
 const apiKey = process.env.AI_GATEWAY_API_KEY;
 if (!apiKey) {
