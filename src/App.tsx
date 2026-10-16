@@ -34,7 +34,7 @@ import {
   updateWidget as updateWidgetCommand,
   updateWidgetSize as updateWidgetSizeCommand,
 } from '@/lib/organizer-commands';
-import { type AgentContext, type AgentPermission } from '@/types/agent';
+import { type AgentContext } from '@/types/agent';
 import type { CalendarImportDraft } from '@/lib/calendar-imports';
 import type { Task, Widget, WidgetAIState, WidgetType } from '@/types';
 
