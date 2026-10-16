@@ -17,8 +17,8 @@ describe('organizer command helpers (focused)', () => {
     const dailyFocusWidget = createWidget('daily-focus', 1, [tasksWidget]);
 
     expect(tasksWidget.type).toBe('tasks');
-    expect(tasksWidget.tasks).toEqual([]);
-    expect(dailyFocusWidget.sourceWidgetId).toBe(tasksWidget.id);
+    expect(tasksWidget.type === 'tasks' ? tasksWidget.tasks : undefined).toEqual([]);
+    expect(dailyFocusWidget.type === 'daily-focus' ? dailyFocusWidget.sourceWidgetId : undefined).toBe(tasksWidget.id);
   });
 
   it('adds, toggles, and reprioritizes source tasks', () => {
