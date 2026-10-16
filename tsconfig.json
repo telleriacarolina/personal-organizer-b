@@ -22,10 +22,6 @@
     /* Linting */
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    "types": [
-      "vitest/globals",
-      "node"
-    ],
     "paths": {
       "@/*": [
         "./src/*"
