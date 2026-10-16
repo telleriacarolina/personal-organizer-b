@@ -80,7 +80,8 @@ function parseDurationMinutes(rawDuration: string | undefined, startTime: number
   if (text) {
     const parts = text.match(/(\d+(?:\.\d+)?)/g);
     if (parts && parts.length > 0) {
-      if (text.includes(':') && parts.length >= 2) {
+      const isColonDuration = text.includes(':') && parts.length >= 2;
+      if (isColonDuration) {
         const hours = Number(parts[0]);
         const minutes = Number(parts[1]);
         if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
@@ -88,15 +89,12 @@ function parseDurationMinutes(rawDuration: string | undefined, startTime: number
           if (totalMinutes > 0 && totalMinutes <= MAX_REASONABLE_DURATION_MINUTES) {
             return totalMinutes;
           }
-          if (endTime && endTime > startTime) {
-            return Math.max(1, Math.round((endTime - startTime) / 60000));
-          }
+        }
+      } else {
+        const numericMinutes = Number(parts[0]);
+        if (Number.isNaN(numericMinutes)) {
           return undefined;
         }
-      }
-
-      const numericMinutes = Number(parts[0]);
-      if (!Number.isNaN(numericMinutes)) {
         if (text.toLowerCase().includes('hour') && parts.length === 1) {
           const totalMinutes = Math.round(numericMinutes * 60);
           if (totalMinutes > 0 && totalMinutes <= MAX_REASONABLE_DURATION_MINUTES) {
