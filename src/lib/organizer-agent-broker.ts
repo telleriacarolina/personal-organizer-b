@@ -241,13 +241,17 @@ function ensureDateRange(fromValue: unknown, toValue: unknown, labels: { from: s
   return { from, to };
 }
 
-function requireWidgetId(value: unknown, widgets: Widget[], type: Widget['type']) {
+function requireWidgetId<TWidgetType extends Widget['type']>(
+  value: unknown,
+  widgets: Widget[],
+  type: TWidgetType,
+): Extract<Widget, { type: TWidgetType }> {
   assertString(value, 'widgetId', { required: true, max: 120 });
-  const widget = widgets.find((candidate) => candidate.id === value && candidate.type === type);
+  const widget = getWidgetsByType(widgets, type).find((candidate) => candidate.id === value);
   if (!widget) {
     throw new Error(`A ${type} widget with that id was not found.`);
   }
-  return widget as Extract<Widget, { type: typeof type }>;
+  return widget;
 }
 
 const ORGANIZER_AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
@@ -1270,7 +1274,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'tasks.get': (input, context) => {
     const auditId = createAuditId();
     assertString(input.taskId, 'taskId', { required: true, max: 120 });
-    const match = findTask(context.widgets, input.taskId);
+    const match = findTask(context.widgets, String(input.taskId));
     if (!match) return createResponse(auditId, 'Task not found.', { ok: false });
     return createResponse(auditId, `Loaded task "${match.task.text}".`, {
       data: { task: match.task },
@@ -1316,7 +1320,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'tasks.update': (input, context) => {
     const auditId = createAuditId();
     assertString(input.taskId, 'taskId', { required: true, max: 120 });
-    const match = findTask(context.widgets, input.taskId);
+    const match = findTask(context.widgets, String(input.taskId));
     if (!match) return createResponse(auditId, 'Task not found.', { ok: false });
     assertString(input.text, 'text', { max: 240 });
     assertOptionalEnum(input.priority, TASK_PRIORITIES, 'priority');
@@ -1361,7 +1365,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     const auditId = createAuditId();
     assertString(input.taskId, 'taskId', { required: true, max: 120 });
     assertRequiredBoolean(input.completed, 'completed');
-    const match = findTask(context.widgets, input.taskId);
+    const match = findTask(context.widgets, String(input.taskId));
     if (!match) return createResponse(auditId, 'Task not found.', { ok: false });
     const completed = Boolean(input.completed);
     const task = { ...match.task, completed };
@@ -1410,7 +1414,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'notes.get': (input, context) => {
     const auditId = createAuditId();
     assertString(input.noteId, 'noteId', { required: true, max: 120 });
-    const match = findNote(context.widgets, input.noteId);
+    const match = findNote(context.widgets, String(input.noteId));
     if (!match) return createResponse(auditId, 'Note not found.', { ok: false });
     return createResponse(auditId, `Loaded note "${match.note.title}".`, {
       data: { note: match.note, untrustedContent: true },
@@ -1453,7 +1457,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'notes.update': (input, context) => {
     const auditId = createAuditId();
     assertString(input.noteId, 'noteId', { required: true, max: 120 });
-    const match = findNote(context.widgets, input.noteId);
+    const match = findNote(context.widgets, String(input.noteId));
     if (!match) return createResponse(auditId, 'Note not found.', { ok: false });
     assertString(input.title, 'title', { max: 160 });
     assertString(input.content, 'content', { max: 12000 });
@@ -1505,7 +1509,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'habits.get': (input, context) => {
     const auditId = createAuditId();
     assertString(input.habitId, 'habitId', { required: true, max: 120 });
-    const match = findHabit(context.widgets, input.habitId);
+    const match = findHabit(context.widgets, String(input.habitId));
     if (!match) return createResponse(auditId, 'Habit not found.', { ok: false });
     return createResponse(auditId, `Loaded habit "${match.habit.name}".`, {
       data: { habit: match.habit },
@@ -1546,7 +1550,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     const auditId = createAuditId();
     assertString(input.habitId, 'habitId', { required: true, max: 120 });
     assertString(input.name, 'name', { required: true, max: 160 });
-    const match = findHabit(context.widgets, input.habitId);
+    const match = findHabit(context.widgets, String(input.habitId));
     if (!match) return createResponse(auditId, 'Habit not found.', { ok: false });
     const habit = { ...match.habit, name: String(input.name).trim() };
     if (input.dryRun) {
@@ -1578,7 +1582,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     assertRequiredBoolean(input.completed, 'completed');
     const date = normalizeDateOnly(input.date);
     if (!date) throw new Error('date is required.');
-    const match = findHabit(context.widgets, input.habitId);
+    const match = findHabit(context.widgets, String(input.habitId));
     if (!match) return createResponse(auditId, 'Habit not found.', { ok: false });
     const completed = Boolean(input.completed);
     const habit = {
@@ -1630,7 +1634,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'goals.get': (input, context) => {
     const auditId = createAuditId();
     assertString(input.goalId, 'goalId', { required: true, max: 120 });
-    const match = findGoal(context.widgets, input.goalId);
+    const match = findGoal(context.widgets, String(input.goalId));
     if (!match) return createResponse(auditId, 'Goal not found.', { ok: false });
     return createResponse(auditId, `Loaded goal "${match.goal.title}".`, {
       data: { goal: match.goal },
@@ -1674,7 +1678,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'goals.update': (input, context) => {
     const auditId = createAuditId();
     assertString(input.goalId, 'goalId', { required: true, max: 120 });
-    const match = findGoal(context.widgets, input.goalId);
+    const match = findGoal(context.widgets, String(input.goalId));
     if (!match) return createResponse(auditId, 'Goal not found.', { ok: false });
     assertString(input.title, 'title', { max: 160 });
     assertString(input.description, 'description', { max: 4000 });
@@ -1712,7 +1716,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     const auditId = createAuditId();
     assertString(input.goalId, 'goalId', { required: true, max: 120 });
     assertRequiredBoolean(input.completed, 'completed');
-    const match = findGoal(context.widgets, input.goalId);
+    const match = findGoal(context.widgets, String(input.goalId));
     if (!match) return createResponse(auditId, 'Goal not found.', { ok: false });
     const goal = { ...match.goal, completed: Boolean(input.completed) };
     if (input.dryRun) {
@@ -1769,7 +1773,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'calendar.get': (input, context) => {
     const auditId = createAuditId();
     assertString(input.eventId, 'eventId', { required: true, max: 120 });
-    const match = findCalendarEvent(context.widgets, input.eventId);
+    const match = findCalendarEvent(context.widgets, String(input.eventId));
     if (!match) return createResponse(auditId, 'Event not found.', { ok: false });
     return createResponse(auditId, `Loaded event "${match.event.title}".`, {
       data: { event: match.event },
@@ -1817,7 +1821,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'calendar.update_event': (input, context) => {
     const auditId = createAuditId();
     assertString(input.eventId, 'eventId', { required: true, max: 120 });
-    const match = findCalendarEvent(context.widgets, input.eventId);
+    const match = findCalendarEvent(context.widgets, String(input.eventId));
     if (!match) return createResponse(auditId, 'Event not found.', { ok: false });
     assertString(input.title, 'title', { max: 160 });
     assertOptionalEnum(input.type, CALENDAR_TYPES, 'type');
@@ -1867,7 +1871,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'calendar.set_reminder': (input, context) => {
     const auditId = createAuditId();
     assertString(input.eventId, 'eventId', { required: true, max: 120 });
-    const match = findCalendarEvent(context.widgets, input.eventId);
+    const match = findCalendarEvent(context.widgets, String(input.eventId));
     if (!match) return createResponse(auditId, 'Event not found.', { ok: false });
     assertOptionalNumber(input.reminder, 'reminder');
     const reminder = input.reminder === null ? undefined : typeof input.reminder === 'number' ? input.reminder : match.event.reminder;
@@ -2098,7 +2102,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'shopping.update_item': (input, context) => {
     const auditId = createAuditId();
     assertString(input.itemId, 'itemId', { required: true, max: 120 });
-    const match = findShoppingItem(context.widgets, input.itemId);
+    const match = findShoppingItem(context.widgets, String(input.itemId));
     if (!match) return createResponse(auditId, 'Shopping item not found.', { ok: false });
     assertString(input.name, 'name', { max: 160 });
     assertString(input.quantity, 'quantity', { max: 60 });
@@ -2140,7 +2144,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
     const auditId = createAuditId();
     assertString(input.itemId, 'itemId', { required: true, max: 120 });
     assertRequiredBoolean(input.purchased, 'purchased');
-    const match = findShoppingItem(context.widgets, input.itemId);
+    const match = findShoppingItem(context.widgets, String(input.itemId));
     if (!match) return createResponse(auditId, 'Shopping item not found.', { ok: false });
     const purchased = Boolean(input.purchased);
     const item: PersonalShoppingItem = {
@@ -2259,7 +2263,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'record_notes.get_metadata': (input, context) => {
     const auditId = createAuditId();
     assertString(input.recordId, 'recordId', { required: true, max: 120 });
-    const match = findRecordNote(context.widgets, input.recordId);
+    const match = findRecordNote(context.widgets, String(input.recordId));
     if (!match) return createResponse(auditId, 'Record note not found.', { ok: false });
     const record: Omit<RecordNote, 'dataUrl'> & { hasMedia: boolean } = {
       id: match.record.id,
@@ -2279,7 +2283,7 @@ const executors: Partial<Record<OrganizerToolName, ToolExecutor>> = {
   'record_notes.update_metadata': (input, context) => {
     const auditId = createAuditId();
     assertString(input.recordId, 'recordId', { required: true, max: 120 });
-    const match = findRecordNote(context.widgets, input.recordId);
+    const match = findRecordNote(context.widgets, String(input.recordId));
     if (!match) return createResponse(auditId, 'Record note not found.', { ok: false });
     assertString(input.title, 'title', { max: 160 });
     assertString(input.transcription, 'transcription', { max: 12000 });
@@ -2454,7 +2458,7 @@ export function buildResourceFingerprint(
 ) {
   switch (toolName) {
     case 'tasks.create': {
-      const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'tasks');
+      const widget = getWidgetsByType(widgets, 'tasks').find((candidate) => candidate.id === input.widgetId);
       return buildFingerprint({ widgetId: input.widgetId, count: widget?.tasks.length ?? 0 });
     }
     case 'tasks.update':
@@ -2463,7 +2467,7 @@ export function buildResourceFingerprint(
       return buildFingerprint(match?.task ?? null);
     }
     case 'notes.create': {
-      const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'notes');
+      const widget = getWidgetsByType(widgets, 'notes').find((candidate) => candidate.id === input.widgetId);
       return buildFingerprint({ widgetId: input.widgetId, count: widget?.notes.length ?? 0 });
     }
     case 'notes.update': {
@@ -2471,7 +2475,7 @@ export function buildResourceFingerprint(
       return buildFingerprint(match?.note ?? null);
     }
     case 'habits.create': {
-      const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'habits');
+      const widget = getWidgetsByType(widgets, 'habits').find((candidate) => candidate.id === input.widgetId);
       return buildFingerprint({ widgetId: input.widgetId, count: widget?.habits.length ?? 0 });
     }
     case 'habits.update':
@@ -2480,7 +2484,7 @@ export function buildResourceFingerprint(
       return buildFingerprint(match?.habit ?? null);
     }
     case 'goals.create': {
-      const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'goals');
+      const widget = getWidgetsByType(widgets, 'goals').find((candidate) => candidate.id === input.widgetId);
       return buildFingerprint({ widgetId: input.widgetId, count: widget?.goals.length ?? 0 });
     }
     case 'goals.update':
@@ -2489,7 +2493,7 @@ export function buildResourceFingerprint(
       return buildFingerprint(match?.goal ?? null);
     }
     case 'calendar.create_event': {
-      const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'calendar');
+      const widget = getWidgetsByType(widgets, 'calendar').find((candidate) => candidate.id === input.widgetId);
       return buildFingerprint({ widgetId: input.widgetId, count: widget?.events.length ?? 0 });
     }
     case 'calendar.update_event':
@@ -2498,13 +2502,13 @@ export function buildResourceFingerprint(
       return buildFingerprint(match?.event ?? null);
     }
     case 'work.publish_to_calendar': {
-      const widget = widgets.find((candidate) => candidate.id === input.calendarWidgetId && candidate.type === 'calendar');
+      const widget = getWidgetsByType(widgets, 'calendar').find((candidate) => candidate.id === input.calendarWidgetId);
       return buildFingerprint({ calendarWidgetId: input.calendarWidgetId, count: widget?.events.length ?? 0 });
     }
     case 'shopping.create_item':
     case 'shopping.create_reminder':
     case 'shopping.set_budget': {
-      const widget = widgets.find((candidate) => candidate.id === input.widgetId && candidate.type === 'shopping');
+      const widget = getWidgetsByType(widgets, 'shopping').find((candidate) => candidate.id === input.widgetId);
       return buildFingerprint({
         widgetId: input.widgetId,
         items: widget?.items.length ?? 0,

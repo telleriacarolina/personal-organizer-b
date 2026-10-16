@@ -5,8 +5,6 @@ import type {
   Widget,
 } from './index';
 
-export type JsonRecord = Record<string, unknown>;
-
 export type OrganizerToolDomain =
   | 'tasks'
   | 'notes'
@@ -133,6 +131,8 @@ export type AgentActivityStatus =
   | 'cancelled'
   | 'blocked'
   | 'expired';
+
+export type JsonRecord = Record<string, unknown>;
 
 export interface AgentMessage {
   id: string;
