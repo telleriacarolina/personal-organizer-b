@@ -7,7 +7,7 @@ describe('persistence helpers (focused)', () => {
   });
 
   it('round-trips values with localStorage state repositories', () => {
-    const repository = createLocalStorageStateRepository('test.widgets', []);
+    const repository = createLocalStorageStateRepository<Array<{ id: string; type: string }>>('test.widgets', []);
     const value = [{ id: 'widget-1', type: 'tasks' }];
 
     repository.save(value);
