@@ -32,8 +32,8 @@ A comprehensive personal productivity dashboard with customizable widgets for ta
 
 ### Prerequisites
 
-* Node.js 20 or higher
-* npm
+* Node.js 22.12 or higher
+* npm 10 or higher
 
 ### Installation
 
