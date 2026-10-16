@@ -20,6 +20,9 @@ describe('organizer commands', () => {
     const widget = createWidget('daily-focus', 1, widgets);
 
     expect(widget.type).toBe('daily-focus');
+    if (widget.type !== 'daily-focus') {
+      throw new Error('Expected daily-focus widget');
+    }
     expect(widget.sourceWidgetId).toBe('tasks-1');
   });
 
@@ -42,7 +45,10 @@ describe('organizer commands', () => {
     });
     const afterToggle = toggleTaskInSource(afterAdd, 'tasks-1', 'task-1');
     const afterPriority = updateTaskPriorityInSource(afterToggle, 'tasks-1', 'task-1', 'medium');
-    const tasksWidget = afterPriority.find((widget) => widget.id === 'tasks-1' && widget.type === 'tasks');
+    const tasksWidget = afterPriority.find(
+      (widget): widget is Extract<Widget, { type: 'tasks' }> =>
+        widget.id === 'tasks-1' && widget.type === 'tasks'
+    );
 
     expect(tasksWidget?.tasks).toHaveLength(2);
     expect(tasksWidget?.tasks[0].completed).toBe(true);

@@ -179,12 +179,12 @@ export function WorkWidget({
 
   const updateClientStatus = (id: string, status: ClientSlot['status']) => {
     onUpdate((current) => ({
-      clientSlots: updateItem(id, (slot) => ({ ...slot, status }))(current.clientSlots),
+      clientSlots: updateItem<ClientSlot>(id, (slot) => ({ ...slot, status }))(current.clientSlots),
     }));
   };
 
   const deleteClientSlot = (id: string) => {
-    onUpdate((current) => ({ clientSlots: deleteItem(id)(current.clientSlots) }));
+    onUpdate((current) => ({ clientSlots: deleteItem<ClientSlot>(id)(current.clientSlots) }));
     toast.success('Client slot deleted');
   };
 
@@ -200,7 +200,7 @@ export function WorkWidget({
   };
 
   const deleteMeal = (id: string) => {
-    onUpdate((current) => ({ meals: deleteItem(id)(current.meals) }));
+    onUpdate((current) => ({ meals: deleteItem<WorkMeal>(id)(current.meals) }));
     toast.success('Meal deleted');
   };
 
@@ -225,7 +225,7 @@ export function WorkWidget({
       const endTime = Date.now();
       const duration = Math.floor((endTime - entry.startTime) / 1000 / 60);
       onUpdate((current) => ({
-        timeEntries: updateItem(id, (timeEntry) => ({ ...timeEntry, endTime, duration }))(current.timeEntries),
+        timeEntries: updateItem<TimeEntry>(id, (timeEntry) => ({ ...timeEntry, endTime, duration }))(current.timeEntries),
         activeTimerEntryId: current.activeTimerEntryId === id ? null : current.activeTimerEntryId,
       }));
       toast.success(`Timer stopped: ${duration} minutes`);
@@ -234,7 +234,7 @@ export function WorkWidget({
 
   const deleteTimeEntry = (id: string) => {
     onUpdate((current) => ({
-      timeEntries: deleteItem(id)(current.timeEntries),
+      timeEntries: deleteItem<TimeEntry>(id)(current.timeEntries),
       activeTimerEntryId: current.activeTimerEntryId === id ? null : current.activeTimerEntryId,
     }));
     toast.success('Time entry deleted');
@@ -253,12 +253,12 @@ export function WorkWidget({
 
   const updateJobStatus = (id: string, status: Job['status']) => {
     onUpdate((current) => ({
-      jobs: updateItem(id, (job) => ({ ...job, status }))(current.jobs),
+      jobs: updateItem<Job>(id, (job) => ({ ...job, status }))(current.jobs),
     }));
   };
 
   const deleteJob = (id: string) => {
-    onUpdate((current) => ({ jobs: deleteItem(id)(current.jobs) }));
+    onUpdate((current) => ({ jobs: deleteItem<Job>(id)(current.jobs) }));
     toast.success('Job deleted');
   };
 
@@ -276,12 +276,12 @@ export function WorkWidget({
 
   const toggleShoppingItem = (id: string) => {
     onUpdate((current) => ({
-      shoppingList: updateItem(id, (item) => ({ ...item, purchased: !item.purchased }))(current.shoppingList),
+      shoppingList: updateItem<ShoppingItem>(id, (item) => ({ ...item, purchased: !item.purchased }))(current.shoppingList),
     }));
   };
 
   const deleteShoppingItem = (id: string) => {
-    onUpdate((current) => ({ shoppingList: deleteItem(id)(current.shoppingList) }));
+    onUpdate((current) => ({ shoppingList: deleteItem<ShoppingItem>(id)(current.shoppingList) }));
   };
 
   const addErrand = (data: Omit<WorkErrand, 'id' | 'createdAt'>) => {
@@ -297,12 +297,12 @@ export function WorkWidget({
 
   const toggleErrand = (id: string) => {
     onUpdate((current) => ({
-      errands: updateItem(id, (errand) => ({ ...errand, completed: !errand.completed }))(current.errands),
+      errands: updateItem<WorkErrand>(id, (errand) => ({ ...errand, completed: !errand.completed }))(current.errands),
     }));
   };
 
   const deleteErrand = (id: string) => {
-    onUpdate((current) => ({ errands: deleteItem(id)(current.errands) }));
+    onUpdate((current) => ({ errands: deleteItem<WorkErrand>(id)(current.errands) }));
     toast.success('Work errand deleted');
   };
 
@@ -357,7 +357,7 @@ export function WorkWidget({
 
   const deleteRoutine = (routineId: string) => {
     onUpdate((current) => ({
-      routines: deleteItem(routineId)(current.routines || []),
+      routines: deleteItem<WorkRoutine>(routineId)(current.routines || []),
       ...(current.activeRoutineId === routineId && { activeRoutineId: undefined }),
     }));
     toast.success('Routine deleted');

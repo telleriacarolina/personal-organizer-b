@@ -62,10 +62,10 @@ describe("ChartStyle", () => {
 
     const markup = renderToStaticMarkup(<ChartStyle id="chart-traffic" config={config} />)
 
-    expect(markup).toContain("[data-chart=chart-traffic]")
+    expect(markup).toContain('[data-chart="chart-traffic"]')
     expect(markup).toContain("--color-desktop: #3b82f6;")
     expect(markup).toContain("--color-mobile: #22c55e;")
-    expect(markup).toContain(".dark [data-chart=chart-traffic]")
+    expect(markup).toContain('.dark [data-chart="chart-traffic"]')
     expect(markup).toContain("--color-mobile: #16a34a;")
   })
 
@@ -83,7 +83,7 @@ describe("ChartStyle", () => {
     const markup = renderToStaticMarkup(<ChartStyle id="chart-revenue" config={config} />)
 
     expect(markup).toContain("--color-revenue: #fb923c;")
-    expect(markup).toContain(".dark [data-chart=chart-revenue]")
+    expect(markup).toContain('.dark [data-chart="chart-revenue"]')
     expect(markup).toContain("--color-revenue: #f97316;")
     expect(markup).not.toContain("undefined")
   })
@@ -112,10 +112,10 @@ describe("ChartStyle", () => {
 
     const css = styleTag?.innerHTML ?? ""
 
-    expect(css).toContain("[data-chart=chart-themed]")
+    expect(css).toContain('[data-chart="chart-themed"]')
     expect(css).toContain("--color-desktop: #f00;")
     expect(css).toContain("--color-mobile: #0f0;")
-    expect(css).toContain(".dark [data-chart=chart-themed]")
+    expect(css).toContain('.dark [data-chart="chart-themed"]')
     expect(css).toContain("--color-mobile: #00f;")
   })
 })

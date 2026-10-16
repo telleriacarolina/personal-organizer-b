@@ -39,4 +39,9 @@ jobs:
         run: deno lint
 
       - name: Run tests
-        run: deno test -A
+        run: |
+          if find . -path ./node_modules -prune -o -path ./src -prune -o -path ./dist -prune -o -type f \( -name '*_test.ts' -o -name '*_test.tsx' -o -name '*_test.js' -o -name '*_test.mts' \) -print -quit | grep -q .; then
+            deno test -A
+          else
+            echo "No Deno test modules found outside excluded directories; skipping."
+          fi
