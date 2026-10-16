@@ -8,24 +8,12 @@ import {
 
 describe("chart-config", () => {
   it("chart container classes target Recharts 3 selectors", () => {
-    expect(
-      CHART_CONTAINER_CLASS_NAME,
-    ).toMatch(/recharts-cartesian-axis-tick-value/)
-    expect(
-      CHART_CONTAINER_CLASS_NAME,
-    ).toMatch(/recharts-polar-grid-angle_line\[stroke='#ccc'\]/)
-    expect(
-      CHART_CONTAINER_CLASS_NAME,
-    ).toMatch(/recharts-polar-grid-concentric-circle\[stroke='#ccc'\]/)
-    expect(
-      CHART_CONTAINER_CLASS_NAME,
-    ).toMatch(/recharts-reference-line-line\[stroke='#ccc'\]/)
-    expect(
-      CHART_CONTAINER_CLASS_NAME,
-    ).toMatch(/recharts-cross\.recharts-tooltip-cursor\[stroke='#ccc'\]/)
-    expect(
-      CHART_CONTAINER_CLASS_NAME,
-    ).toMatch(/recharts-rectangle\.recharts-tooltip-cursor\[fill='#ccc'\]/)
+    expect(CHART_CONTAINER_CLASS_NAME).toMatch(/recharts-cartesian-axis-tick-value/)
+    expect(CHART_CONTAINER_CLASS_NAME).toMatch(/recharts-polar-grid-angle_line\[stroke='#ccc'\]/)
+    expect(CHART_CONTAINER_CLASS_NAME).toMatch(/recharts-polar-grid-concentric-circle\[stroke='#ccc'\]/)
+    expect(CHART_CONTAINER_CLASS_NAME).toMatch(/recharts-reference-line-line\[stroke='#ccc'\]/)
+    expect(CHART_CONTAINER_CLASS_NAME).toMatch(/recharts-cross\.recharts-tooltip-cursor\[stroke='#ccc'\]/)
+    expect(CHART_CONTAINER_CLASS_NAME).toMatch(/recharts-rectangle\.recharts-tooltip-cursor\[fill='#ccc'\]/)
     expect(CHART_CONTAINER_CLASS_NAME).not.toMatch(/recharts-cartesian-axis-tick_text/)
     expect(CHART_CONTAINER_CLASS_NAME).not.toMatch(/recharts-polar-grid_\[stroke='#ccc'\]/)
     expect(CHART_CONTAINER_CLASS_NAME).not.toMatch(/recharts-reference-line_\[stroke='#ccc'\]/)

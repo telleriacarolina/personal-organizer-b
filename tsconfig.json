@@ -18,6 +18,7 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
+    "types": ["vitest/globals", "node"],
     /* Linting */
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
@@ -29,7 +30,7 @@
       "@/*": [
         "./src/*"
       ]
-    },
+    }
   },
   "include": [
     "src"
