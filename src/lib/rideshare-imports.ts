@@ -11,6 +11,7 @@ const DATE_HEADER_HINTS = ['date', 'start', 'request', 'pickup', 'accepted', 'ti
 const END_HEADER_HINTS = ['end', 'dropoff', 'completed', 'finish'];
 const DURATION_HEADER_HINTS = ['duration', 'online minutes', 'minutes'];
 const DESCRIPTION_HEADER_HINTS = ['rider', 'passenger', 'trip id', 'ride id', 'request id'];
+const MAX_REASONABLE_DURATION_MINUTES = 24 * 60;
 
 export function parseRideshareCsv(provider: RideshareProvider, rawCsv: string): RideshareImportResult {
   const rows = parseCsvRows(rawCsv);
@@ -83,16 +84,26 @@ function parseDurationMinutes(rawDuration: string | undefined, startTime: number
         const hours = Number(parts[0]);
         const minutes = Number(parts[1]);
         if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
-          return Math.max(1, Math.round((hours * 60) + minutes));
+          const totalMinutes = Math.round((hours * 60) + minutes);
+          if (totalMinutes > 0 && totalMinutes <= MAX_REASONABLE_DURATION_MINUTES) {
+            return totalMinutes;
+          }
         }
       }
 
       const numericMinutes = Number(parts[0]);
       if (!Number.isNaN(numericMinutes)) {
         if (text.toLowerCase().includes('hour') && parts.length === 1) {
-          return Math.max(1, Math.round(numericMinutes * 60));
+          const totalMinutes = Math.round(numericMinutes * 60);
+          if (totalMinutes > 0 && totalMinutes <= MAX_REASONABLE_DURATION_MINUTES) {
+            return totalMinutes;
+          }
+          return undefined;
         }
-        return Math.max(1, Math.round(numericMinutes));
+        const totalMinutes = Math.round(numericMinutes);
+        if (totalMinutes > 0 && totalMinutes <= MAX_REASONABLE_DURATION_MINUTES) {
+          return totalMinutes;
+        }
       }
     }
   }

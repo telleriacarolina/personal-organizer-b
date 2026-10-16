@@ -242,35 +242,33 @@ export function WorkWidget({
   };
 
   const importRideshareEntries = (entries: Array<Omit<TimeEntry, 'id' | 'createdAt'>>) => {
-    let added = 0;
-    onUpdate((current) => {
-      const signature = (entry: Pick<TimeEntry, 'description' | 'project' | 'startTime' | 'endTime' | 'duration'>) => [
-        entry.description.trim().toLowerCase(),
-        (entry.project ?? '').trim().toLowerCase(),
-        entry.startTime,
-        entry.endTime ?? '',
-        entry.duration ?? '',
-      ].join('|');
+    const signature = (entry: Pick<TimeEntry, 'description' | 'project' | 'startTime' | 'endTime' | 'duration'>) => [
+      entry.description.trim().toLowerCase(),
+      (entry.project ?? '').trim().toLowerCase(),
+      entry.startTime,
+      entry.endTime ?? '',
+      entry.duration ?? '',
+    ].join('|');
 
-      const existingSignatures = new Set(current.timeEntries.map((entry) => signature(entry)));
-      const importedEntries: TimeEntry[] = [];
+    const existingSignatures = new Set(timeEntries.map((entry) => signature(entry)));
+    const importedEntries: TimeEntry[] = [];
 
-      entries.forEach((entry) => {
-        const entrySignature = signature(entry);
-        if (existingSignatures.has(entrySignature)) return;
-        existingSignatures.add(entrySignature);
-        importedEntries.push({
-          ...entry,
-          id: createId('time-entry'),
-          createdAt: Date.now(),
-        });
+    entries.forEach((entry) => {
+      const entrySignature = signature(entry);
+      if (existingSignatures.has(entrySignature)) return;
+      existingSignatures.add(entrySignature);
+      importedEntries.push({
+        ...entry,
+        id: createId('time-entry'),
+        createdAt: Date.now(),
       });
-
-      added = importedEntries.length;
-      return { timeEntries: [...current.timeEntries, ...importedEntries] };
     });
 
-    return { added, skipped: entries.length - added };
+    if (importedEntries.length > 0) {
+      onUpdate((current) => ({ timeEntries: [...current.timeEntries, ...importedEntries] }));
+    }
+
+    return { added: importedEntries.length, skipped: entries.length - importedEntries.length };
   };
 
   const addJob = (data: Omit<Job, 'id' | 'createdAt'>) => {

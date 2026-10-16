@@ -66,4 +66,16 @@ describe('parseRideshareCsv', () => {
     expect(result.entries).toHaveLength(0);
     expect(result.skippedRows).toBe(2);
   });
+
+  it('ignores unreasonable duration values and falls back to start/end timestamps', () => {
+    const csv = [
+      'Trip ID,Start Date,End Date,Duration (minutes)',
+      'trip-1,2026-10-10T08:00:00Z,2026-10-10T08:25:00Z,2026',
+    ].join('\n');
+
+    const result = parseRideshareCsv('uber', csv);
+
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].duration).toBe(25);
+  });
 });
