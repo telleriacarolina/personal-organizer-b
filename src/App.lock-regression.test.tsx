@@ -9,9 +9,7 @@ describe('App global lock render regression', () => {
   });
 
   it('toggles global lock once without hitting maximum update depth and reflects updated state', async () => {
-    window.localStorage.clear();
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
     render(<App />);
 
     fireEvent.click(screen.getByTitle('Lock all widgets'));
