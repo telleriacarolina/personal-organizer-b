@@ -61,4 +61,33 @@ describe('dashboard-state global lock helpers', () => {
     expect(secondLocked[0]).toBe(firstLocked[0]);
     expect(secondLocked[1]).toBe(firstLocked[1]);
   });
+
+  it('only updates widgets that are out of sync when changing lock state', () => {
+    const inSyncWidget: Widget = {
+      id: 'tasks-1',
+      type: 'tasks',
+      position: 0,
+      size: { width: 350, height: 400, locked: true },
+      tasks: [],
+    };
+    const outOfSyncWidget: Widget = {
+      id: 'notes-1',
+      type: 'notes',
+      position: 1,
+      size: { width: 350, height: 400, locked: false },
+      notes: [],
+    };
+    const widgets: Widget[] = [inSyncWidget, outOfSyncWidget];
+
+    const next = applyGlobalLockState(widgets, true);
+    const repeated = applyGlobalLockState(next, true);
+
+    expect(next).not.toBe(widgets);
+    expect(next[0]).toBe(inSyncWidget);
+    expect(next[1]).not.toBe(outOfSyncWidget);
+    expect(next[1].size).toMatchObject({ width: 350, height: 400, locked: true });
+    expect(repeated).toBe(next);
+    expect(repeated[0]).toBe(next[0]);
+    expect(repeated[1]).toBe(next[1]);
+  });
 });
