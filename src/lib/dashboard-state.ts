@@ -3,20 +3,15 @@ import type { Widget } from '@/types';
 export const toggleGlobalLockValue = (current: boolean) => !current;
 
 export const applyGlobalLockState = (widgets: Widget[], locked: boolean) => {
-  const requiresUpdate = widgets.some((widget) => {
+  const nextWidgets = widgets.map((widget) => {
     const width = widget.size?.width ?? 350;
     const height = widget.size?.height ?? 400;
-    return widget.size?.locked !== locked || widget.size?.width !== width || widget.size?.height !== height;
-  });
-
-  if (!requiresUpdate) {
-    return widgets;
-  }
-
-  return widgets.map((widget) => {
-    const width = widget.size?.width ?? 350;
-    const height = widget.size?.height ?? 400;
-    const isInSync = widget.size?.locked === locked && widget.size?.width === width && widget.size?.height === height;
+    const isInSync =
+      widget.size?.locked === locked &&
+      widget.size?.width !== undefined &&
+      widget.size?.height !== undefined &&
+      widget.size.width === width &&
+      widget.size.height === height;
 
     if (isInSync) {
       return widget;
@@ -32,4 +27,6 @@ export const applyGlobalLockState = (widgets: Widget[], locked: boolean) => {
       },
     };
   });
+
+  return widgets.every((widget, index) => nextWidgets[index] === widget) ? widgets : nextWidgets;
 };
