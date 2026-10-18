@@ -21,4 +21,18 @@ describe('dashboard-state global lock helpers', () => {
     expect(locked.every((widget) => widget.size?.locked === true)).toBe(true);
     expect(unlocked.every((widget) => widget.size?.locked === false)).toBe(true);
   });
+
+  it('does not rewrite widgets when the requested lock state is already applied', () => {
+    const widgets: Widget[] = [
+      {
+        id: 'tasks-1',
+        type: 'tasks',
+        position: 0,
+        size: { width: 350, height: 400, locked: true },
+        tasks: [],
+      },
+    ];
+
+    expect(applyGlobalLockState(widgets, true)).toBe(widgets);
+  });
 });
