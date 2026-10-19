@@ -7,6 +7,7 @@ import {
   preferencesRepository,
   stateRepositories,
   storageKeys,
+  subscribeToPersistenceIssues,
   widgetRepository,
 } from './persistence';
 
@@ -116,6 +117,35 @@ describe('widgetRepository', () => {
     expect((loaded[0] as Extract<Widget, { type: 'work' }>).jobs).toHaveLength(1);
     expect((loaded[0] as Extract<Widget, { type: 'work' }>).errands).toHaveLength(1);
     expect((loaded[0] as Extract<Widget, { type: 'work' }>).errands[0]).toMatchObject({ id: 'errand-1', priority: 'medium' });
+  });
+
+  it('notifies persistence listeners when malformed widgets are skipped', () => {
+    const issues: Array<{ code: string; message: string }> = [];
+    const unsubscribe = subscribeToPersistenceIssues((issue) => {
+      issues.push({ code: issue.code, message: issue.message });
+    });
+
+    const validWidget: Widget = {
+      id: 'tasks-1',
+      type: 'tasks',
+      position: 0,
+      tasks: [{ id: 'task-1', text: 'Valid task', completed: false, createdAt: Date.now() }],
+    };
+    const malformedWidget = {
+      id: 'calendar-1',
+      type: 'calendar',
+      position: 1,
+      events: 'not-an-array',
+    } as unknown as Widget;
+
+    localStorageMock.setItem(storageKeys.widgets, JSON.stringify([validWidget, malformedWidget]));
+    const loaded = stateRepositories.widgets.load();
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toMatchObject({ id: 'tasks-1', type: 'tasks' });
+    expect(issues.some((issue) => issue.code === 'corrupted-data' && issue.message.includes('calendar'))).toBe(true);
+
+    unsubscribe();
   });
 
   it('loads legacy persisted widgets with stringified boolean values', () => {

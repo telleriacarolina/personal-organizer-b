@@ -810,17 +810,44 @@ function recoverPersistedValue<T>(value: unknown, schema: z.ZodTypeAny): T | und
 
 function normalizePersistedWidgets(rawWidgets: unknown): Widget[] {
   if (!Array.isArray(rawWidgets)) {
+    reportPersistenceIssue({
+      storage: 'localStorage',
+      operation: 'read',
+      key: storageKeys.widgets,
+      code: 'corrupted-data',
+      message: 'Persisted widget dashboard was not stored as an array and was reset to an empty list.',
+      cause: rawWidgets,
+    });
     return [];
   }
 
   return rawWidgets.flatMap((widget) => {
     if (!widget || typeof widget !== 'object' || !('type' in widget) || typeof widget.type !== 'string') {
+      reportPersistenceIssue({
+        storage: 'localStorage',
+        operation: 'read',
+        key: storageKeys.widgets,
+        code: 'corrupted-data',
+        message: 'Skipped a malformed saved widget because it did not include a valid type.',
+        cause: widget,
+      });
       return [];
     }
 
     const widgetType = widget.type as WidgetType;
     const definition = widgetDefinitions[widgetType];
     if (!definition) {
+      const widgetIdValue =
+        widget !== null && typeof widget === 'object' && 'id' in widget ? (widget as Record<string, unknown>).id : undefined;
+      const widgetId = widgetIdValue === undefined ? undefined : String(widgetIdValue);
+      reportPersistenceIssue({
+        storage: 'localStorage',
+        operation: 'read',
+        key: storageKeys.widgets,
+        code: 'corrupted-data',
+        message: `Skipped unknown saved widget type "${widgetType}"${widgetId ? ` for widget "${widgetId}"` : ''}.`,
+        cause: widget,
+      });
       return [];
     }
 
@@ -835,7 +862,16 @@ function normalizePersistedWidgets(rawWidgets: unknown): Widget[] {
       const widgetIdValue =
         widget !== null && typeof widget === 'object' && 'id' in widget ? (widget as Record<string, unknown>).id : undefined;
       const widgetId = widgetIdValue === undefined ? undefined : String(widgetIdValue);
-      console.warn('[persistence] Skipped malformed saved widget', { widgetId, widgetType, field, message, error });
+      const summary = `Skipped malformed saved widget${widgetId ? ` "${widgetId}"` : ''} (${widgetType}) at ${message}.`;
+      console.warn('[persistence] ' + summary, { widgetId, widgetType, field, message, error });
+      reportPersistenceIssue({
+        storage: 'localStorage',
+        operation: 'read',
+        key: storageKeys.widgets,
+        code: 'corrupted-data',
+        message: summary,
+        cause: error,
+      });
       return [];
     }
   });
