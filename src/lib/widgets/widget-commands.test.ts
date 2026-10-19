@@ -98,6 +98,18 @@ describe('widgetDefinitions', () => {
     expect(issues.some((issue) => issue.field === 'messages.0.suggestions.0.actions.0.payload.taskUpdates.0.priority')).toBe(true);
   });
 
+  it('coerces legacy size.locked values through the shared boolean helper', () => {
+    const widget = widgetDefinitions.tasks.defaultState({ id: 'tasks-legacy', position: 0 });
+
+    const trueString = widgetDefinitions.tasks.migrate({ ...widget, size: { width: 350, height: 400, locked: 'true' } }, { version: 1 });
+    const falseString = widgetDefinitions.tasks.migrate({ ...widget, size: { width: 350, height: 400, locked: 'false' } }, { version: 1 });
+    const booleanValue = widgetDefinitions.tasks.migrate({ ...widget, size: { width: 350, height: 400, locked: false } }, { version: 1 });
+
+    expect(trueString.size?.locked).toBe(true);
+    expect(falseString.size?.locked).toBe(false);
+    expect(booleanValue.size?.locked).toBe(false);
+  });
+
   it('accepts previously persisted widget payloads with loosely typed nested data', () => {
     const legacyWidgets: Widget[] = [
       {

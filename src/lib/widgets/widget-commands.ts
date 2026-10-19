@@ -72,14 +72,35 @@ export function executeWidgetCommand(current: Widget[], command: WidgetCommand):
     const normalized: Widget[] = [];
     const issues: ValidationIssue[] = [];
 
-    current.forEach((widget, index) => {
-      const migrated = widgetDefinitions[widget.type].migrate(widget, { version: 1 });
-      const { normalized: normalizedWidget, issues: widgetIssues } = validateNormalizedWidget({
-        ...migrated,
-        position: index,
-      });
-      normalized.push(normalizedWidget);
-      issues.push(...widgetIssues);
+    let validIndex = 0;
+    current.forEach((widget) => {
+      const definition = widgetDefinitions[widget.type as keyof typeof widgetDefinitions];
+      if (!definition) {
+        issues.push({ field: `${widget.type || 'widget'}.type`, message: 'Unknown widget type; dropping invalid saved widget.', severity: 'error' });
+        return;
+      }
+
+      try {
+        const migrated = definition.migrate(widget, { version: 1 });
+        const { normalized: normalizedWidget, issues: widgetIssues } = validateNormalizedWidget({
+          ...migrated,
+          position: validIndex,
+        });
+        normalized.push(normalizedWidget);
+        validIndex += 1;
+        issues.push(...widgetIssues);
+      } catch (error) {
+        console.warn('[widget-sync] Dropped invalid saved widget', {
+          id: typeof widget === 'object' && widget && 'id' in widget ? widget.id : undefined,
+          type: typeof widget === 'object' && widget && 'type' in widget ? widget.type : undefined,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        issues.push({
+          field: `${widget.type || 'widget'}.data`,
+          message: 'Widget data is malformed and was skipped during sync.',
+          severity: 'error',
+        });
+      }
     });
 
     return {

@@ -5,6 +5,7 @@ import {
   aiInsightRepository,
   aiSuggestionRepository,
   preferencesRepository,
+  stateRepositories,
   storageKeys,
   widgetRepository,
 } from './persistence';
@@ -52,6 +53,27 @@ describe('widgetRepository', () => {
 
     widgetRepository.remove('tasks-1');
     expect(widgetRepository.list().map((widget) => widget.id)).toEqual(['notes-1']);
+  });
+
+  it('preserves valid sibling widgets when malformed saved widgets are filtered out', () => {
+    const validWidget: Widget = {
+      id: 'tasks-1',
+      type: 'tasks',
+      position: 0,
+      tasks: [{ id: 'task-1', text: 'Valid task', completed: false, createdAt: Date.now() }],
+    };
+    const malformedWidget = {
+      id: 'notes-1',
+      type: 'notes',
+      position: 1,
+      notes: [{ id: 'bad-note', title: '', content: 'oops', createdAt: Date.now(), updatedAt: Date.now() }],
+    } as unknown as Widget;
+
+    localStorageMock.setItem(storageKeys.widgets, JSON.stringify([validWidget, malformedWidget]));
+    const loaded = stateRepositories.widgets.load();
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toMatchObject({ id: 'tasks-1', type: 'tasks' });
   });
 });
 
