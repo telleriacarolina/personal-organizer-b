@@ -1,30 +1,41 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import App from './App';
+import App from '@/App';
 
-describe('App global lock sync', () => {
+describe('App global lock regression', () => {
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+  const originalConsoleError = console.error;
+
   beforeEach(() => {
+    window.localStorage.clear();
+    errorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
+      originalConsoleError(...args);
+    });
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
     window.localStorage.clear();
   });
 
-  it('toggles the global lock without entering a repeated update cycle', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
+  it('toggles global lock without hitting a maximum update depth loop', async () => {
     render(<App />);
 
-    const lockButton = screen.getByTitle('Lock all widgets');
-    fireEvent.click(lockButton);
+    fireEvent.click(screen.getByTitle('Lock all widgets'));
 
     await waitFor(() => {
       expect(screen.getByTitle('Unlock all widgets')).toBeInTheDocument();
+      expect(screen.getByText('Locked')).toBeInTheDocument();
+      expect(window.localStorage.getItem('organizer-global-lock')).toBe('true');
     });
 
-    expect(window.localStorage.getItem('organizer-global-lock')).toBe('true');
-    expect(consoleErrorSpy.mock.calls.flat().join(' ')).not.toContain('Maximum update depth exceeded');
-
-    consoleErrorSpy.mockRestore();
+    expect(
+      errorSpy.mock.calls.some((call) =>
+        call.some((arg) => String(arg).includes('Maximum update depth exceeded'))
+      )
+    ).toBe(false);
   });
 });
