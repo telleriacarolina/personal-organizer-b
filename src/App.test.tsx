@@ -29,6 +29,7 @@ describe('App global lock regression', () => {
     await waitFor(() => {
       expect(screen.getByTitle('Unlock all widgets')).toBeInTheDocument();
       expect(screen.getByText('Locked')).toBeInTheDocument();
+      expect(window.localStorage.getItem('organizer-global-lock')).toBe('true');
     });
 
     expect(
