@@ -6,6 +6,8 @@ The app already has a strong foundation: a dashboard shell, widget system, persi
 
 This backlog prioritizes the work that most directly reduces risk, improves the core user experience, and creates confidence in the app as a daily-use personal organizer.
 
+This is a planning document for the next milestone, not the source of truth for tracked GitHub issues. The team should create actual issue tickets and link them here once work begins; until then, this document defines the recommended execution order and acceptance bar.
+
 ## Recommended backlog issues
 
 ### Issue 1: Harden local persistence and dashboard recovery
@@ -29,8 +31,9 @@ Scope:
 Acceptance criteria:
 - App opens successfully when local data is empty, partial, stale, or structurally invalid.
 - Malformed widget payloads are normalized or discarded without crashing the dashboard.
-- Legacy data can be migrated to the current schema without data loss.
-- A recovery path is clearly documented and test-covered for at least the common upgrade scenarios.
+- Legacy data can be migrated to the current schema without data loss, with an explicit fallback path for irrecoverable entries.
+- Recovery behavior is covered by automated tests for the common upgrade scenarios: empty state, stale schema, malformed payload, and partial write.
+- The recovery strategy is documented in the repo, including which malformed records are preserved, discarded, or migrated.
 
 ---
 
@@ -54,9 +57,10 @@ Scope:
 
 Acceptance criteria:
 - A user can create a task, view it in Daily Focus, and complete it without broken state.
-- Reloading the app preserves task completion and widget references correctly.
+- Reloading the app preserves task completion, widget references, and order correctly.
 - Empty states, editing, deletion, and completion states are clear and consistent.
-- Duplicate or stale references degrade gracefully rather than breaking the widget.
+- Duplicate or stale references degrade gracefully instead of breaking the widget.
+- A regression test or smoke path confirms task creation, focus visibility, and completion on reload.
 
 ---
 
@@ -83,6 +87,7 @@ Acceptance criteria:
 - Removing a source widget does not leave the app in a broken state.
 - Invalid or missing references render a safe fallback instead of a crash or blank state.
 - Cross-widget updates remain consistent across reloads.
+- A test covers stale or deleted source references and verifies the system falls back to a safe, non-breaking state.
 
 ---
 
@@ -98,6 +103,13 @@ Description:
 
 The organizer agent is a differentiator, but trust depends on strict write controls. AI suggestions should remain explicit, reviewable, and scoped to safe actions. The app should never mutate user data without a clear user confirmation step.
 
+Why this is P1 for the next sprint:
+
+- The workflow is trust-critical and should be protected before broader automation is expanded.
+- The product requirement is clear: the user must approve any write-like action before it persists.
+- However, this work often depends on broader agent UX and safety design decisions, so it is intentionally scheduled after the core data and workflow reliability fixes are complete.
+- This keeps the two-week milestone realistic while still preserving a hard release gate: AI write actions must be blocked or explicitly reviewed before release.
+
 Scope:
 - `src/lib/organizer-agent-service.ts`
 - `src/lib/organizer-agent-broker.ts`
@@ -110,6 +122,7 @@ Acceptance criteria:
 - The review step clearly states what will change before it is applied.
 - Destructive or ambiguous operations require additional confirmation.
 - AI-generated suggestions are kept separate from source widget data and remain auditable.
+- A release gate requires a manual smoke check confirming that no AI action mutates stored organizer data without explicit user approval.
 
 ---
 
@@ -137,6 +150,7 @@ Acceptance criteria:
 - Empty states and validation feedback are understandable without guidance.
 - User actions that change data save reliably and remain visible after reload.
 - Completion and priority states are visually and semantically consistent.
+- A QA checklist confirms the top five daily planner flows pass after a reload and after a representative edit session.
 
 ---
 
@@ -186,8 +200,31 @@ Acceptance criteria:
 - Every release has a short smoke checklist covering storage, dashboard render, task flow, and AI review safety.
 - The team can tell if a change is ready to ship based on a repeatable validation flow.
 - Core user journeys are tested or manually checked before release.
+- Release readiness requires successful lint, test, and build checks plus a smoke check for persistence and task flow.
 
 ---
+
+## Milestone scope for the next 2 weeks
+
+### Required for the two-week milestone
+
+These are the items that should be treated as the mandatory delivery set for the next milestone:
+
+- Issue 1: Persistence recovery hardening
+- Issue 2: Task-to-focus workflow validation
+- Issue 3: Cross-widget reference handling
+- Issue 5: Core workflow QA pass
+- Release gate / smoke validation checklist
+
+### Follow-up items after the milestone
+
+These remain important, but they should either be finished in the next sprint or be protected behind explicit release approval:
+
+- Issue 4: AI write safety enforcement
+- Issue 6: Accessibility and keyboard pass
+- Issue 7: Full release process polish, if release criteria change or if there is broader scope to ship
+
+The two-week scope is intentionally narrow. The goal is to reduce the highest-risk product failures before the team expands scope into additional UX work or new feature development.
 
 ## Prioritization by impact and effort
 
@@ -202,6 +239,12 @@ Acceptance criteria:
 | Enforce review-before-write AI safety | P1 | High | Medium | Protects trust and prevents unsafe write behavior |
 | Improve accessibility and keyboard controls | P1 | Medium | Medium | Makes product usable and inclusive |
 | Release smoke checklist | P1 | Medium | Low | Creates a repeatable quality gate |
+
+### P0 vs. P1 rationale
+
+- P0 items are the product’s reliability backbone: if they fail, the app is unreliable for day-to-day use or loses user data.
+- P1 items are still important, but they either depend on broader product/UX design decisions or are best treated as a release gate rather than a first-pass unblocker.
+- AI write safety is high-impact because it affects trust and user data integrity, but it is intentionally marked P1 for this milestone because it requires a careful approval and review UX, not only a patch to the storage or widget layer.
 
 ### Impact vs. effort summary
 
@@ -249,10 +292,11 @@ Ship the app’s reliability and trust foundation in a way that reduces risk for
 
 #### Deliverables by end of Week 1
 
-- Data migration and recovery tests passed
-- Core task + focus workflow validated
-- Cross-widget state remains sane after reload and deletion
-- Known edge cases documented in the team backlog
+- Data migration and recovery tests passed.
+- Core task + focus workflow validated.
+- Cross-widget state remains sane after reload and deletion.
+- Known edge cases documented in the team backlog.
+- Release smoke checklist draft is ready for review.
 
 ### Week 2: AI trust, UX quality, and release readiness
 
@@ -275,10 +319,25 @@ Ship the app’s reliability and trust foundation in a way that reduces risk for
 
 #### Deliverables by end of Week 2
 
-- AI writes are reviewable and safe by default
-- Core accessibility issues are addressed in the main app shell
-- A release checklist is in place and used by the team
-- The app is ready for a minimal but trustworthy release candidate
+- AI writes are reviewable and safe by default.
+- Core accessibility issues are addressed in the main app shell.
+- A release checklist is in place and used by the team.
+- The app is ready for a minimal but trustworthy release candidate, or the release is explicitly blocked on unresolved P0 issues.
+
+---
+
+## Release gate definition
+
+The product is not ready to ship until the following checks pass:
+
+- Automated CI checks succeed for lint, test, and build.
+- Persistence migration and recovery tests pass for empty, stale, and malformed saved data.
+- Core task workflow smoke tests pass: create task, place it in Daily Focus, reload, and complete it without losing state.
+- Cross-widget reference smoke tests pass for deleted or stale source items.
+- AI review safety smoke test passes: a write-like action is blocked or requires explicit review before persisting.
+- A quick manual regression checklist confirms the app renders and behaves correctly for the main planner flows.
+
+If any of the P0 checks fail, the release should be blocked until they are resolved or consciously accepted with a documented exception.
 
 ---
 
@@ -286,9 +345,10 @@ Ship the app’s reliability and trust foundation in a way that reduces risk for
 
 1. Harden local persistence and recovery
 2. Stabilize task-to-focus and cross-widget flows
-3. Enforce AI review-before-write protections
-4. Finish a small accessibility pass
-5. Establish the release smoke checklist
+3. Complete the core QA pass for the primary planner workflows
+4. Enforce AI review-before-write protections
+5. Finish a small accessibility pass
+6. Establish the release smoke checklist
 
 This order creates the safest path to product confidence: first prevent data loss, then protect the main user journey, then defend trust-critical features, and finally polish the experience without risking the core foundation.
 
