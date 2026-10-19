@@ -5,9 +5,11 @@ import type {
   RecordNote,
   Widget,
   WidgetAIState,
+  WidgetType,
 } from '@/types';
 import type { AIConfig, PersistedSuggestion } from '@/types/ai';
 import type { CustomColors } from '@/types/theme';
+import { widgetDefinitions } from '@/lib/widgets/widget-registry';
 
 export type PersistenceStorage = 'localStorage' | 'indexedDB';
 export type PersistenceOperation = 'read' | 'write' | 'delete' | 'migrate';
@@ -725,9 +727,40 @@ function removeValue(key: string, store = getBrowserStorage()): void {
   store.removeItem(key);
 }
 
+function normalizePersistedWidgets(rawWidgets: unknown): Widget[] {
+  if (!Array.isArray(rawWidgets)) {
+    return [];
+  }
+
+  return rawWidgets.flatMap((widget) => {
+    if (!widget || typeof widget !== 'object' || !('type' in widget) || typeof widget.type !== 'string') {
+      return [];
+    }
+
+    const widgetType = widget.type as WidgetType;
+    const definition = widgetDefinitions[widgetType];
+    if (!definition) {
+      return [];
+    }
+
+    try {
+      return [definition.migrate(widget, { version: 1 })];
+    } catch {
+      return [];
+    }
+  });
+}
+
 export function createLocalStorageStateRepository<T>(key: string, fallback: T): StateRepository<T> {
   return {
-    load: () => readJson(key, fallback),
+    load: () => {
+      const value = readJson(key, fallback);
+      if (key === storageKeys.widgets) {
+        return normalizePersistedWidgets(value) as T;
+      }
+
+      return value;
+    },
     save: (value) => writeJson(key, value),
   };
 }
