@@ -63,10 +63,10 @@ describe('widgetRepository', () => {
       tasks: [{ id: 'task-1', text: 'Valid task', completed: false, createdAt: Date.now() }],
     };
     const malformedWidget = {
-      id: 'notes-1',
-      type: 'notes',
+      id: 'unknown-1',
+      type: 'unknown-widget',
       position: 1,
-      notes: [{ id: 'bad-note', title: '', content: 'oops', createdAt: Date.now(), updatedAt: Date.now() }],
+      payload: 'not-a-widget',
     } as unknown as Widget;
 
     localStorageMock.setItem(storageKeys.widgets, JSON.stringify([validWidget, malformedWidget]));
@@ -74,6 +74,66 @@ describe('widgetRepository', () => {
 
     expect(loaded).toHaveLength(1);
     expect(loaded[0]).toMatchObject({ id: 'tasks-1', type: 'tasks' });
+  });
+
+  it('retains valid nested work data while skipping malformed entries', () => {
+    const validJob = {
+      id: 'job-1',
+      title: 'Design sprint',
+      client: 'Client A',
+      status: 'pending',
+      priority: 'high',
+      createdAt: Date.now(),
+    };
+    const validErrand = {
+      id: 'errand-1',
+      title: 'Pickup supplies',
+      completed: false,
+      priority: 'medium',
+      createdAt: Date.now(),
+    };
+    const malformedWidget = {
+      id: 'work-1',
+      type: 'work',
+      position: 2,
+      clientSlots: [],
+      meals: [],
+      timeEntries: [],
+      jobs: [validJob],
+      shoppingList: [],
+      errands: [
+        { ...validErrand, priority: 'invalid' },
+        validErrand,
+      ],
+      routines: [],
+    } as unknown as Widget;
+
+    localStorageMock.setItem(storageKeys.widgets, JSON.stringify([malformedWidget]));
+    const loaded = stateRepositories.widgets.load();
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toMatchObject({ id: 'work-1', type: 'work' });
+    expect((loaded[0] as Extract<Widget, { type: 'work' }>).jobs).toHaveLength(1);
+    expect((loaded[0] as Extract<Widget, { type: 'work' }>).errands).toHaveLength(1);
+    expect((loaded[0] as Extract<Widget, { type: 'work' }>).errands[0]).toMatchObject({ id: 'errand-1', priority: 'medium' });
+  });
+
+  it('loads legacy persisted widgets with stringified boolean values', () => {
+    const legacyWidget: Widget = {
+      id: 'tasks-legacy',
+      type: 'tasks',
+      position: 0,
+      size: { width: 350, height: 400, locked: 'false' as unknown as boolean },
+      tasks: [{ id: 'task-1', text: 'Legacy task', completed: 'false' as unknown as boolean, createdAt: Date.now() }],
+    };
+
+    localStorageMock.setItem(storageKeys.widgets, JSON.stringify([legacyWidget]));
+    const loaded = stateRepositories.widgets.load();
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toMatchObject({ id: 'tasks-legacy', type: 'tasks' });
+    expect((loaded[0] as Extract<Widget, { type: 'tasks' }>).size?.locked).toBe(false);
+    expect((loaded[0] as Extract<Widget, { type: 'tasks' }>).tasks[0]?.completed).toBe(false);
   });
 });
 

@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type {
   BackgroundImage,
   FamilyCalendarPlannerEvent,
@@ -727,6 +728,86 @@ function removeValue(key: string, store = getBrowserStorage()): void {
   store.removeItem(key);
 }
 
+function recoverPersistedValue<T>(value: unknown, schema: z.ZodTypeAny): T | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) {
+    if (value === null && schema instanceof z.ZodNullable) {
+      return null as T;
+    }
+    return recoverPersistedValue(value, schema.unwrap()) as T | undefined;
+  }
+
+  if (schema instanceof z.ZodDefault) {
+    const repaired = recoverPersistedValue(value, schema._def.innerType as z.ZodTypeAny);
+    return repaired ?? (schema._def.defaultValue() as T);
+  }
+
+  if (schema instanceof z.ZodArray) {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+
+    const recovered: unknown[] = [];
+    for (const item of value) {
+      const candidate = recoverPersistedValue(item, schema.element);
+      if (candidate !== undefined) {
+        recovered.push(candidate);
+      }
+    }
+
+    return recovered as T;
+  }
+
+  if (schema instanceof z.ZodObject) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return undefined;
+    }
+
+    const source = value as Record<string, unknown>;
+    const recovered: Record<string, unknown> = {};
+    for (const [key, childSchema] of Object.entries(schema.shape)) {
+      if (!(key in source)) {
+        continue;
+      }
+
+      const candidate = recoverPersistedValue(source[key], childSchema as z.ZodTypeAny);
+      if (candidate === undefined) {
+        continue;
+      }
+      recovered[key] = candidate;
+    }
+
+    const parsed = schema.safeParse(recovered);
+    return parsed.success ? (parsed.data as T) : undefined;
+  }
+
+  if (schema instanceof z.ZodUnion) {
+    for (const option of schema.options) {
+      const candidate = recoverPersistedValue(value, option);
+      if (candidate !== undefined) {
+        return candidate as T;
+      }
+    }
+    return undefined;
+  }
+
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    for (const option of schema.options.values()) {
+      const candidate = recoverPersistedValue(value, option);
+      if (candidate !== undefined) {
+        return candidate as T;
+      }
+    }
+    return undefined;
+  }
+
+  const parsed = schema.safeParse(value);
+  return parsed.success ? (parsed.data as T) : undefined;
+}
+
 function normalizePersistedWidgets(rawWidgets: unknown): Widget[] {
   if (!Array.isArray(rawWidgets)) {
     return [];
@@ -744,9 +825,17 @@ function normalizePersistedWidgets(rawWidgets: unknown): Widget[] {
     }
 
     try {
-      return [definition.migrate(widget, { version: 1 })];
+      const repaired = recoverPersistedValue(widget, definition.schema);
+      const migrated = definition.migrate(repaired ?? widget, { version: 1 });
+      return [migrated];
     } catch (error) {
-      console.warn('[persistence] Dropped invalid saved widget', widget, error);
+      const issue = error instanceof z.ZodError ? error.issues[0] : undefined;
+      const field = issue && issue.path.length > 0 ? issue.path.join('.') : 'widget';
+      const message = issue ? `${field}: ${issue.message}` : 'malformed widget payload';
+      const widgetIdValue =
+        widget !== null && typeof widget === 'object' && 'id' in widget ? (widget as Record<string, unknown>).id : undefined;
+      const widgetId = widgetIdValue === undefined ? undefined : String(widgetIdValue);
+      console.warn('[persistence] Skipped malformed saved widget', { widgetId, widgetType, field, message, error });
       return [];
     }
   });
