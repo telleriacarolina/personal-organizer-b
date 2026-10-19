@@ -417,7 +417,7 @@ export function CalendarWidget({
     return `${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}`;
   };
 
-  const getEventsForMonth = () => {
+  const monthEvents = useMemo(() => {
     const monthStartDate = startOfMonth(currentMonth);
     const monthEndDate = endOfMonth(currentMonth);
 
@@ -427,11 +427,9 @@ export function CalendarWidget({
         return eventDate >= monthStartDate && eventDate <= monthEndDate;
       })
       .sort((a, b) => a.date - b.date);
-  };
+  }, [currentMonth, events]);
 
-  const monthEvents = useMemo(() => getEventsForMonth(), [currentMonth, events]);
-
-  const getEventsForWeek = () => {
+  const weekEvents = useMemo(() => {
     const weekStartDate = startOfWeek(currentWeek);
     const weekEndDate = endOfWeek(currentWeek);
 
@@ -441,11 +439,9 @@ export function CalendarWidget({
         return eventDate >= weekStartDate && eventDate <= weekEndDate;
       })
       .sort((a, b) => a.date - b.date);
-  };
+  }, [currentWeek, events]);
 
-  const weekEvents = useMemo(() => getEventsForWeek(), [currentWeek, events]);
-
-  const getEventsForDay = () => {
+  const dayEvents = useMemo(() => {
     const dayStartDate = startOfDay(currentDay);
     const dayEndDate = endOfDay(currentDay);
 
@@ -455,9 +451,7 @@ export function CalendarWidget({
         return eventDate >= dayStartDate && eventDate <= dayEndDate;
       })
       .sort(compareEventsForDay);
-  };
-
-  const dayEvents = useMemo(() => getEventsForDay(), [compareEventsForDay, currentDay, events]);
+  }, [compareEventsForDay, currentDay, events]);
   const handleNavigatePrev = () => {
     if (viewMode === 'month') {
       setCurrentMonth(subMonths(currentMonth, 1));

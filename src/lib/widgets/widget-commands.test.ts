@@ -35,6 +35,50 @@ describe('widgetDefinitions', () => {
     const issues = widgetDefinitions.calendar.validate(invalid);
     expect(issues.length).toBeGreaterThan(0);
   });
+
+  it('validates nested shopping receipt/trip/reminder data', () => {
+    const shoppingWidget = widgetDefinitions.shopping.defaultState({ id: 'shop-1', position: 0 });
+    const invalid = {
+      ...shoppingWidget,
+      receipts: [{ id: 'r-1', storeName: 'Store', date: Date.now(), items: [], total: '25.00', createdAt: Date.now() }],
+      trips: [{ id: 't-1', date: Date.now(), storeName: 'Store', total: 40, itemCount: '2', receiptIds: [], }],
+      reminders: [{ id: 'm-1', storeName: 'Store', category: 'food', frequency: 'monthly', nextReminderDate: Date.now(), averageSpend: 10, commonItems: [], enabled: 'yes', createdAt: Date.now() }],
+    };
+
+    const issues = widgetDefinitions.shopping.validate(invalid as never);
+    expect(issues.length).toBeGreaterThan(0);
+  });
+
+  it('validates nested work widget collections and organization preference', () => {
+    const workWidget = widgetDefinitions.work.defaultState({ id: 'work-1', position: 0 });
+    const invalid = {
+      ...workWidget,
+      jobs: [{ id: 'job-1', title: 'Website', client: 'Client A', status: 'pending', priority: 'top', createdAt: Date.now() }],
+      organizationPreference: { type: 'invalid-mode' },
+    };
+
+    const issues = widgetDefinitions.work.validate(invalid as never);
+    expect(issues.length).toBeGreaterThan(0);
+  });
+
+  it('validates AI chat suggestion payloads as AI insights', () => {
+    const aiChatWidget = widgetDefinitions['ai-chat'].defaultState({ id: 'ai-1', position: 0 });
+    const invalid = {
+      ...aiChatWidget,
+      messages: [
+        {
+          id: 'msg-1',
+          role: 'assistant',
+          text: 'Suggestion',
+          timestamp: Date.now(),
+          suggestions: [{ id: 'insight-1', kind: 'task-focus', title: 'Plan', confidence: 0.75 }],
+        },
+      ],
+    };
+
+    const issues = widgetDefinitions['ai-chat'].validate(invalid as never);
+    expect(issues.length).toBeGreaterThan(0);
+  });
 });
 
 describe('executeWidgetCommand', () => {
