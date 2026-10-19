@@ -745,27 +745,24 @@ function normalizePersistedWidgets(rawWidgets: unknown): Widget[] {
 
     try {
       return [definition.migrate(widget, { version: 1 })];
-    } catch {
+    } catch (error) {
+      console.warn('[persistence] Dropped invalid saved widget', widget, error);
       return [];
     }
   });
 }
 
-export function createLocalStorageStateRepository<T>(key: string, fallback: T): StateRepository<T> {
+export function createLocalStorageStateRepository<T>(key: string, fallback: T, normalize?: (value: unknown) => T): StateRepository<T> {
   return {
     load: () => {
       const value = readJson(key, fallback);
-      if (key === storageKeys.widgets) {
-        return normalizePersistedWidgets(value) as T;
-      }
-
-      return value;
+      return normalize ? normalize(value) : value;
     },
     save: (value) => writeJson(key, value),
   };
 }
 
-const widgetsStateRepository = createLocalStorageStateRepository<Widget[]>(storageKeys.widgets, []);
+const widgetsStateRepository = createLocalStorageStateRepository<Widget[]>(storageKeys.widgets, [], normalizePersistedWidgets);
 const snapToGridStateRepositoryInternal = createLocalStorageStateRepository<boolean>(storageKeys.snapToGrid, false);
 const globalLockStateRepositoryInternal = createLocalStorageStateRepository<boolean>(storageKeys.globalLock, false);
 const widgetAIStateRepositoryInternal = createLocalStorageStateRepository<Record<string, WidgetAIState>>(storageKeys.widgetAIState, {});
