@@ -8,6 +8,8 @@ This backlog prioritizes the work that most directly reduces risk, improves the 
 
 This is a planning document for the next milestone, not the source of truth for tracked GitHub issues. The team should create actual issue tickets and link them here once work begins; until then, this document defines the recommended execution order and acceptance bar.
 
+Recommended tracking states for linked implementation issues: `Ready`, `In progress`, `Blocked`, `Verified`, and `Deferred`.
+
 ## Recommended backlog issues
 
 ### Issue 1: Harden local persistence and dashboard recovery
@@ -103,12 +105,12 @@ Description:
 
 The organizer agent is a differentiator, but trust depends on strict write controls. AI suggestions should remain explicit, reviewable, and scoped to safe actions. The app should never mutate user data without a clear user confirmation step.
 
-Why this is P1 for the next sprint:
+Why this remains P1 in implementation order:
 
 - The workflow is trust-critical and should be protected before broader automation is expanded.
 - The product requirement is clear: the user must approve any write-like action before it persists.
 - However, this work often depends on broader agent UX and safety design decisions, so it is intentionally scheduled after the core data and workflow reliability fixes are complete.
-- This keeps the two-week milestone realistic while still preserving a hard release gate: AI write actions must be blocked or explicitly reviewed before release.
+- This item is sequenced after core data/workflow stabilization, while still preserving a hard release gate: if any AI action can modify or delete user data, unapproved writes must be blocked before release.
 
 Scope:
 - `src/lib/organizer-agent-service.ts`
@@ -204,27 +206,91 @@ Acceptance criteria:
 
 ---
 
-## Milestone scope for the next 2 weeks
+## Ordered milestone delivery plan (dependency-driven)
 
-### Required for the two-week milestone
+Implementation order should follow dependency and risk, not calendar duration. If dependencies change during implementation, reorder milestones explicitly in this document and in linked issues with a short rationale.
 
-These are the items that should be treated as the mandatory delivery set for the next milestone:
+### Milestone 1 — Data integrity and recovery
 
+Focus:
 - Issue 1: Persistence recovery hardening
+
+Exit criteria:
+- Automated regression tests pass for empty, partial, stale-schema, malformed, and legacy snapshots.
+- Tests prove valid sibling records are preserved when unrelated records are malformed or unrecoverable.
+- Normalization/migration behavior is documented with explicit fallback behavior.
+
+Evidence to record:
+- Test file references and CI run links for recovery/migration coverage.
+- Notes identifying preserved, migrated, and discarded record classes.
+
+### Milestone 2 — Core workflow reliability
+
+Focus:
 - Issue 2: Task-to-focus workflow validation
-- Issue 3: Cross-widget reference handling
 - Issue 5: Core workflow QA pass
-- Release gate / smoke validation checklist
 
-### Follow-up items after the milestone
+Exit criteria:
+- Regression coverage verifies create/edit/complete/delete across core workflows.
+- Reload persistence is verified for task completion, focus visibility, notes, habits, and goals.
+- Stale references in the main workflow render safe fallbacks instead of broken state.
 
-These remain important, but they should either be finished in the next sprint or be protected behind explicit release approval:
+Evidence to record:
+- Regression test paths and CI run links.
+- Manual smoke checklist results for the main planner journey before/after reload.
 
+### Milestone 3 — Cross-widget consistency
+
+Focus:
+- Issue 3: Cross-widget reference handling
+
+Exit criteria:
+- Stale/deleted source references resolve safely without crashes or blank states.
+- Imported Work → Calendar events remain deduplicated and consistent across reloads.
+- Regression coverage includes stale-source and deleted-widget scenarios.
+
+Evidence to record:
+- Test paths and CI run links for reference/dedup behavior.
+- Repro notes showing fallback behavior for invalid references.
+
+### Milestone 4 — AI trust and write safety
+
+Focus:
 - Issue 4: AI write safety enforcement
-- Issue 6: Accessibility and keyboard pass
-- Issue 7: Full release process polish, if release criteria change or if there is broader scope to ship
 
-The two-week scope is intentionally narrow. The goal is to reduce the highest-risk product failures before the team expands scope into additional UX work or new feature development.
+Exit criteria:
+- AI proposals that are rejected, cancelled, malformed, ambiguous, or changed cannot silently persist writes.
+- Any write-like action requires explicit approval with a clear preview before persistence.
+- Regression and smoke checks verify no unapproved write path remains.
+
+Evidence to record:
+- Automated test references and smoke-test checklist entries for approval/denial paths.
+- QA notes demonstrating stored state remains unchanged after denied/cancelled writes.
+
+### Milestone 5 — Release readiness
+
+Focus:
+- Issue 7: Release gate and smoke validation checklist
+
+Exit criteria:
+- Required CI checks (lint, test, build) pass for release candidates.
+- Required regression suites for Milestones 1–4 pass.
+- Main workflow smoke tests pass and evidence is recorded.
+- Release remains blocked while critical acceptance criteria are unmet.
+
+Evidence to record:
+- CI run links for required checks.
+- Completed smoke checklist and regression summary attached to release notes or issue thread.
+
+### Follow-up milestone — Accessibility and broader resilience
+
+Focus:
+- Issue 6: Accessibility and keyboard pass
+- Broader resilience improvements (for example, additional shopping/media recovery hardening)
+
+Exit criteria:
+- Keyboard accessibility and contrast issues in core flows are verified against the acceptance criteria.
+- Additional resilience items are sequenced by risk and dependency and carried forward with explicit status.
 
 ## Prioritization by impact and effort
 
@@ -243,8 +309,8 @@ The two-week scope is intentionally narrow. The goal is to reduce the highest-ri
 ### P0 vs. P1 rationale
 
 - P0 items are the product’s reliability backbone: if they fail, the app is unreliable for day-to-day use or loses user data.
-- P1 items are still important, but they either depend on broader product/UX design decisions or are best treated as a release gate rather than a first-pass unblocker.
-- AI write safety is high-impact because it affects trust and user data integrity, but it is intentionally marked P1 for this milestone because it requires a careful approval and review UX, not only a patch to the storage or widget layer.
+- P1 items are still important, but they may depend on broader product/UX design decisions or follow after urgent reliability stabilization.
+- AI write safety is high-impact because it affects trust and user data integrity. It remains P1 for sequencing, but release-blocking safety requirements override label ordering: if AI can modify or delete user data, unapproved writes must be prevented before ship.
 
 ### Impact vs. effort summary
 
@@ -265,64 +331,12 @@ This means the most effective immediate work is a set of reliability and workflo
 
 ---
 
-## Recommended 2-week sprint plan
+## Milestone execution notes
 
-### Sprint goal
-
-Ship the app’s reliability and trust foundation in a way that reduces risk for all future feature work. The team should finish the product-critical workflows and establish a defensible release gate before broader polish or expansion.
-
-### Week 1: Reliability and workflow stabilization
-
-#### Focus areas
-
-1. Storage and recovery hardening
-   - Implement graceful handling for corrupt or legacy local data.
-   - Add migration and validation tests for widget payloads.
-   - Define a canonical dashboard snapshot and normalization strategy.
-
-2. Core workflow QA
-   - Validate task creation, completion, deletion, and reload behavior.
-   - Improve Daily Focus integration and empty states.
-   - Confirm notes, habits, and goals remain stable after reload.
-
-3. Cross-widget reference cleanup
-   - Fix stale source references.
-   - Ensure imported Work → Calendar data deduplicates correctly.
-   - Confirm widget removal does not leave broken references behind.
-
-#### Deliverables by end of Week 1
-
-- Data migration and recovery tests passed.
-- Core task + focus workflow validated.
-- Cross-widget state remains consistent and valid after reload and deletion.
-- Known edge cases documented in the team backlog.
-- Release smoke checklist draft is ready for review.
-
-### Week 2: AI trust, UX quality, and release readiness
-
-#### Focus areas
-
-1. AI safety enforcement
-   - Finalize review-before-write controls.
-   - Add explicit permission and preview flows for write actions.
-   - Ensure suggestion history remains auditable and separate from source data.
-
-2. Accessibility and keyboard pass
-   - Check key dialog, button, and widget actions for keyboard support.
-   - Confirm focus states and labels are present in main flows.
-   - Review color contrast and reduced-motion policies.
-
-3. Release gate and regression checklist
-   - Define a smoke checklist for daily organizer flows.
-   - Validate the build/test/lint process for the release branch.
-   - Confirm the app is stable enough for a small release candidate.
-
-#### Deliverables by end of Week 2
-
-- AI writes are reviewable and safe by default.
-- Core accessibility issues are addressed in the main app shell.
-- A release checklist is in place and used by the team.
-- The app is ready for a minimal but trustworthy release candidate, or the release is explicitly blocked on unresolved P0 issues.
+- Milestones are complete only when their acceptance criteria and evidence requirements are satisfied.
+- A successful build alone is not proof that data recovery, core workflow safety, or AI write safety is complete.
+- Unfinished work should be carried forward with explicit status (`Blocked` or `Deferred`) rather than marked complete due to schedule pressure.
+- Any milestone reorder is allowed only with a dependency-based rationale captured in linked implementation issues.
 
 ---
 
