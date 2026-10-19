@@ -4,7 +4,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen, Trash } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
-import { DEFAULT_THEME_NAME, ThemeCustomizationButton } from '@/components/ThemeCustomization';
+import {
+  DEFAULT_FONT_NAME,
+  DEFAULT_THEME_NAME,
+  FONT_PRESET_STORAGE_KEY,
+  ThemeCustomizationButton,
+} from '@/components/ThemeCustomization';
 import { AIConfigButton } from '@/components/ai/AIConfigButton';
 import { OrganizerAgentButton } from '@/components/ai/OrganizerAgentButton';
 import { AIChatWidget } from '@/components/widgets/AIChatWidget';
@@ -49,6 +54,7 @@ function App() {
   const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
   const [isClearingData, setIsClearingData] = useState(false);
   const [showWorkQuestionnaire, setShowWorkQuestionnaire] = useState(false);
+  const [themeCustomizationKey, setThemeCustomizationKey] = useState(0);
   const [snapToGrid, setSnapToGrid] = usePersistentState(stateRepositories.snapToGrid, false);
   const [globalLock, setGlobalLock] = usePersistentState(stateRepositories.globalLock, false);
   const [widgetAIState, setWidgetAIState] = usePersistentState(stateRepositories.widgetAIState, {});
@@ -220,7 +226,8 @@ function App() {
       stateRepositories.theme.save(DEFAULT_THEME_NAME);
       stateRepositories.customColors.save(null);
       stateRepositories.backgroundImage.save(null);
-      localStorage.removeItem('organizer-font-preset');
+      localStorage.setItem(FONT_PRESET_STORAGE_KEY, JSON.stringify(DEFAULT_FONT_NAME));
+      setThemeCustomizationKey((current) => current + 1);
       stateRepositories.plannerEvents.save([]);
       stateRepositories.aiConfig.save(DEFAULT_AI_CONFIG);
       stateRepositories.aiSuggestions.save([]);
@@ -379,7 +386,7 @@ function App() {
               </Button>
               <AIConfigButton />
               <OrganizerAgentButton context={agentContext} />
-              <ThemeCustomizationButton />
+              <ThemeCustomizationButton key={themeCustomizationKey} />
               <Button onClick={() => setShowAddDialog(true)} size="lg" className="gap-2 flex-1 sm:flex-initial">
                 <Plus size={20} />
                 <span className="hidden sm:inline">Add Widget</span>

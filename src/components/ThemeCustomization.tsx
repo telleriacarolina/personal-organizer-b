@@ -56,7 +56,8 @@ interface FontPreset {
 }
 
 export const DEFAULT_THEME_NAME = 'Warm Terracotta';
-const DEFAULT_FONT_NAME = 'Modern';
+export const DEFAULT_FONT_NAME = 'Modern';
+export const FONT_PRESET_STORAGE_KEY = 'organizer-font-preset';
 const DEFAULT_RADIUS = '0.75rem';
 
 const themePresets: ThemePreset[] = [
@@ -463,7 +464,7 @@ interface ThemeCustomizationProps {
 
 export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationProps) {
   const [selectedTheme, setSelectedTheme] = useLocalStorageState<string>('organizer-theme', DEFAULT_THEME_NAME);
-  const [selectedFont, setSelectedFont] = useLocalStorageState<string>('organizer-font-preset', DEFAULT_FONT_NAME);
+  const [selectedFont, setSelectedFont] = useLocalStorageState<string>(FONT_PRESET_STORAGE_KEY, DEFAULT_FONT_NAME);
   const [customColors, setCustomColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
   const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
   const { url: _resolvedBackgroundUrl, isMissing: _isBackgroundMissing } = useStoredMediaUrl({
@@ -1012,7 +1013,7 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
 export function ThemeCustomizationButton() {
   const [open, setOpen] = useState(false);
   const [selectedTheme] = useLocalStorageState<string>('organizer-theme', DEFAULT_THEME_NAME);
-  const [selectedFont] = useLocalStorageState<string>('organizer-font-preset', DEFAULT_FONT_NAME);
+  const [selectedFont] = useLocalStorageState<string>(FONT_PRESET_STORAGE_KEY, DEFAULT_FONT_NAME);
   const [customColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
   const [backgroundImage, _setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
   const { url: _resolvedBackgroundUrl } = useStoredMediaUrl({
