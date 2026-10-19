@@ -808,6 +808,15 @@ function recoverPersistedValue<T>(value: unknown, schema: z.ZodTypeAny): T | und
   return parsed.success ? (parsed.data as T) : undefined;
 }
 
+function getWidgetId(widget: unknown): string | undefined {
+  if (!widget || typeof widget !== 'object' || !('id' in widget)) {
+    return undefined;
+  }
+
+  const value = (widget as Record<string, unknown>).id;
+  return value === undefined ? undefined : String(value);
+}
+
 function normalizePersistedWidgets(rawWidgets: unknown): Widget[] {
   if (!Array.isArray(rawWidgets)) {
     reportPersistenceIssue({
@@ -837,9 +846,7 @@ function normalizePersistedWidgets(rawWidgets: unknown): Widget[] {
     const widgetType = widget.type as WidgetType;
     const definition = widgetDefinitions[widgetType];
     if (!definition) {
-      const widgetIdValue =
-        widget !== null && typeof widget === 'object' && 'id' in widget ? (widget as Record<string, unknown>).id : undefined;
-      const widgetId = widgetIdValue === undefined ? undefined : String(widgetIdValue);
+      const widgetId = getWidgetId(widget);
       reportPersistenceIssue({
         storage: 'localStorage',
         operation: 'read',
@@ -859,10 +866,8 @@ function normalizePersistedWidgets(rawWidgets: unknown): Widget[] {
       const issue = error instanceof z.ZodError ? error.issues[0] : undefined;
       const field = issue && issue.path.length > 0 ? issue.path.join('.') : 'widget';
       const message = issue ? `${field}: ${issue.message}` : 'malformed widget payload';
-      const widgetIdValue =
-        widget !== null && typeof widget === 'object' && 'id' in widget ? (widget as Record<string, unknown>).id : undefined;
-      const widgetId = widgetIdValue === undefined ? undefined : String(widgetIdValue);
-      const summary = `Skipped malformed saved widget${widgetId ? ` "${widgetId}"` : ''} (${widgetType}) at ${message}.`;
+      const widgetId = getWidgetId(widget);
+      const summary = `Skipped malformed saved widget${widgetId ? ` "${widgetId}"` : ''} (${widgetType}) because ${message}.`;
       console.warn('[persistence] ' + summary, { widgetId, widgetType, field, message, error });
       reportPersistenceIssue({
         storage: 'localStorage',
