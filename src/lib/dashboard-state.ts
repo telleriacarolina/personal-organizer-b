@@ -9,9 +9,7 @@ export const applyGlobalLockState = (widgets: Widget[], locked: boolean) => {
     const isInSync =
       widget.size?.locked === locked &&
       widget.size?.width !== undefined &&
-      widget.size?.height !== undefined &&
-      widget.size.width === width &&
-      widget.size.height === height;
+      widget.size?.height !== undefined;
 
     if (isInSync) {
       return widget;
