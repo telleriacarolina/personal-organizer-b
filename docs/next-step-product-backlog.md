@@ -294,7 +294,7 @@ Ship the app’s reliability and trust foundation in a way that reduces risk for
 
 - Data migration and recovery tests passed.
 - Core task + focus workflow validated.
-- Cross-widget state remains sane after reload and deletion.
+- Cross-widget state remains consistent and valid after reload and deletion.
 - Known edge cases documented in the team backlog.
 - Release smoke checklist draft is ready for review.
 
