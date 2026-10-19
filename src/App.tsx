@@ -4,7 +4,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen, Trash } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
-import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
+import { DEFAULT_FONT_NAME, DEFAULT_THEME_NAME, FONT_PRESET_STORAGE_KEY, ThemeCustomizationButton } from '@/components/ThemeCustomization';
 import { AIConfigButton } from '@/components/ai/AIConfigButton';
 import { OrganizerAgentButton } from '@/components/ai/OrganizerAgentButton';
 import { AIChatWidget } from '@/components/widgets/AIChatWidget';
@@ -20,6 +20,7 @@ import { DailyFocusWidget } from '@/components/widgets/DailyFocusWidget';
 import { RecordNoteWidget } from '@/components/widgets/RecordNoteWidget';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { createId } from '@/lib/id';
 import { appendImportedCalendarEvent } from '@/lib/calendar-imports';
 import { getOrganizerAgentToolSchemas } from '@/lib/organizer-agent-broker';
@@ -52,6 +53,7 @@ function App() {
   const [snapToGrid, setSnapToGrid] = usePersistentState(stateRepositories.snapToGrid, false);
   const [globalLock, setGlobalLock] = usePersistentState(stateRepositories.globalLock, false);
   const [widgetAIState, setWidgetAIState] = usePersistentState(stateRepositories.widgetAIState, {});
+  const [_selectedFont, setSelectedFont] = useLocalStorageState<string>(FONT_PRESET_STORAGE_KEY, DEFAULT_FONT_NAME);
   const dragStartTimeRef = useRef<number>(0);
   const pendingSnapToGridToastRef = useRef<string | null>(null);
   const pendingGlobalLockToastRef = useRef<string | null>(null);
@@ -217,10 +219,10 @@ function App() {
       setSnapToGrid(false);
       setGlobalLock(false);
       setWidgetAIState({});
-      stateRepositories.theme.save('Warm Terracotta');
+      stateRepositories.theme.save(DEFAULT_THEME_NAME);
       stateRepositories.customColors.save(null);
       stateRepositories.backgroundImage.save(null);
-      localStorage.removeItem('organizer-font-preset');
+      setSelectedFont(DEFAULT_FONT_NAME);
       stateRepositories.plannerEvents.save([]);
       stateRepositories.aiConfig.save(DEFAULT_AI_CONFIG);
       stateRepositories.aiSuggestions.save([]);

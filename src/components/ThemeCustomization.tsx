@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { type Dispatch, type SetStateAction, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -55,8 +55,9 @@ interface FontPreset {
   preview: string;
 }
 
-const DEFAULT_THEME_NAME = 'Warm Terracotta';
-const DEFAULT_FONT_NAME = 'Modern';
+export const DEFAULT_THEME_NAME = 'Warm Terracotta';
+export const DEFAULT_FONT_NAME = 'Modern';
+export const FONT_PRESET_STORAGE_KEY = 'organizer-font-preset';
 const DEFAULT_RADIUS = '0.75rem';
 
 const themePresets: ThemePreset[] = [
@@ -446,6 +447,17 @@ const fontPresets: FontPreset[] = [
   },
 ];
 
+function getFontPresetByName(fontName: string): FontPreset {
+  return fontPresets.find((preset) => preset.name === fontName) ?? fontPresets[0];
+}
+
+function applyFontPreset(fontPreset: FontPreset) {
+  const root = document.documentElement;
+  root.style.setProperty('--app-font-family', fontPreset.family);
+  root.style.setProperty('--app-line-height', fontPreset.lineHeight ?? '1.5');
+  root.style.setProperty('--app-letter-spacing', fontPreset.letterSpacing ?? 'normal');
+}
+
 function normalizeHexColor(color: string): string | null {
   if (!/^#([\da-f]{3}|[\da-f]{6})$/i.test(color)) {
     return null;
@@ -489,11 +501,17 @@ function hexToOklch(color: string): string {
 interface ThemeCustomizationProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  selectedFont: string;
+  setSelectedFont: Dispatch<SetStateAction<string>>;
 }
 
-export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationProps) {
+export function ThemeCustomization({
+  open,
+  onOpenChange,
+  selectedFont,
+  setSelectedFont,
+}: ThemeCustomizationProps) {
   const [selectedTheme, setSelectedTheme] = useLocalStorageState<string>('organizer-theme', DEFAULT_THEME_NAME);
-  const [selectedFont, setSelectedFont] = useLocalStorageState<string>('organizer-font-preset', DEFAULT_FONT_NAME);
   const [customColors, setCustomColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
   const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
   const { url: _resolvedBackgroundUrl, isMissing: _isBackgroundMissing } = useStoredMediaUrl({
@@ -536,13 +554,6 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     root.style.setProperty('--accent', accentOklch);
     root.style.setProperty('--background', bgOklch);
     root.style.setProperty('--radius', DEFAULT_RADIUS);
-  };
-
-  const applyFontPreset = (fontPreset: FontPreset) => {
-    const root = document.documentElement;
-    root.style.setProperty('--app-font-family', fontPreset.family);
-    root.style.setProperty('--app-line-height', fontPreset.lineHeight ?? '1.5');
-    root.style.setProperty('--app-letter-spacing', fontPreset.letterSpacing ?? 'normal');
   };
 
   const applyBackgroundImage = (image: BackgroundImage | null) => {
@@ -591,12 +602,10 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
   };
 
   const handleFontSelect = (fontName: string) => {
-    const fontPreset = fontPresets.find((preset) => preset.name === fontName);
-    if (fontPreset) {
-      setSelectedFont(fontName);
-      applyFontPreset(fontPreset);
-      toast.success(`${fontName} font applied!`);
-    }
+    const fontPreset = getFontPresetByName(fontName);
+    setSelectedFont(fontPreset.name);
+    applyFontPreset(fontPreset);
+    toast.success(`${fontPreset.name} font applied!`);
   };
 
   const handlePreview = (themeName: string) => {
@@ -616,11 +625,8 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
         applyCustomColors(customColors);
       }
     }
-    if (previewFont && previewFont !== selectedFont) {
-      const currentFont = fontPresets.find((preset) => preset.name === selectedFont);
-      if (currentFont) {
-        applyFontPreset(currentFont);
-      }
+    if (previewFont) {
+      applyFontPreset(getFontPresetByName(selectedFont));
     }
     setPreviewTheme(null);
     setPreviewFont(null);
@@ -1033,7 +1039,7 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
 export function ThemeCustomizationButton() {
   const [open, setOpen] = useState(false);
   const [selectedTheme] = useLocalStorageState<string>('organizer-theme', DEFAULT_THEME_NAME);
-  const [selectedFont] = useLocalStorageState<string>('organizer-font-preset', DEFAULT_FONT_NAME);
+  const [selectedFont, setSelectedFont] = useLocalStorageState<string>(FONT_PRESET_STORAGE_KEY, DEFAULT_FONT_NAME);
   const [customColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
   const [backgroundImage, _setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
   const { url: _resolvedBackgroundUrl } = useStoredMediaUrl({
@@ -1067,11 +1073,8 @@ export function ThemeCustomizationButton() {
   }, [selectedTheme, customColors]);
 
   useEffect(() => {
-    const fontPreset = fontPresets.find((preset) => preset.name === selectedFont) ?? fontPresets[0];
-    const root = document.documentElement;
-    root.style.setProperty('--app-font-family', fontPreset.family);
-    root.style.setProperty('--app-line-height', fontPreset.lineHeight ?? '1.5');
-    root.style.setProperty('--app-letter-spacing', fontPreset.letterSpacing ?? 'normal');
+    const fontPreset = getFontPresetByName(selectedFont);
+    applyFontPreset(fontPreset);
   }, [selectedFont]);
 
   useEffect(() => {
@@ -1116,7 +1119,12 @@ export function ThemeCustomizationButton() {
         <span className="sm:hidden">Theme</span>
       </Button>
       
-      <ThemeCustomization open={open} onOpenChange={setOpen} />
+      <ThemeCustomization
+        open={open}
+        onOpenChange={setOpen}
+        selectedFont={selectedFont}
+        setSelectedFont={setSelectedFont}
+      />
     </>
   );
 }
