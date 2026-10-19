@@ -7,7 +7,9 @@
   }
   
   body {
-    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-family: var(--app-font-family, 'Instrument Sans', system-ui, sans-serif);
+    line-height: var(--app-line-height, 1.5);
+    letter-spacing: var(--app-letter-spacing, normal);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -21,6 +23,14 @@
       -webkit-overflow-scrolling: touch;
     }
   }
+}
+
+.text-boundary {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  box-sizing: border-box;
 }
 
 .grid-snap-container {

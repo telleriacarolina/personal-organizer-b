@@ -220,6 +220,7 @@ function App() {
       stateRepositories.theme.save('Warm Terracotta');
       stateRepositories.customColors.save(null);
       stateRepositories.backgroundImage.save(null);
+      localStorage.removeItem('organizer-font-preset');
       stateRepositories.plannerEvents.save([]);
       stateRepositories.aiConfig.save(DEFAULT_AI_CONFIG);
       stateRepositories.aiSuggestions.save([]);

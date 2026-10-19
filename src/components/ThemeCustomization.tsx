@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 interface ThemePreset {
   name: string;
   description: string;
+  radius?: string;
   colors: {
     background: string;
     foreground: string;
@@ -44,6 +45,19 @@ interface CustomColors {
   accent: string;
   background: string;
 }
+
+interface FontPreset {
+  name: string;
+  description: string;
+  family: string;
+  lineHeight?: string;
+  letterSpacing?: string;
+  preview: string;
+}
+
+const DEFAULT_THEME_NAME = 'Warm Terracotta';
+const DEFAULT_FONT_NAME = 'Modern';
+const DEFAULT_RADIUS = '0.75rem';
 
 const themePresets: ThemePreset[] = [
   {
@@ -170,6 +184,94 @@ const themePresets: ThemePreset[] = [
       border: 'oklch(0.35 0.02 240)',
       success: 'oklch(0.68 0.15 160)',
       successForeground: 'oklch(0.98 0 0)',
+    },
+  },
+  {
+    name: 'Kawaii Cute',
+    description: 'Pastel blush, lavender, and mint playfulness',
+    radius: '1.125rem',
+    colors: {
+      background: 'oklch(0.96 0.03 335)',
+      foreground: 'oklch(0.25 0.03 320)',
+      card: 'oklch(0.93 0.04 315)',
+      cardForeground: 'oklch(0.25 0.03 320)',
+      primary: 'oklch(0.69 0.17 352)',
+      primaryForeground: 'oklch(0.98 0 0)',
+      secondary: 'oklch(0.91 0.04 145)',
+      secondaryForeground: 'oklch(0.24 0.03 150)',
+      muted: 'oklch(0.94 0.03 300)',
+      mutedForeground: 'oklch(0.46 0.03 320)',
+      accent: 'oklch(0.78 0.12 155)',
+      accentForeground: 'oklch(0.24 0.03 150)',
+      border: 'oklch(0.86 0.04 315)',
+      success: 'oklch(0.74 0.11 150)',
+      successForeground: 'oklch(0.22 0.03 150)',
+    },
+  },
+  {
+    name: 'Soft Minimal',
+    description: 'Sage, cream, and subtle clean contrast',
+    radius: '0.875rem',
+    colors: {
+      background: 'oklch(0.97 0.015 110)',
+      foreground: 'oklch(0.26 0.02 95)',
+      card: 'oklch(0.93 0.02 100)',
+      cardForeground: 'oklch(0.26 0.02 95)',
+      primary: 'oklch(0.56 0.08 140)',
+      primaryForeground: 'oklch(0.98 0 0)',
+      secondary: 'oklch(0.92 0.02 85)',
+      secondaryForeground: 'oklch(0.26 0.02 95)',
+      muted: 'oklch(0.95 0.01 95)',
+      mutedForeground: 'oklch(0.50 0.02 95)',
+      accent: 'oklch(0.71 0.07 120)',
+      accentForeground: 'oklch(0.25 0.02 95)',
+      border: 'oklch(0.86 0.015 95)',
+      success: 'oklch(0.70 0.09 145)',
+      successForeground: 'oklch(0.98 0 0)',
+    },
+  },
+  {
+    name: 'Dark Academia',
+    description: 'Forest, burgundy, and parchment elegance',
+    radius: '0.625rem',
+    colors: {
+      background: 'oklch(0.26 0.02 105)',
+      foreground: 'oklch(0.92 0.02 80)',
+      card: 'oklch(0.32 0.03 105)',
+      cardForeground: 'oklch(0.92 0.02 80)',
+      primary: 'oklch(0.62 0.13 32)',
+      primaryForeground: 'oklch(0.98 0 0)',
+      secondary: 'oklch(0.38 0.03 130)',
+      secondaryForeground: 'oklch(0.94 0.01 75)',
+      muted: 'oklch(0.34 0.02 105)',
+      mutedForeground: 'oklch(0.72 0.02 85)',
+      accent: 'oklch(0.74 0.08 78)',
+      accentForeground: 'oklch(0.22 0.02 100)',
+      border: 'oklch(0.44 0.03 108)',
+      success: 'oklch(0.68 0.09 145)',
+      successForeground: 'oklch(0.18 0.02 105)',
+    },
+  },
+  {
+    name: 'Retro Pop',
+    description: 'Vibrant neon accents with playful energy',
+    radius: '0.9rem',
+    colors: {
+      background: 'oklch(0.95 0.02 280)',
+      foreground: 'oklch(0.24 0.04 280)',
+      card: 'oklch(0.89 0.05 275)',
+      cardForeground: 'oklch(0.24 0.04 280)',
+      primary: 'oklch(0.67 0.23 334)',
+      primaryForeground: 'oklch(0.99 0 0)',
+      secondary: 'oklch(0.88 0.04 250)',
+      secondaryForeground: 'oklch(0.20 0.03 255)',
+      muted: 'oklch(0.92 0.03 270)',
+      mutedForeground: 'oklch(0.48 0.03 275)',
+      accent: 'oklch(0.73 0.22 240)',
+      accentForeground: 'oklch(0.98 0 0)',
+      border: 'oklch(0.82 0.05 270)',
+      success: 'oklch(0.73 0.12 152)',
+      successForeground: 'oklch(0.18 0.03 255)',
     },
   },
   {
@@ -300,6 +402,50 @@ const themePresets: ThemePreset[] = [
   },
 ];
 
+const fontPresets: FontPreset[] = [
+  {
+    name: 'Modern',
+    description: 'Clean contemporary sans-serif',
+    family: '"Instrument Sans", "Inter", "Segoe UI", system-ui, sans-serif',
+    preview: 'Balanced and versatile for daily planning.',
+  },
+  {
+    name: 'Rounded',
+    description: 'Friendly rounded sans-serif',
+    family: '"Nunito", "Avenir Rounded", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif',
+    preview: 'Warm and approachable with smooth curves.',
+  },
+  {
+    name: 'Elegant',
+    description: 'Refined serif for polished notes',
+    family: '"Lora", "Iowan Old Style", "Palatino Linotype", Georgia, serif',
+    lineHeight: '1.6',
+    preview: 'A graceful style for thoughtful writing.',
+  },
+  {
+    name: 'Handwritten',
+    description: 'Readable personal handwriting feel',
+    family: '"Caveat", "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive',
+    lineHeight: '1.55',
+    preview: 'Adds a playful personal touch.',
+  },
+  {
+    name: 'Classic',
+    description: 'Traditional serif with steady rhythm',
+    family: '"Merriweather", "Times New Roman", "Nimbus Roman", serif',
+    lineHeight: '1.6',
+    preview: 'Timeless structure for focused reading.',
+  },
+  {
+    name: 'Accessibility Focus',
+    description: 'High legibility with comfortable spacing',
+    family: '"Atkinson Hyperlegible", "Verdana", "Tahoma", "Segoe UI", sans-serif',
+    lineHeight: '1.7',
+    letterSpacing: '0.01em',
+    preview: 'Prioritizes clarity across long sessions.',
+  },
+];
+
 function normalizeHexColor(color: string): string | null {
   if (!/^#([\da-f]{3}|[\da-f]{6})$/i.test(color)) {
     return null;
@@ -346,7 +492,8 @@ interface ThemeCustomizationProps {
 }
 
 export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationProps) {
-  const [selectedTheme, setSelectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
+  const [selectedTheme, setSelectedTheme] = useLocalStorageState<string>('organizer-theme', DEFAULT_THEME_NAME);
+  const [selectedFont, setSelectedFont] = useLocalStorageState<string>('organizer-font-preset', DEFAULT_FONT_NAME);
   const [customColors, setCustomColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
   const [backgroundImage, setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
   const { url: _resolvedBackgroundUrl, isMissing: _isBackgroundMissing } = useStoredMediaUrl({
@@ -354,6 +501,8 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     fallbackUrl: backgroundImage?.url ?? null,
   });
   const [previewTheme, setPreviewTheme] = useState<string | null>(null);
+  const [previewFont, setPreviewFont] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('presets');
   const [localPrimary, setLocalPrimary] = useState('#7a5c3d');
   const [localAccent, setLocalAccent] = useState('#ae6745');
   const [localBg, setLocalBg] = useState('#f2ede5');
@@ -374,6 +523,7 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
       const cssVar = key.replace(/([A-Z])/g, '-$1').toLowerCase();
       root.style.setProperty(`--${cssVar}`, value);
     });
+    root.style.setProperty('--radius', theme.radius ?? DEFAULT_RADIUS);
   };
 
   const applyCustomColors = (colors: CustomColors) => {
@@ -385,6 +535,14 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     root.style.setProperty('--primary', primaryOklch);
     root.style.setProperty('--accent', accentOklch);
     root.style.setProperty('--background', bgOklch);
+    root.style.setProperty('--radius', DEFAULT_RADIUS);
+  };
+
+  const applyFontPreset = (fontPreset: FontPreset) => {
+    const root = document.documentElement;
+    root.style.setProperty('--app-font-family', fontPreset.family);
+    root.style.setProperty('--app-line-height', fontPreset.lineHeight ?? '1.5');
+    root.style.setProperty('--app-letter-spacing', fontPreset.letterSpacing ?? 'normal');
   };
 
   const applyBackgroundImage = (image: BackgroundImage | null) => {
@@ -432,6 +590,15 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     }
   };
 
+  const handleFontSelect = (fontName: string) => {
+    const fontPreset = fontPresets.find((preset) => preset.name === fontName);
+    if (fontPreset) {
+      setSelectedFont(fontName);
+      applyFontPreset(fontPreset);
+      toast.success(`${fontName} font applied!`);
+    }
+  };
+
   const handlePreview = (themeName: string) => {
     const theme = themePresets.find((t) => t.name === themeName);
     if (theme) {
@@ -449,7 +616,14 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
         applyCustomColors(customColors);
       }
     }
+    if (previewFont && previewFont !== selectedFont) {
+      const currentFont = fontPresets.find((preset) => preset.name === selectedFont);
+      if (currentFont) {
+        applyFontPreset(currentFont);
+      }
+    }
     setPreviewTheme(null);
+    setPreviewFont(null);
   };
 
   const handleApplyCustomColors = () => {
@@ -503,6 +677,12 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     toast.success('Background image removed');
   };
 
+  useEffect(() => {
+    if (!open) {
+      setActiveTab('presets');
+    }
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
       if (!isOpen) {
@@ -521,8 +701,8 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="presets" className="mt-4 sm:mt-6">
-          <TabsList className="grid w-full grid-cols-3 h-auto">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4 sm:mt-6">
+          <TabsList className="grid w-full grid-cols-4 h-auto">
             <TabsTrigger value="presets" className="text-xs sm:text-sm px-2 py-2">
               <span className="hidden sm:inline">Theme Presets</span>
               <span className="sm:hidden">Themes</span>
@@ -530,6 +710,10 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
             <TabsTrigger value="custom" className="text-xs sm:text-sm px-2 py-2">
               <span className="hidden sm:inline">Custom Colors</span>
               <span className="sm:hidden">Custom</span>
+            </TabsTrigger>
+            <TabsTrigger value="fonts" className="text-xs sm:text-sm px-2 py-2">
+              <span className="hidden sm:inline">Fonts</span>
+              <span className="sm:hidden">Font</span>
             </TabsTrigger>
             <TabsTrigger value="background" className="text-xs sm:text-sm px-2 py-2">
               <span className="hidden sm:inline">Background Image</span>
@@ -550,7 +734,7 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
                     onMouseEnter={() => handlePreview(theme.name)}
                     onMouseLeave={handleClosePreview}
                     className={`
-                      relative p-3 sm:p-4 rounded-lg border-2 transition-all text-left
+                      relative p-3 sm:p-4 rounded-lg border-2 transition-all text-left min-w-0
                       ${isSelected ? 'border-primary shadow-lg scale-[1.02]' : 'border-border hover:border-primary/50 hover:shadow-md'}
                     `}
                   >
@@ -575,11 +759,82 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
                       />
                     </div>
 
-                    <h3 className="font-semibold text-base sm:text-lg mb-1">{theme.name}</h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground">{theme.description}</p>
+                    <h3 className="font-semibold text-base sm:text-lg mb-1 text-boundary">{theme.name}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground text-boundary">{theme.description}</p>
                     
                     {isPreviewing && !isSelected && (
-                      <div className="mt-2 text-xs text-primary font-medium">
+                      <div className="mt-2 text-xs text-primary font-medium text-boundary">
+                        Previewing...
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setActiveTab('custom')}
+                className={`
+                  relative p-3 sm:p-4 rounded-lg border-2 border-dashed transition-all text-left min-w-0
+                  ${selectedTheme === 'custom' ? 'border-primary shadow-lg scale-[1.02]' : 'border-border hover:border-primary/50 hover:bg-muted/40'}
+                `}
+              >
+                {selectedTheme === 'custom' && (
+                  <div className="absolute top-2 right-2 sm:top-3 sm:right-3 bg-primary text-primary-foreground rounded-full p-1">
+                    <Check size={14} weight="bold" className="sm:w-4 sm:h-4" />
+                  </div>
+                )}
+                <h3 className="font-semibold text-base sm:text-lg mb-1 text-boundary">Custom Palette</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground text-boundary">
+                  Mix your own colors from the Custom tab.
+                </p>
+              </button>
+            </div>
+
+            <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                <strong>Tip:</strong> Hover over a theme to preview it, or click to apply it permanently.
+              </p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="fonts" className="mt-4 sm:mt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              {fontPresets.map((fontPreset) => {
+                const isSelected = selectedFont === fontPreset.name;
+                const isPreviewing = previewFont === fontPreset.name;
+                const previewStyle = {
+                  fontFamily: fontPreset.family,
+                  lineHeight: fontPreset.lineHeight,
+                  letterSpacing: fontPreset.letterSpacing,
+                };
+
+                return (
+                  <button
+                    key={fontPreset.name}
+                    onClick={() => handleFontSelect(fontPreset.name)}
+                    onMouseEnter={() => {
+                      setPreviewFont(fontPreset.name);
+                      applyFontPreset(fontPreset);
+                    }}
+                    onMouseLeave={handleClosePreview}
+                    className={`
+                      relative p-3 sm:p-4 rounded-lg border-2 transition-all text-left min-w-0
+                      ${isSelected ? 'border-primary shadow-lg scale-[1.02]' : 'border-border hover:border-primary/50 hover:shadow-md'}
+                    `}
+                  >
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 bg-primary text-primary-foreground rounded-full p-1">
+                        <Check size={14} weight="bold" className="sm:w-4 sm:h-4" />
+                      </div>
+                    )}
+
+                    <h3 className="font-semibold text-base sm:text-lg mb-1 text-boundary">{fontPreset.name}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground text-boundary">{fontPreset.description}</p>
+                    <p className="mt-2 text-sm text-boundary" style={previewStyle}>
+                      {fontPreset.preview}
+                    </p>
+
+                    {isPreviewing && !isSelected && (
+                      <div className="mt-2 text-xs text-primary font-medium text-boundary">
                         Previewing...
                       </div>
                     )}
@@ -587,10 +842,9 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
                 );
               })}
             </div>
-
             <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                <strong>Tip:</strong> Hover over a theme to preview it, or click to apply it permanently.
+              <p className="text-sm text-muted-foreground text-boundary">
+                Font selections are saved and can be combined with any theme preset or custom colors.
               </p>
             </div>
           </TabsContent>
@@ -778,7 +1032,8 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
 
 export function ThemeCustomizationButton() {
   const [open, setOpen] = useState(false);
-  const [selectedTheme] = useLocalStorageState<string>('organizer-theme', 'Warm Terracotta');
+  const [selectedTheme] = useLocalStorageState<string>('organizer-theme', DEFAULT_THEME_NAME);
+  const [selectedFont] = useLocalStorageState<string>('organizer-font-preset', DEFAULT_FONT_NAME);
   const [customColors] = useLocalStorageState<CustomColors | null>('organizer-custom-colors', null);
   const [backgroundImage, _setBackgroundImage] = useLocalStorageState<BackgroundImage | null>('organizer-bg-image', null);
   const { url: _resolvedBackgroundUrl } = useStoredMediaUrl({
@@ -797,6 +1052,7 @@ export function ThemeCustomizationButton() {
       root.style.setProperty('--primary', primaryOklch);
       root.style.setProperty('--accent', accentOklch);
       root.style.setProperty('--background', bgOklch);
+      root.style.setProperty('--radius', DEFAULT_RADIUS);
     } else {
       const theme = themePresets.find((t) => t.name === selectedTheme);
       if (theme) {
@@ -805,9 +1061,18 @@ export function ThemeCustomizationButton() {
           const cssVar = key.replace(/([A-Z])/g, '-$1').toLowerCase();
           root.style.setProperty(`--${cssVar}`, value);
         });
+        root.style.setProperty('--radius', theme.radius ?? DEFAULT_RADIUS);
       }
     }
   }, [selectedTheme, customColors]);
+
+  useEffect(() => {
+    const fontPreset = fontPresets.find((preset) => preset.name === selectedFont) ?? fontPresets[0];
+    const root = document.documentElement;
+    root.style.setProperty('--app-font-family', fontPreset.family);
+    root.style.setProperty('--app-line-height', fontPreset.lineHeight ?? '1.5');
+    root.style.setProperty('--app-letter-spacing', fontPreset.letterSpacing ?? 'normal');
+  }, [selectedFont]);
 
   useEffect(() => {
     if (backgroundImage) {
