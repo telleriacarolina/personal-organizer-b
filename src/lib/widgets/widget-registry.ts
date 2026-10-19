@@ -2,26 +2,56 @@ import { z } from 'zod';
 import type {
   AIChatWidget,
   CalendarWidget,
+  ClientSlot,
   DailyFocusWidget,
   GoalsWidget,
+  Job,
   HabitsWidget,
+  AIInsight,
+  AIInsightAction,
+  EventReminderUpdate,
+  ExtractedTaskDraft,
   NotesWidget,
+  Receipt,
+  ReceiptItem,
   RecordNoteWidget,
+  ShoppingReminder,
+  ShoppingTrip,
   ShoppingWidget,
+  TaskPriorityUpdate,
+  TimeEntry,
   TasksWidget,
   Widget,
+  WorkErrand,
+  WorkMeal,
+  WorkOrganizationPreference,
+  WorkRoutine,
+  ShoppingItem,
   WorkWidget,
 } from '@/types';
 import type { WidgetDefinitions, ValidationIssue } from './widget-definition';
 
+const coerceNumber = z.coerce.number();
+const coerceInt = z.coerce.number().int();
+const coerceBoolean = z.preprocess(
+  (value) => {
+    if (typeof value === 'string') {
+      if (value === 'true') return true;
+      if (value === 'false') return false;
+    }
+    return value;
+  },
+  z.boolean(),
+);
+
 const baseWidgetSchema = z.object({
   id: z.string().min(1),
-  position: z.number().int().nonnegative(),
+  position: z.coerce.number().int().nonnegative(),
   size: z
     .object({
-      width: z.number().positive(),
-      height: z.number().positive(),
-      locked: z.boolean().optional(),
+      width: z.coerce.number().positive(),
+      height: z.coerce.number().positive(),
+      locked: coerceBoolean.optional(),
     })
     .optional(),
 });
@@ -29,11 +59,11 @@ const baseWidgetSchema = z.object({
 const taskSchema = z.object({
   id: z.string().min(1),
   text: z.string().min(1),
-  completed: z.boolean(),
+  completed: coerceBoolean,
   priority: z.enum(['low', 'medium', 'high']).optional(),
   dueDate: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
-  createdAt: z.number().int(),
+  createdAt: coerceInt,
 });
 
 const noteSchema = z.object({
@@ -47,17 +77,17 @@ const noteSchema = z.object({
 const habitSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  completions: z.record(z.string(), z.boolean()),
-  createdAt: z.number().int(),
+  completions: z.record(z.string(), coerceBoolean),
+  createdAt: coerceInt,
 });
 
 const goalSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
   description: z.string(),
-  targetDate: z.number().int().optional(),
-  completed: z.boolean(),
-  createdAt: z.number().int(),
+  targetDate: coerceInt.optional(),
+  completed: coerceBoolean,
+  createdAt: coerceInt,
 });
 
 const calendarEventSchema = z
@@ -66,18 +96,18 @@ const calendarEventSchema = z
     title: z.string().min(1),
     type: z.enum(['appointment', 'event', 'occasion']),
     description: z.string().optional(),
-    date: z.number().int(),
+    date: coerceInt,
     startTime: z.string().optional(),
     endTime: z.string().optional(),
-    allDay: z.boolean().optional(),
+    allDay: coerceBoolean.optional(),
     location: z.string().optional(),
-    reminder: z.number().int().optional(),
-    reminderSent: z.boolean().optional(),
+    reminder: coerceInt.optional(),
+    reminderSent: coerceBoolean.optional(),
     color: z.string().optional(),
     sourceType: z.enum(['work', 'ical']).optional(),
     sourceId: z.string().optional(),
     sourceWidgetId: z.string().optional(),
-    createdAt: z.number().int(),
+    createdAt: coerceInt,
   })
   .superRefine((event, ctx) => {
     const isAllDay = Boolean(event.allDay);
@@ -101,15 +131,15 @@ const shoppingItemSchema = z.object({
   quantity: z.string().optional(),
   category: z.enum(['food', 'clothes', 'personal-items', 'work', 'gifts', 'home-supplies', 'health', 'electronics', 'other']),
   store: z.string().optional(),
-  estimatedPrice: z.number().optional(),
-  actualPrice: z.number().optional(),
-  purchased: z.boolean(),
-  priority: z.enum(['low', 'medium', 'high']),
+  estimatedPrice: coerceNumber.optional(),
+  actualPrice: coerceNumber.optional(),
+  purchased: coerceBoolean,
+  priority: z.enum(['low', 'medium', 'high']).default('medium'),
   notes: z.string().optional(),
   barcode: z.string().optional(),
   receiptId: z.string().optional(),
-  createdAt: z.number().int(),
-  purchasedAt: z.number().int().optional(),
+  createdAt: coerceInt,
+  purchasedAt: coerceInt.optional(),
 });
 
 const recordSchema = z.object({
@@ -118,17 +148,222 @@ const recordSchema = z.object({
   mediaType: z.enum(['voice', 'video', 'photo']),
   mediaId: z.string().min(1).optional(),
   dataUrl: z.string().min(1).optional(),
-  duration: z.number().optional(),
+  duration: coerceNumber.optional(),
   transcription: z.string().optional(),
-  createdAt: z.number().int(),
+  createdAt: coerceInt,
+});
+
+const taskPriorityUpdateSchema: z.ZodType<TaskPriorityUpdate> = z.object({
+  taskId: z.string().min(1),
+  priority: z.enum(['low', 'medium', 'high']),
+});
+
+const extractedTaskDraftSchema: z.ZodType<ExtractedTaskDraft> = z.object({
+  text: z.string().min(1),
+  priority: z.enum(['low', 'medium', 'high']),
+  dueDate: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
+});
+
+const eventReminderUpdateSchema: z.ZodType<EventReminderUpdate> = z.object({
+  eventId: z.string().min(1),
+  reminder: coerceInt,
+});
+
+const workOrganizationPreferenceSchema: z.ZodType<WorkOrganizationPreference> = z.object({
+  type: z.enum(['date', 'week', 'month', 'time-of-day', 'job-based']),
+  startTime: z.string().optional(),
+});
+
+const aiInsightActionSchema: z.ZodType<AIInsightAction> = z.discriminatedUnion('type', [
+  z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    type: z.literal('reprioritize-task'),
+    payload: z.object({ taskUpdates: z.array(taskPriorityUpdateSchema) }).optional(),
+  }),
+  z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    type: z.literal('add-tasks-to-source'),
+    payload: z.object({ tasks: z.array(extractedTaskDraftSchema) }).optional(),
+  }),
+  z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    type: z.literal('set-work-organization'),
+    payload: z.object({ organizationPreference: workOrganizationPreferenceSchema }).optional(),
+  }),
+  z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    type: z.literal('set-event-reminders'),
+    payload: z.object({ reminderUpdates: z.array(eventReminderUpdateSchema) }).optional(),
+  }),
+  z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    type: z.literal('generate-shopping-reminders'),
+    payload: z.object({ generator: z.literal('shopping-reminders') }).optional(),
+  }),
+]);
+
+const aiInsightSchema: z.ZodType<AIInsight> = z.object({
+  id: z.string().min(1),
+  kind: z.enum([
+    'system',
+    'task-focus',
+    'note-summary',
+    'note-task-extraction',
+    'work-organization',
+    'shopping-insight',
+    'calendar-suggestion',
+  ]),
+  title: z.string().min(1),
+  summary: z.string(),
+  rationale: z.string(),
+  confidence: coerceNumber,
+  generatedAt: coerceInt,
+  status: z.enum(['active', 'applied', 'dismissed']),
+  bullets: z.array(z.string()).optional(),
+  actions: z.array(aiInsightActionSchema).optional(),
+});
+
+const receiptItemSchema: z.ZodType<ReceiptItem> = z.object({
+  name: z.string().min(1),
+  quantity: z.string().optional(),
+  price: coerceNumber,
+  category: z.enum(['food', 'clothes', 'personal-items', 'work', 'gifts', 'home-supplies', 'health', 'electronics', 'other']).optional(),
+});
+
+const receiptSchema: z.ZodType<Receipt> = z.object({
+  id: z.string().min(1),
+  storeName: z.string().min(1),
+  date: coerceInt,
+  items: z.array(receiptItemSchema),
+  total: coerceNumber,
+  tax: coerceNumber.optional(),
+  subtotal: coerceNumber.optional(),
+  notes: z.string().optional(),
+  imageMediaId: z.string().optional(),
+  imageData: z.string().optional(),
+  imageRef: z
+    .object({
+      id: z.string().min(1),
+      mimeType: z.string().min(1),
+      byteSize: coerceInt,
+      createdAt: coerceInt,
+    })
+    .optional(),
+  createdAt: coerceInt,
+});
+
+const shoppingTripSchema: z.ZodType<ShoppingTrip> = z.object({
+  id: z.string().min(1),
+  date: coerceInt,
+  storeName: z.string().min(1),
+  total: coerceNumber,
+  itemCount: coerceInt,
+  receiptIds: z.array(z.string().min(1)),
+});
+
+const shoppingReminderSchema: z.ZodType<ShoppingReminder> = z.object({
+  id: z.string().min(1),
+  storeName: z.string().min(1),
+  category: z.enum(['food', 'clothes', 'personal-items', 'work', 'gifts', 'home-supplies', 'health', 'electronics', 'other']),
+  frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly']),
+  nextReminderDate: coerceInt,
+  averageSpend: coerceNumber,
+  commonItems: z.array(z.string()),
+  enabled: coerceBoolean,
+  lastTriggered: coerceInt.optional(),
+  createdAt: coerceInt,
+});
+
+const clientSlotSchema: z.ZodType<ClientSlot> = z.object({
+  id: z.string().min(1),
+  clientName: z.string().min(1),
+  date: coerceInt,
+  startTime: z.string().min(1),
+  endTime: z.string().optional(),
+  service: z.string().optional(),
+  notes: z.string().optional(),
+  status: z.enum(['scheduled', 'completed', 'cancelled']),
+  createdAt: coerceInt,
+});
+
+const workMealSchema: z.ZodType<WorkMeal> = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  date: coerceInt,
+  time: z.string().min(1),
+  items: z.array(z.string()).optional(),
+  notes: z.string().optional(),
+  createdAt: coerceInt,
+});
+
+const timeEntrySchema: z.ZodType<TimeEntry> = z.object({
+  id: z.string().min(1),
+  description: z.string().min(1),
+  startTime: coerceInt,
+  endTime: coerceInt.optional(),
+  duration: coerceNumber.optional(),
+  project: z.string().optional(),
+  createdAt: coerceInt,
+});
+
+const jobSchema: z.ZodType<Job> = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  client: z.string().min(1),
+  description: z.string().optional(),
+  status: z.enum(['pending', 'in-progress', 'completed', 'on-hold']),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']),
+  deadline: coerceInt.optional(),
+  estimatedHours: coerceNumber.optional(),
+  actualHours: coerceNumber.optional(),
+  createdAt: coerceInt,
+});
+
+const workShoppingItemSchema: z.ZodType<ShoppingItem> = z.object({
+  id: z.string().min(1),
+  item: z.string().min(1),
+  quantity: z.string().optional(),
+  category: z.string().optional(),
+  purchased: coerceBoolean,
+  createdAt: coerceInt,
+});
+
+const workErrandSchema: z.ZodType<WorkErrand> = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  location: z.string().optional(),
+  dueDate: coerceInt.optional(),
+  completed: coerceBoolean,
+  priority: z.enum(['low', 'medium', 'high']),
+  createdAt: coerceInt,
+});
+
+const workRoutineSchema: z.ZodType<WorkRoutine> = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  clientSlots: z.array(clientSlotSchema),
+  meals: z.array(workMealSchema),
+  timeEntries: z.array(timeEntrySchema),
+  jobs: z.array(jobSchema),
+  shoppingList: z.array(workShoppingItemSchema),
+  errands: z.array(workErrandSchema),
+  createdAt: coerceInt,
 });
 
 const aiMessageSchema = z.object({
   id: z.string().min(1),
   role: z.enum(['user', 'assistant']),
   text: z.string(),
-  timestamp: z.number().int(),
-  suggestions: z.array(z.any()).optional(),
+  timestamp: coerceInt,
+  suggestions: z.array(aiInsightSchema).optional(),
   targetWidget: z.string().optional(),
 });
 
@@ -142,9 +377,9 @@ const shoppingWidgetSchema: z.ZodType<ShoppingWidget> = baseWidgetSchema.extend(
   type: z.literal('shopping'),
   items: z.array(shoppingItemSchema),
   budget: z.number().optional(),
-  receipts: z.array(z.any()).optional(),
-  trips: z.array(z.any()).optional(),
-  reminders: z.array(z.any()).optional(),
+  receipts: z.array(receiptSchema).optional(),
+  trips: z.array(shoppingTripSchema).optional(),
+  reminders: z.array(shoppingReminderSchema).optional(),
 });
 const aiChatWidgetSchema: z.ZodType<AIChatWidget> = baseWidgetSchema.extend({
   type: z.literal('ai-chat'),
@@ -154,17 +389,17 @@ const aiChatWidgetSchema: z.ZodType<AIChatWidget> = baseWidgetSchema.extend({
 const recordNoteWidgetSchema: z.ZodType<RecordNoteWidget> = baseWidgetSchema.extend({ type: z.literal('record-note'), records: z.array(recordSchema) });
 const workWidgetSchema: z.ZodType<WorkWidget> = baseWidgetSchema.extend({
   type: z.literal('work'),
-  clientSlots: z.array(z.any()),
-  meals: z.array(z.any()),
-  timeEntries: z.array(z.any()),
-  jobs: z.array(z.any()),
-  shoppingList: z.array(z.any()),
-  errands: z.array(z.any()),
-  routines: z.array(z.any()).optional(),
+  clientSlots: z.array(clientSlotSchema),
+  meals: z.array(workMealSchema),
+  timeEntries: z.array(timeEntrySchema),
+  jobs: z.array(jobSchema),
+  shoppingList: z.array(workShoppingItemSchema),
+  errands: z.array(workErrandSchema),
+  routines: z.array(workRoutineSchema).optional(),
   activeRoutineId: z.string().optional(),
   activeTimerEntryId: z.string().nullable().optional(),
   calendarSourceWidgetId: z.string().nullable().optional(),
-  organizationPreference: z.any().optional(),
+  organizationPreference: workOrganizationPreferenceSchema.optional(),
 });
 
 const toIssues = (result: z.SafeParseError<unknown>): ValidationIssue[] =>

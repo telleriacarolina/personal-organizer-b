@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type {
   BackgroundImage,
   FamilyCalendarPlannerEvent,
@@ -5,9 +6,11 @@ import type {
   RecordNote,
   Widget,
   WidgetAIState,
+  WidgetType,
 } from '@/types';
 import type { AIConfig, PersistedSuggestion } from '@/types/ai';
 import type { CustomColors } from '@/types/theme';
+import { widgetDefinitions } from '@/lib/widgets/widget-registry';
 
 export type PersistenceStorage = 'localStorage' | 'indexedDB';
 export type PersistenceOperation = 'read' | 'write' | 'delete' | 'migrate';
@@ -725,14 +728,171 @@ function removeValue(key: string, store = getBrowserStorage()): void {
   store.removeItem(key);
 }
 
-export function createLocalStorageStateRepository<T>(key: string, fallback: T): StateRepository<T> {
+function recoverPersistedValue<T>(value: unknown, schema: z.ZodTypeAny): T | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) {
+    if (value === null && schema instanceof z.ZodNullable) {
+      return null as T;
+    }
+    return recoverPersistedValue(value, schema.unwrap()) as T | undefined;
+  }
+
+  if (schema instanceof z.ZodDefault) {
+    const repaired = recoverPersistedValue(value, schema._def.innerType as z.ZodTypeAny);
+    return repaired ?? (schema._def.defaultValue() as T);
+  }
+
+  if (schema instanceof z.ZodArray) {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+
+    const recovered: unknown[] = [];
+    for (const item of value) {
+      const candidate = recoverPersistedValue(item, schema.element);
+      if (candidate !== undefined) {
+        recovered.push(candidate);
+      }
+    }
+
+    return recovered as T;
+  }
+
+  if (schema instanceof z.ZodObject) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return undefined;
+    }
+
+    const source = value as Record<string, unknown>;
+    const recovered: Record<string, unknown> = {};
+    for (const [key, childSchema] of Object.entries(schema.shape)) {
+      if (!(key in source)) {
+        continue;
+      }
+
+      const candidate = recoverPersistedValue(source[key], childSchema as z.ZodTypeAny);
+      if (candidate === undefined) {
+        continue;
+      }
+      recovered[key] = candidate;
+    }
+
+    const parsed = schema.safeParse(recovered);
+    return parsed.success ? (parsed.data as T) : undefined;
+  }
+
+  if (schema instanceof z.ZodUnion) {
+    for (const option of schema.options) {
+      const candidate = recoverPersistedValue(value, option);
+      if (candidate !== undefined) {
+        return candidate as T;
+      }
+    }
+    return undefined;
+  }
+
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    for (const option of schema.options.values()) {
+      const candidate = recoverPersistedValue(value, option);
+      if (candidate !== undefined) {
+        return candidate as T;
+      }
+    }
+    return undefined;
+  }
+
+  const parsed = schema.safeParse(value);
+  return parsed.success ? (parsed.data as T) : undefined;
+}
+
+function getWidgetId(widget: unknown): string | undefined {
+  if (!widget || typeof widget !== 'object' || !('id' in widget)) {
+    return undefined;
+  }
+
+  const value = (widget as Record<string, unknown>).id;
+  return value === undefined ? undefined : String(value);
+}
+
+function normalizePersistedWidgets(rawWidgets: unknown): Widget[] {
+  if (!Array.isArray(rawWidgets)) {
+    reportPersistenceIssue({
+      storage: 'localStorage',
+      operation: 'read',
+      key: storageKeys.widgets,
+      code: 'corrupted-data',
+      message: 'Persisted widget dashboard was not stored as an array and was reset to an empty list.',
+      cause: rawWidgets,
+    });
+    return [];
+  }
+
+  return rawWidgets.flatMap((widget) => {
+    if (!widget || typeof widget !== 'object' || !('type' in widget) || typeof widget.type !== 'string') {
+      reportPersistenceIssue({
+        storage: 'localStorage',
+        operation: 'read',
+        key: storageKeys.widgets,
+        code: 'corrupted-data',
+        message: 'Skipped a malformed saved widget because it did not include a valid type.',
+        cause: widget,
+      });
+      return [];
+    }
+
+    const widgetType = widget.type as WidgetType;
+    const definition = widgetDefinitions[widgetType];
+    if (!definition) {
+      const widgetId = getWidgetId(widget);
+      reportPersistenceIssue({
+        storage: 'localStorage',
+        operation: 'read',
+        key: storageKeys.widgets,
+        code: 'corrupted-data',
+        message: `Skipped unknown saved widget type "${widgetType}"${widgetId ? ` for widget "${widgetId}"` : ''}.`,
+        cause: widget,
+      });
+      return [];
+    }
+
+    try {
+      const repaired = recoverPersistedValue(widget, definition.schema);
+      const migrated = definition.migrate(repaired ?? widget, { version: 1 });
+      return [migrated];
+    } catch (error) {
+      const issue = error instanceof z.ZodError ? error.issues[0] : undefined;
+      const field = issue && issue.path.length > 0 ? issue.path.join('.') : 'widget';
+      const message = issue ? `${field}: ${issue.message}` : 'malformed widget payload';
+      const widgetId = getWidgetId(widget);
+      const summary = `Skipped malformed saved widget${widgetId ? ` "${widgetId}"` : ''} (${widgetType}) because ${message}.`;
+      console.warn('[persistence] ' + summary, { widgetId, widgetType, field, message, error });
+      reportPersistenceIssue({
+        storage: 'localStorage',
+        operation: 'read',
+        key: storageKeys.widgets,
+        code: 'corrupted-data',
+        message: summary,
+        cause: error,
+      });
+      return [];
+    }
+  });
+}
+
+export function createLocalStorageStateRepository<T>(key: string, fallback: T, normalize?: (value: unknown) => T): StateRepository<T> {
   return {
-    load: () => readJson(key, fallback),
+    load: () => {
+      const value = readJson(key, fallback);
+      return normalize ? normalize(value) : value;
+    },
     save: (value) => writeJson(key, value),
   };
 }
 
-const widgetsStateRepository = createLocalStorageStateRepository<Widget[]>(storageKeys.widgets, []);
+const widgetsStateRepository = createLocalStorageStateRepository<Widget[]>(storageKeys.widgets, [], normalizePersistedWidgets);
 const snapToGridStateRepositoryInternal = createLocalStorageStateRepository<boolean>(storageKeys.snapToGrid, false);
 const globalLockStateRepositoryInternal = createLocalStorageStateRepository<boolean>(storageKeys.globalLock, false);
 const widgetAIStateRepositoryInternal = createLocalStorageStateRepository<Record<string, WidgetAIState>>(storageKeys.widgetAIState, {});

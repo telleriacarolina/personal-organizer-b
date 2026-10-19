@@ -32,11 +32,11 @@ All widget-level domain mutations should flow through the typed command boundary
 
 Command execution validates and normalizes data before persistence updates.
 
-## 3) App orchestration extraction
+## 3) App orchestration
 
-Location: `/home/runner/work/personal-organizer-b/personal-organizer-b/src/hooks/useWidgetDashboardState.ts`
+Location: `/home/runner/work/personal-organizer-b/personal-organizer-b/src/App.tsx`
 
-`App.tsx` now focuses on composition/rendering while orchestration logic lives in a focused hook.
+`App.tsx` orchestrates dashboard widget state and delegates domain-level mutations to command/domain helpers.
 
 ## 4) Domain reducers for complex widgets
 

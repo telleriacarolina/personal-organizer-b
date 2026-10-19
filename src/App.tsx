@@ -303,12 +303,12 @@ function App() {
   }), [agentPermissions, currentWidgets, setWidgets]);
 
   useEffect(() => {
-    mutateWidgets((current) => applyGlobalLockState(current, globalLock));
+    setWidgets((current) => applyGlobalLockState(current || [], globalLock));
     if (pendingGlobalLockToastRef.current) {
       toast.success(pendingGlobalLockToastRef.current);
       pendingGlobalLockToastRef.current = null;
     }
-  }, [globalLock, mutateWidgets]);
+  }, [globalLock, setWidgets]);
 
   useEffect(() => {
     if (pendingSnapToGridToastRef.current) {

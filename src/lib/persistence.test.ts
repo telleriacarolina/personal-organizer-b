@@ -5,7 +5,9 @@ import {
   aiInsightRepository,
   aiSuggestionRepository,
   preferencesRepository,
+  stateRepositories,
   storageKeys,
+  subscribeToPersistenceIssues,
   widgetRepository,
 } from './persistence';
 
@@ -52,6 +54,116 @@ describe('widgetRepository', () => {
 
     widgetRepository.remove('tasks-1');
     expect(widgetRepository.list().map((widget) => widget.id)).toEqual(['notes-1']);
+  });
+
+  it('preserves valid sibling widgets when malformed saved widgets are filtered out', () => {
+    const validWidget: Widget = {
+      id: 'tasks-1',
+      type: 'tasks',
+      position: 0,
+      tasks: [{ id: 'task-1', text: 'Valid task', completed: false, createdAt: Date.now() }],
+    };
+    const malformedWidget = {
+      id: 'unknown-1',
+      type: 'unknown-widget',
+      position: 1,
+      payload: 'not-a-widget',
+    } as unknown as Widget;
+
+    localStorageMock.setItem(storageKeys.widgets, JSON.stringify([validWidget, malformedWidget]));
+    const loaded = stateRepositories.widgets.load();
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toMatchObject({ id: 'tasks-1', type: 'tasks' });
+  });
+
+  it('retains valid nested work data while skipping malformed entries', () => {
+    const validJob = {
+      id: 'job-1',
+      title: 'Design sprint',
+      client: 'Client A',
+      status: 'pending',
+      priority: 'high',
+      createdAt: Date.now(),
+    };
+    const validErrand = {
+      id: 'errand-1',
+      title: 'Pickup supplies',
+      completed: false,
+      priority: 'medium',
+      createdAt: Date.now(),
+    };
+    const malformedWidget = {
+      id: 'work-1',
+      type: 'work',
+      position: 2,
+      clientSlots: [],
+      meals: [],
+      timeEntries: [],
+      jobs: [validJob],
+      shoppingList: [],
+      errands: [
+        { ...validErrand, priority: 'invalid' },
+        validErrand,
+      ],
+      routines: [],
+    } as unknown as Widget;
+
+    localStorageMock.setItem(storageKeys.widgets, JSON.stringify([malformedWidget]));
+    const loaded = stateRepositories.widgets.load();
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toMatchObject({ id: 'work-1', type: 'work' });
+    expect((loaded[0] as Extract<Widget, { type: 'work' }>).jobs).toHaveLength(1);
+    expect((loaded[0] as Extract<Widget, { type: 'work' }>).errands).toHaveLength(1);
+    expect((loaded[0] as Extract<Widget, { type: 'work' }>).errands[0]).toMatchObject({ id: 'errand-1', priority: 'medium' });
+  });
+
+  it('notifies persistence listeners when malformed widgets are skipped', () => {
+    const issues: Array<{ code: string; message: string }> = [];
+    const unsubscribe = subscribeToPersistenceIssues((issue) => {
+      issues.push({ code: issue.code, message: issue.message });
+    });
+
+    const validWidget: Widget = {
+      id: 'tasks-1',
+      type: 'tasks',
+      position: 0,
+      tasks: [{ id: 'task-1', text: 'Valid task', completed: false, createdAt: Date.now() }],
+    };
+    const malformedWidget = {
+      id: 'calendar-1',
+      type: 'calendar',
+      position: 1,
+      events: 'not-an-array',
+    } as unknown as Widget;
+
+    localStorageMock.setItem(storageKeys.widgets, JSON.stringify([validWidget, malformedWidget]));
+    const loaded = stateRepositories.widgets.load();
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toMatchObject({ id: 'tasks-1', type: 'tasks' });
+    expect(issues.some((issue) => issue.code === 'corrupted-data' && issue.message.includes('calendar'))).toBe(true);
+
+    unsubscribe();
+  });
+
+  it('loads legacy persisted widgets with stringified boolean values', () => {
+    const legacyWidget: Widget = {
+      id: 'tasks-legacy',
+      type: 'tasks',
+      position: 0,
+      size: { width: 350, height: 400, locked: 'false' as unknown as boolean },
+      tasks: [{ id: 'task-1', text: 'Legacy task', completed: 'false' as unknown as boolean, createdAt: Date.now() }],
+    };
+
+    localStorageMock.setItem(storageKeys.widgets, JSON.stringify([legacyWidget]));
+    const loaded = stateRepositories.widgets.load();
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toMatchObject({ id: 'tasks-legacy', type: 'tasks' });
+    expect((loaded[0] as Extract<Widget, { type: 'tasks' }>).size?.locked).toBe(false);
+    expect((loaded[0] as Extract<Widget, { type: 'tasks' }>).tasks[0]?.completed).toBe(false);
   });
 });
 
