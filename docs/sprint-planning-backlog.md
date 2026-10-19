@@ -21,15 +21,15 @@ Legend:
 - **Effort**: estimated engineering effort for one team.
 - **Priority**: risk ranking for the product, not a promise that all P1 work happens before all P0 work.
 
-### Scope discipline for the next two-week sprint
+### Scope discipline for the next delivery cycle
 
-This document is a planning artifact and should be treated as a delivery proposal, not evidence that every backlog item is already implemented. The committed, must-ship scope for the next sprint is intentionally narrower than the full backlog:
+This document is a planning artifact and should be treated as a delivery proposal, not evidence that every backlog item is already implemented. The committed, must-ship scope for the next milestone sequence is intentionally narrower than the full backlog:
 
-- Must-ship for this sprint: **#1, #2, #4, #3, #5**
+- Must-ship for the initial delivery plan: **#1, #2, #4, #3, #5**
 - Planned follow-up/deferred: **#6, #7**
-- Release gate required in sprint: **#8**, but as a lightweight execution gate rather than a broad operational hardening effort
+- Release gate required before release: **#8**, but as a lightweight execution gate rather than a broad operational hardening effort
 
-This keeps the sprint realistic while still preserving the product’s reliability and trust goals. Priority and implementation order are intentionally distinct: a P1 item may be deferred during the sprint if it would increase execution risk or distract from core data safety and workflow reliability.
+This keeps delivery realistic while preserving the product’s reliability and trust goals. Priority and implementation order are intentionally distinct: a P1 item may be deferred during a milestone if it would increase execution risk or distract from core data safety and workflow reliability.
 
 | Priority | Issue | Impact | Effort | Why now |
 |---|---|---|---|---|
@@ -39,8 +39,8 @@ This keeps the sprint realistic while still preserving the product’s reliabili
 | P0 | #4 Stabilize cross-widget references (Tasks ↔ Focus, Work → Calendar) | High | Medium | Preserves core value prop of connected workflows. |
 | P1 | #5 Enforce AI review-before-write guardrails and action previews | High | Medium | Builds trust and limits unintended mutations. |
 | P1 | #6 Improve shopping/media resilience and missing-blob recovery | Medium-High | Medium | Reduces failures in complex stateful flows; scheduled after core reliability work. |
-| P1 | #7 Accessibility and keyboard interaction pass on core flows | Medium-High | Medium | Important for usability, but not the highest-risk blocker for this sprint. |
-| P1 | #8 Release quality gate (lint/test/build + smoke checklist) | Medium | Low-Medium | Provides a repeatable release gate and evidence trail for the sprint. |
+| P1 | #7 Accessibility and keyboard interaction pass on core flows | Medium-High | Medium | Important for usability, but not the highest-risk blocker for the initial milestone sequence. |
+| P1 | #8 Release quality gate (lint/test/build + smoke checklist) | Medium | Low-Medium | Provides a repeatable release gate and evidence trail for the delivery plan. |
 
 ### Issue #1 — Harden local data recovery and corruption handling
 **Description**  
@@ -147,49 +147,91 @@ Define a lightweight release gate with automated checks and a manual smoke test 
 - **AI trust boundaries next** (#5) so assistance remains safe and auditable once core state is stable.
 - **Operational quality and polish last** (#6, #8, #7) to improve resilience, release confidence, and usability without destabilizing foundations.
 
-This ordering reflects the sprint plan and the risk model, but the backlog still keeps #6 and #7 as valid follow-up work. The difference is that this sprint is intentionally capped to the highest-risk and highest-value work items.
+This ordering reflects the delivery sequence and the risk model, but the backlog still keeps #6 and #7 as valid follow-up work. The difference is that this milestone plan is intentionally capped to the highest-risk and highest-value work items.
 
 ---
 
-## Two-week sprint plan (10 working days)
+## Milestone-based delivery plan
 
-### Sprint goal
-Ship a reliability-focused increment that makes the Personal Organizer safe to trust daily: robust data recovery, migration safety, validated core workflows, and hardened AI write boundaries.
+### Delivery objective
+Ship a reliability-focused increment that makes Personal Organizer safe to trust daily: robust data recovery, migration safety, validated core workflows, and hardened AI write boundaries.
 
-This sprint intends to deliver the must-ship scope only. Items outside the commitment (#6 and #7) are tracked as deferred scope and brought forward only if the prime work is completed early and verified.
+This delivery plan intends to complete the must-ship scope only. Items outside the commitment (#6 and #7) are tracked as deferred scope and brought forward only if the core milestones are completed and verified.
 
-### Phase 1 (Days 1–2): Alignment + test scaffolding
+### Milestone 1 — Data integrity
+**Goal**  
+Stabilize persisted state, recover from malformed records, and protect upgrade safety.
+
+**Exit criteria**
+- Issue #1 is implemented and verified against malformed, partial, and legacy state.
+- Issue #2 is implemented with migration fixtures and regression tests in CI.
+- Recovery flows preserve valid sibling data and document the path for unrecoverable records.
+- Verification evidence is recorded for startup, reload, and migration edge cases.
+
 **Deliverables**
-- Finalized scope for Issues #1, #2, #4, #3, and #5.
-- Baseline test fixture strategy for legacy/malformed state snapshots.
+- Recovery implementation for malformed, partial, and legacy persisted state for Issue #1.
+- Migration fixture strategy and test coverage for legacy state snapshots in Issue #2.
 - Definition of done and risk register for data-loss scenarios.
-- Issue creation or linking for each backlog item, with completed/deferred/blocked status tracked separately.
+- Issue tracking status for completed/deferred/blocked items as the milestone proceeds.
 
-### Phase 2 (Days 3–5): Data layer hardening
-**Deliverables**
-- Issue #1 implemented: corruption handling + graceful recovery paths.
-- Issue #2 implemented: migration tests and snapshot fixtures in CI.
-- Initial verification report for load/migrate edge cases.
+### Milestone 2 — Core workflow reliability
+**Goal**  
+Confirm that the app’s daily value paths are stable across edits, reloads, and cross-widget interactions.
 
-### Phase 3 (Days 6–8): Core workflow and integration stabilization
+**Exit criteria**
+- Issue #4 is implemented and verified for Tasks ↔ Focus and Work → Calendar reference stability.
+- Issue #3 is complete for the highest-traffic task/note/habit flows.
+- Reload, delete, re-import, and state rehydration tests pass without silent data loss.
+- Verification evidence is recorded for the most common user journeys.
+
 **Deliverables**
-- Issue #4 implemented: reference-safe behavior for Tasks ↔ Focus and Work → Calendar.
-- Issue #3 implemented for highest-traffic flows in tasks/notes/habits.
+- Reference-safe behavior for Tasks ↔ Focus and Work → Calendar.
+- Workflow validation tests for CRUD and reload correctness.
 - Regression tests for deletion/reload/re-import edge cases.
 
-### Phase 4 (Days 9–10): AI trust boundaries + sprint closeout
-**Deliverables**
-- Issue #5 implemented: explicit review-before-write enforcement and action previews.
-- Targeted QA pass across top user journeys.
-- Sprint review artifact: completed vs deferred backlog and next-sprint carryover proposal.
-- Release gate run: lint + tests + build + required smoke checklist recorded in the sprint tracking location.
+### Milestone 3 — AI trust boundaries
+**Goal**  
+Reduce unintended mutation risk and ensure every AI write is reviewable and reversible.
 
-### Planned sprint outcomes
-- App startup is resilient to malformed local data.
-- Migration behavior is test-backed and regression-resistant.
-- Core workflows and cross-widget links are reliable after reload and edit/delete operations.
-- AI-assisted mutations are explicit, reviewable, and safer by default.
-- Release readiness is based on objective evidence rather than a checklist being present only in planning.
+**Exit criteria**
+- Issue #5 is implemented with explicit review-before-write enforcement and action previews.
+- Denied, cancelled, malformed, and ambiguous proposals make no persisted changes.
+- Approval applies only to the reviewed proposal and requires re-approval for subsequent edits.
+- Negative-path tests cover allowed, blocked, denied, cancelled, malformed, and ambiguous action scenarios.
+
+**Deliverables**
+- Explicit review/approval UX for AI mutations.
+- Scoped previews showing the target widget/item and before/after intent.
+- Targeted QA pass across AI approval and denial flows.
+
+### Milestone 4 — Release readiness
+**Goal**  
+Provide objective evidence that the release is safe to ship and that defects are tracked and closed before release.
+
+**Exit criteria**
+- CI checks pass for lint, tests, and production build.
+- Release-gate smoke checklist is executed and recorded for data recovery, core workflows, cross-widget links, and AI review flow.
+- Any release-blocking issue is resolved or explicitly deferred with documented risk and owner.
+- Verification evidence is attached to the PR, issue, or delivery tracker before release approval.
+
+**Deliverables**
+- Release quality gate definitions and required smoke checks.
+- Recorded verification results for critical flows.
+- Closed-loop defect management for release blockers and deferred work.
+
+### Follow-up milestone — Resilience and accessibility
+**Goal**  
+Harden the remaining resilience and usability work after the core reliability milestones are in place.
+
+**Exit criteria**
+- Issues #6 and #7 are planned or executed according to risk, dependency, and team readiness.
+- Remaining work is tracked as ready, in progress, blocked, verified, or deferred.
+- No release-critical defects remain from the core milestone set.
+
+**Deliverables**
+- Shopping/media resilience and missing-blob recovery work as needed.
+- Keyboard/accessibility pass for core flows when dependencies permit.
+- Reassessment of scope as implementation complexity becomes clearer.
 
 ---
 
@@ -197,17 +239,17 @@ This sprint intends to deliver the must-ship scope only. Items outside the commi
 
 This document is a planning artifact, not proof that all items are implemented. As GitHub issues are created for each backlog item, they should be tracked separately for:
 
-- **Completed**: implemented and verified during the sprint.
-- **Deferred**: intentionally moved to a later sprint due to scope limits.
+- **Completed**: implemented and verified during the milestone sequence.
+- **Deferred**: intentionally moved to a later milestone due to scope limits or dependency timing.
 - **Blocked**: not yet actionable because of dependency or required design/UX decisions.
 
-The two-week sprint should only claim the must-ship deliverables above; the remainder of the backlog remains actionable follow-up work and should not be treated as already accepted into the sprint commitment.
+The delivery plan should only claim the must-ship milestones above; the remainder of the backlog remains actionable follow-up work and should not be treated as already accepted into the commitment.
 
 ---
 
-## Release gate: measurable quality bar for the sprint
+## Release gate: measurable quality bar
 
-The sprint closes only when the following are complete:
+The release is considered ready only when the following are complete:
 
 - CI must pass for lint, test, and production build.
 - Required smoke checks must be executed and recorded for the following flows:
@@ -217,7 +259,7 @@ The sprint closes only when the following are complete:
   - Tasks ↔ Focus and Work → Calendar reference flow
   - AI proposal preview, approval, and denial flow
 - When a smoke check fails, the issue is marked as blocked and the release is not considered ready.
-- Results are recorded in the PR, GitHub issue, or sprint tracker at the time the release is evaluated.
+- Results are recorded in the PR, GitHub issue, or delivery tracker at the time the release is evaluated.
 
 This makes the release gate clear and auditable instead of relying on a vague checklist artifact.
 
@@ -225,4 +267,4 @@ This makes the release gate clear and auditable instead of relying on a vague ch
 
 ## Suggested PR summary text for this planning artifact
 
-"Add a sprint planning artifact for Personal Organizer that documents the current product foundation, a prioritized GitHub-style backlog (with issue descriptions and acceptance criteria), impact/effort-based sequencing, a narrowed two-week sprint commitment, and a measurable release gate focused on reliability, core workflow validation, and AI trust boundaries."
+"Add a milestone-based planning artifact for Personal Organizer that documents the current product foundation, a prioritized GitHub-style backlog (with issue descriptions and acceptance criteria), impact/effort-based sequencing, a dependency-driven delivery plan, and a measurable release gate focused on reliability, core workflow validation, and AI trust boundaries."
