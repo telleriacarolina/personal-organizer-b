@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen, Trash } from '@phosphor-icons/react';
@@ -118,9 +118,9 @@ function App() {
     toast.success('Widget removed');
   };
 
-  const mutateWidgets = (updater: (current: Widget[]) => Widget[]) => {
+  const mutateWidgets = useCallback((updater: (current: Widget[]) => Widget[]) => {
     setWidgets((current) => updater(current || []));
-  };
+  }, [setWidgets]);
 
   const mutateTypedWidget = <TWidgetType extends Widget['type']>(
     widgetId: string,
