@@ -166,7 +166,7 @@ const themePresets: ThemePreset[] = [
     },
   },
   {
-    name: 'Midnight Dark',
+    name: 'Midnight',
     description: 'Dark and sophisticated',
     colors: {
       background: 'oklch(0.18 0.02 240)',
@@ -250,28 +250,6 @@ const themePresets: ThemePreset[] = [
       border: 'oklch(0.44 0.03 108)',
       success: 'oklch(0.68 0.09 145)',
       successForeground: 'oklch(0.18 0.02 105)',
-    },
-  },
-  {
-    name: 'Retro Pop',
-    description: 'Vibrant neon accents with playful energy',
-    radius: '0.9rem',
-    colors: {
-      background: 'oklch(0.95 0.02 280)',
-      foreground: 'oklch(0.24 0.04 280)',
-      card: 'oklch(0.89 0.05 275)',
-      cardForeground: 'oklch(0.24 0.04 280)',
-      primary: 'oklch(0.67 0.23 334)',
-      primaryForeground: 'oklch(0.99 0 0)',
-      secondary: 'oklch(0.88 0.04 250)',
-      secondaryForeground: 'oklch(0.20 0.03 255)',
-      muted: 'oklch(0.92 0.03 270)',
-      mutedForeground: 'oklch(0.48 0.03 275)',
-      accent: 'oklch(0.73 0.22 240)',
-      accentForeground: 'oklch(0.98 0 0)',
-      border: 'oklch(0.82 0.05 270)',
-      success: 'oklch(0.73 0.12 152)',
-      successForeground: 'oklch(0.18 0.03 255)',
     },
   },
   {
@@ -429,21 +407,6 @@ const fontPresets: FontPreset[] = [
     lineHeight: '1.55',
     preview: 'Adds a playful personal touch.',
   },
-  {
-    name: 'Classic',
-    description: 'Traditional serif with steady rhythm',
-    family: '"Merriweather", "Times New Roman", "Nimbus Roman", serif',
-    lineHeight: '1.6',
-    preview: 'Timeless structure for focused reading.',
-  },
-  {
-    name: 'Accessibility Focus',
-    description: 'High legibility with comfortable spacing',
-    family: '"Atkinson Hyperlegible", "Verdana", "Tahoma", "Segoe UI", sans-serif',
-    lineHeight: '1.7',
-    letterSpacing: '0.01em',
-    preview: 'Prioritizes clarity across long sessions.',
-  },
 ];
 
 function normalizeHexColor(color: string): string | null {
@@ -508,6 +471,22 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
   const [localBg, setLocalBg] = useState('#f2ede5');
   const [opacity, setOpacity] = useState(backgroundImage?.opacity || 30);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (selectedTheme === 'Midnight Dark') {
+      setSelectedTheme('Midnight');
+      return;
+    }
+    if (selectedTheme !== 'custom' && !themePresets.some((theme) => theme.name === selectedTheme)) {
+      setSelectedTheme(DEFAULT_THEME_NAME);
+    }
+  }, [selectedTheme, setSelectedTheme]);
+
+  useEffect(() => {
+    if (!fontPresets.some((preset) => preset.name === selectedFont)) {
+      setSelectedFont(DEFAULT_FONT_NAME);
+    }
+  }, [selectedFont, setSelectedFont]);
 
   useEffect(() => {
     if (customColors) {
