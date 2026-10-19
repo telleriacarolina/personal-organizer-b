@@ -71,13 +71,31 @@ describe('widgetDefinitions', () => {
           role: 'assistant',
           text: 'Suggestion',
           timestamp: Date.now(),
-          suggestions: [{ id: 'insight-1', kind: 'task-focus', title: 'Plan', confidence: 0.75 }],
+          suggestions: [{
+            id: 'insight-1',
+            kind: 'task-focus',
+            title: 'Plan',
+            summary: 'Summary',
+            rationale: 'Rationale',
+            confidence: 0.75,
+            generatedAt: Date.now(),
+            status: 'active',
+            actions: [{
+              id: 'action-1',
+              label: 'Reprioritize',
+              type: 'reprioritize-task',
+              payload: {
+                taskUpdates: [{ taskId: 'task-1', priority: 'urgent' }],
+              },
+            }],
+          }],
         },
       ],
     };
 
     const issues = widgetDefinitions['ai-chat'].validate(invalid as never);
     expect(issues.length).toBeGreaterThan(0);
+    expect(issues.some((issue) => issue.field === 'messages.0.suggestions.0.actions.0.payload.taskUpdates.0.priority')).toBe(true);
   });
 });
 

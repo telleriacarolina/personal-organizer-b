@@ -157,26 +157,43 @@ const eventReminderUpdateSchema: z.ZodType<EventReminderUpdate> = z.object({
   reminder: z.number().int(),
 });
 
-const aiInsightActionPayloadSchema = z.union([
-  z.object({ taskUpdates: z.array(taskPriorityUpdateSchema) }),
-  z.object({ tasks: z.array(extractedTaskDraftSchema) }),
-  z.object({ organizationPreference: z.object({ type: z.enum(['date', 'week', 'month', 'time-of-day', 'job-based']), startTime: z.string().optional() }) }),
-  z.object({ reminderUpdates: z.array(eventReminderUpdateSchema) }),
-  z.object({ generator: z.literal('shopping-reminders') }),
-]);
-
-const aiInsightActionSchema: z.ZodType<AIInsightAction> = z.object({
-  id: z.string().min(1),
-  label: z.string().min(1),
-  type: z.enum([
-    'reprioritize-task',
-    'add-tasks-to-source',
-    'set-work-organization',
-    'set-event-reminders',
-    'generate-shopping-reminders',
-  ]),
-  payload: aiInsightActionPayloadSchema.optional(),
+const workOrganizationPreferenceSchema: z.ZodType<WorkOrganizationPreference> = z.object({
+  type: z.enum(['date', 'week', 'month', 'time-of-day', 'job-based']),
+  startTime: z.string().optional(),
 });
+
+const aiInsightActionSchema: z.ZodType<AIInsightAction> = z.discriminatedUnion('type', [
+  z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    type: z.literal('reprioritize-task'),
+    payload: z.object({ taskUpdates: z.array(taskPriorityUpdateSchema) }).optional(),
+  }),
+  z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    type: z.literal('add-tasks-to-source'),
+    payload: z.object({ tasks: z.array(extractedTaskDraftSchema) }).optional(),
+  }),
+  z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    type: z.literal('set-work-organization'),
+    payload: z.object({ organizationPreference: workOrganizationPreferenceSchema }).optional(),
+  }),
+  z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    type: z.literal('set-event-reminders'),
+    payload: z.object({ reminderUpdates: z.array(eventReminderUpdateSchema) }).optional(),
+  }),
+  z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    type: z.literal('generate-shopping-reminders'),
+    payload: z.object({ generator: z.literal('shopping-reminders') }).optional(),
+  }),
+]);
 
 const aiInsightSchema: z.ZodType<AIInsight> = z.object({
   id: z.string().min(1),
@@ -326,11 +343,6 @@ const workRoutineSchema: z.ZodType<WorkRoutine> = z.object({
   shoppingList: z.array(workShoppingItemSchema),
   errands: z.array(workErrandSchema),
   createdAt: z.number().int(),
-});
-
-const workOrganizationPreferenceSchema: z.ZodType<WorkOrganizationPreference> = z.object({
-  type: z.enum(['date', 'week', 'month', 'time-of-day', 'job-based']),
-  startTime: z.string().optional(),
 });
 
 const aiMessageSchema = z.object({
