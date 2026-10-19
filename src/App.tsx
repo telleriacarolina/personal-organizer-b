@@ -4,7 +4,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, ArrowsOutCardinal, GridFour, Lock, LockOpen, Trash } from '@phosphor-icons/react';
 import { Toaster, toast } from 'sonner';
 import { AddWidgetDialog } from '@/components/AddWidgetDialog';
-import { ThemeCustomizationButton } from '@/components/ThemeCustomization';
+import { DEFAULT_THEME_NAME, ThemeCustomizationButton } from '@/components/ThemeCustomization';
 import { AIConfigButton } from '@/components/ai/AIConfigButton';
 import { OrganizerAgentButton } from '@/components/ai/OrganizerAgentButton';
 import { AIChatWidget } from '@/components/widgets/AIChatWidget';
@@ -217,7 +217,7 @@ function App() {
       setSnapToGrid(false);
       setGlobalLock(false);
       setWidgetAIState({});
-      stateRepositories.theme.save('Warm Terracotta');
+      stateRepositories.theme.save(DEFAULT_THEME_NAME);
       stateRepositories.customColors.save(null);
       stateRepositories.backgroundImage.save(null);
       localStorage.removeItem('organizer-font-preset');

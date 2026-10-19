@@ -55,7 +55,7 @@ interface FontPreset {
   preview: string;
 }
 
-const DEFAULT_THEME_NAME = 'Warm Terracotta';
+export const DEFAULT_THEME_NAME = 'Warm Terracotta';
 const DEFAULT_FONT_NAME = 'Modern';
 const DEFAULT_RADIUS = '0.75rem';
 
@@ -409,6 +409,13 @@ const fontPresets: FontPreset[] = [
   },
 ];
 
+function applyFontPreset(fontPreset: FontPreset) {
+  const root = document.documentElement;
+  root.style.setProperty('--app-font-family', fontPreset.family);
+  root.style.setProperty('--app-line-height', fontPreset.lineHeight ?? '1.5');
+  root.style.setProperty('--app-letter-spacing', fontPreset.letterSpacing ?? 'normal');
+}
+
 function normalizeHexColor(color: string): string | null {
   if (!/^#([\da-f]{3}|[\da-f]{6})$/i.test(color)) {
     return null;
@@ -515,13 +522,6 @@ export function ThemeCustomization({ open, onOpenChange }: ThemeCustomizationPro
     root.style.setProperty('--accent', accentOklch);
     root.style.setProperty('--background', bgOklch);
     root.style.setProperty('--radius', DEFAULT_RADIUS);
-  };
-
-  const applyFontPreset = (fontPreset: FontPreset) => {
-    const root = document.documentElement;
-    root.style.setProperty('--app-font-family', fontPreset.family);
-    root.style.setProperty('--app-line-height', fontPreset.lineHeight ?? '1.5');
-    root.style.setProperty('--app-letter-spacing', fontPreset.letterSpacing ?? 'normal');
   };
 
   const applyBackgroundImage = (image: BackgroundImage | null) => {
@@ -1047,10 +1047,7 @@ export function ThemeCustomizationButton() {
 
   useEffect(() => {
     const fontPreset = fontPresets.find((preset) => preset.name === selectedFont) ?? fontPresets[0];
-    const root = document.documentElement;
-    root.style.setProperty('--app-font-family', fontPreset.family);
-    root.style.setProperty('--app-line-height', fontPreset.lineHeight ?? '1.5');
-    root.style.setProperty('--app-letter-spacing', fontPreset.letterSpacing ?? 'normal');
+    applyFontPreset(fontPreset);
   }, [selectedFont]);
 
   useEffect(() => {
